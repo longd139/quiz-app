@@ -1,0 +1,21 @@
+@import "tailwindcss";
+
+/* PWA safe area */
+.pb-safe { padding-bottom: env(safe-area-inset-bottom, 0); }
+
+/* Fade animation */
+@keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+.page-enter { animation: fadeIn 0.25s ease; }
+
+/* Sync pulse */
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+.sync-pulse { animation: pulse 1s infinite; }
+
+/* Checkbox accent */
+input[type=checkbox] { accent-color: #2563eb; }
+
+/* Overlay */
+.overlay { position: fixed; inset: 0; z-index: 100; }
+
+/* Option hover */
+.opt-btn:hover:not(.opt-selected) { border-color: #93c5fd; }

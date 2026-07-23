@@ -1,0 +1,285 @@
+import { useState, useCallback, useMemo } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { useQuiz } from '../App';
+import { createQuestion, createTest, createCollection, uid, escHtml, escAttr, getFilteredTests } from '../data/storage';
+import { parseBulkPaste } from '../data/parser';
+
+export default function Editor() {
+  const { data, update, showConfirm } = useQuiz();
+  const navigate = useNavigate();
+  const { testId } = useParams();
+
+  // Find existing test if editing
+  const existingTest = useMemo(() => testId ? data.tests.find(t => t.id === testId) : null, [testId, data.tests]);
+
+  const [testName, setTestName] = useState(existingTest?.name || '');
+  const [collectionId, setCollectionId] = useState(existingTest?.collectionId || '');
+  const [questions, setQuestions] = useState(() => existingTest?.questions?.map(q => ({ ...q })) || []);
+  const [bulkText, setBulkText] = useState('');
+  const [parseFeedback, setParseFeedback] = useState('');
+  const [showNewCollection, setShowNewCollection] = useState(false);
+  const [newCollectionName, setNewCollectionName] = useState('');
+
+  // Question picker from other tests
+  const [showQuestionPicker, setShowQuestionPicker] = useState(false);
+  const [pickerTestId, setPickerTestId] = useState(null);
+  const [pickerSelections, setPickerSelections] = useState({});
+  const [previewQuestion, setPreviewQuestion] = useState(null);
+
+  // Get other tests in same collection
+  const otherTests = useMemo(() => {
+    return getFilteredTests(data, collectionId).filter(t => t.id !== testId);
+  }, [data, collectionId, testId]);
+
+  const pickerTest = useMemo(() => {
+    return pickerTestId ? data.tests.find(t => t.id === pickerTestId) : null;
+  }, [data, pickerTestId]);
+
+  const handleParse = () => {
+    const result = parseBulkPaste(bulkText);
+    if (result.questions.length === 0) {
+      setParseFeedback(`<div class="text-sm py-2 px-3 rounded-lg bg-danger-50 text-danger-700 border border-danger-100">${result.warnings.join('<br>')}</div>`);
+      return;
+    }
+    let msg = `<div class="text-sm py-2 px-3 rounded-lg bg-success-50 text-success-700 border border-success-100">&check; Đã phân tích được <strong>${result.questions.length}</strong> câu hỏi.</div>`;
+    if (result.warnings.length > 0) msg += `<div class="text-sm py-2 px-3 rounded-lg bg-warning-50 text-warning-700 border border-warning-100 mt-2">${result.warnings.join('<br>')}</div>`;
+    setParseFeedback(msg);
+
+    if (questions.length > 0) {
+      if (confirm(`Đã có ${questions.length} câu hỏi. Bạn muốn THÊM vào danh sách hiện tại (OK) hay THAY THẾ (Cancel)?`)) {
+        setQuestions([...questions, ...result.questions]);
+      } else {
+        setQuestions(result.questions);
+      }
+    } else {
+      setQuestions(result.questions);
+    }
+    setBulkText('');
+  };
+
+  const handleAddManual = () => {
+    setQuestions([...questions, createQuestion()]);
+  };
+
+  const handleCreateCollection = () => {
+    const name = newCollectionName.trim();
+    if (!name) { alert('Vui lòng nhập tên collection.'); return; }
+    const newColl = createCollection(name);
+    const d = { ...data, collections: [...data.collections, newColl] };
+    update(d);
+    setCollectionId(newColl.id);
+    setShowNewCollection(false);
+    setNewCollectionName('');
+  };
+
+  const handleCollectionChange = (e) => {
+    const val = e.target.value;
+    if (val === '__new__') { setShowNewCollection(true); return; }
+    setShowNewCollection(false);
+    setCollectionId(val);
+  };
+
+  const handleSave = () => {
+    if (!testName.trim()) { alert('Vui lòng nhập tên bài kiểm tra.'); return; }
+    if (!collectionId) { alert('Vui lòng chọn collection trước khi lưu.'); return; }
+    if (questions.length === 0) { alert('Vui lòng thêm ít nhất 1 câu hỏi.'); return; }
+
+    for (let i = 0; i < questions.length; i++) {
+      const q = questions[i];
+      if (!q.prompt.trim()) { alert(`Câu ${i + 1} chưa có nội dung.`); return; }
+      if (q.correctIndices.length === 0) { alert(`Câu ${i + 1} chưa được chọn đáp án đúng.`); return; }
+      for (let j = 0; j < q.options.length; j++) {
+        if (!q.options[j].text.trim()) { alert(`Câu ${i + 1}, đáp án ${q.options[j].label} chưa có nội dung.`); return; }
+      }
+    }
+
+    const now = new Date().toISOString();
+    let d;
+    if (existingTest) {
+      const idx = data.tests.findIndex(t => t.id === testId);
+      d = { ...data, tests: [...data.tests] };
+      d.tests[idx] = { ...d.tests[idx], name: testName, collectionId, questions: questions.map(q => ({ ...q })), updatedAt: now };
+    } else {
+      const test = createTest(testName, collectionId);
+      test.questions = questions.map(q => ({ ...q }));
+      test.updatedAt = now;
+      d = { ...data, tests: [...data.tests, test] };
+    }
+    update(d);
+    navigate('/');
+  };
+
+  const handleAddFromPicker = () => {
+    const selectedIds = Object.entries(pickerSelections).filter(([, v]) => v).map(([id]) => id);
+    if (selectedIds.length === 0) { alert('Vui lòng chọn ít nhất 1 câu hỏi.'); return; }
+    if (!pickerTest) return;
+    const selectedQuestions = pickerTest.questions.filter(q => selectedIds.includes(q.id));
+    setQuestions([...questions, ...selectedQuestions.map(q => ({ ...q, id: uid() }))]);
+    setShowQuestionPicker(false);
+    setPickerTestId(null);
+    setPickerSelections({});
+  };
+
+  return (
+    <div>
+      {/* Collection */}
+      <div className="mb-5">
+        <label className="font-semibold text-sm block mb-1.5">Collection <span className="text-danger-600">*</span>:</label>
+        <select value={collectionId} onChange={handleCollectionChange} className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:border-primary-500 focus:ring-2 focus:ring-primary-100 outline-none transition-all">
+          <option value="">-- Chọn collection --</option>
+          {data.collections.map(c => (
+            <option key={c.id} value={c.id}>{escHtml(c.name)}</option>
+          ))}
+          <option value="__new__">+ Tạo collection mới</option>
+        </select>
+        {showNewCollection && (
+          <div className="mt-2 flex gap-2">
+            <input type="text" value={newCollectionName} onChange={e => setNewCollectionName(e.target.value)} placeholder="Tên collection mới..." className="flex-1 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:border-primary-500 outline-none" />
+            <button onClick={handleCreateCollection} className="bg-success-600 text-white px-3 py-2 rounded-lg text-xs font-semibold whitespace-nowrap">Tạo</button>
+            <button onClick={() => { setShowNewCollection(false); setCollectionId(''); }} className="border border-slate-200 px-3 py-2 rounded-lg text-xs text-slate-600">Hủy</button>
+          </div>
+        )}
+      </div>
+
+      {/* Import from other tests */}
+      {collectionId && otherTests.length > 0 && (
+        <div className="mb-5 p-3 bg-primary-50 rounded-lg">
+          <p className="text-xs text-slate-600 mb-2">Bạn có thể thêm câu hỏi từ bài khác trong cùng collection:</p>
+          <button onClick={() => setShowQuestionPicker(!showQuestionPicker)} className="border border-primary-300 px-3 py-1.5 rounded-lg text-xs font-semibold text-primary-600 hover:bg-primary-100 transition-all">
+            {showQuestionPicker ? 'Ẩn' : 'Chọn câu hỏi từ bài khác'} ({otherTests.length} bài)
+          </button>
+        </div>
+      )}
+
+      {/* Question picker modal */}
+      {showQuestionPicker && (
+        <div className="mb-5 bg-white border border-slate-200 rounded-xl p-4">
+          <div className="flex gap-2 mb-3 flex-wrap">
+            {otherTests.map(t => (
+              <button key={t.id} onClick={() => { setPickerTestId(t.id); setPickerSelections({}); }}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${pickerTestId === t.id ? 'bg-primary-600 text-white' : 'border border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+              >
+                {escHtml(t.name)} ({t.questions.length} câu)
+              </button>
+            ))}
+          </div>
+
+          {pickerTest && (
+            <div className="max-h-64 overflow-y-auto">
+              {pickerTest.questions.map((q, i) => (
+                <div key={q.id} className="flex items-center gap-3 py-2 border-b border-slate-100 last:border-0">
+                  <input type="checkbox" checked={!!pickerSelections[q.id]} onChange={e => setPickerSelections({ ...pickerSelections, [q.id]: e.target.checked })} className="w-4 h-4" />
+                  <span className="flex-1 text-xs cursor-pointer hover:text-primary-600" onClick={() => setPreviewQuestion(previewQuestion?.id === q.id ? null : q)}>
+                    Câu {i + 1}: {escHtml(q.prompt).substring(0, 80)}{q.prompt.length > 80 ? '...' : ''}
+                  </span>
+                  <button onClick={() => setPreviewQuestion(previewQuestion?.id === q.id ? null : q)} className="text-[0.6rem] text-primary-600 underline whitespace-nowrap">
+                    {previewQuestion?.id === q.id ? 'Ẩn' : 'Xem'}
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Question preview popup */}
+          {previewQuestion && (
+            <div className="mt-3 p-3 bg-slate-50 rounded-lg border border-slate-200">
+              <div className="flex justify-between items-start mb-2">
+                <strong className="text-sm">{escHtml(previewQuestion.prompt)}</strong>
+                <button onClick={() => setPreviewQuestion(null)} className="text-slate-400 text-lg">&times;</button>
+              </div>
+              {previewQuestion.options.map(opt => {
+                const isCorrect = previewQuestion.correctIndices.includes(previewQuestion.options.indexOf(opt));
+                return (
+                  <div key={opt.label} className={`py-1 px-2 rounded text-xs flex items-center gap-2 ${isCorrect ? 'bg-success-100 text-success-700 font-semibold' : ''}`}>
+                    <span>{opt.label}.</span><span>{escHtml(opt.text)}</span>
+                    {isCorrect && <span className="ml-auto">&check;</span>}
+                  </div>
+                );
+              })}
+              {previewQuestion.explanation && (
+                <p className="mt-2 text-xs text-slate-500"><strong>Giải thích:</strong> {escHtml(previewQuestion.explanation)}</p>
+              )}
+            </div>
+          )}
+
+          {pickerTest && (
+            <button onClick={handleAddFromPicker} className="mt-3 bg-primary-600 text-white px-3 py-1.5 rounded-lg text-xs font-semibold">
+              Thêm câu đã chọn vào bài
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Test name */}
+      <div className="mb-5">
+        <label className="font-semibold text-sm block mb-1.5">Tên bài kiểm tra:</label>
+        <input type="text" value={testName} onChange={e => setTestName(e.target.value)}
+          placeholder="VD: SWT Chương 1 - Tổng quan về kiểm thử"
+          className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:border-primary-500 focus:ring-2 focus:ring-primary-100 outline-none transition-all" />
+      </div>
+
+      {/* Bulk paste */}
+      <div className="mb-5">
+        <label className="font-semibold text-sm block mb-1.5">Paste câu hỏi hàng loạt:</label>
+        <textarea value={bulkText} onChange={e => setBulkText(e.target.value)}
+          placeholder={`Paste câu hỏi vào đây...\n\nCâu 1: SWT là viết tắt của?\nA. Software Testing\nB. Software Technology\nC. System Web Testing\nD. Software Writing Tool\nĐáp án: A\nGiải thích: SWT = Software Testing\n\nCâu 2: ...`}
+          className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:border-primary-500 focus:ring-2 focus:ring-primary-100 outline-none transition-all min-h-[180px] resize-y" />
+        <button onClick={handleParse} className="mt-3 bg-primary-600 text-white px-4 py-2.5 rounded-lg text-sm font-semibold hover:bg-primary-700 active:scale-95 transition-all">Phân tích câu hỏi</button>
+        {parseFeedback && <div className="mt-2" dangerouslySetInnerHTML={{ __html: parseFeedback }} />}
+      </div>
+
+      {/* Question editor */}
+      <div className="mb-5">
+        <h3 className="text-base font-semibold mb-3">Câu hỏi đã phân tích (<span className="text-slate-500 font-normal">{questions.length}</span>)</h3>
+        {questions.length === 0 ? (
+          <p className="text-slate-500 text-sm text-center py-5">Chưa có câu hỏi nào. Paste câu hỏi và nhấn "Phân tích".</p>
+        ) : (
+          questions.map((q, i) => (
+            <div key={i} className="bg-white border border-slate-200 rounded-xl p-4 mb-3 relative">
+              <button onClick={() => setQuestions(questions.filter((_, idx) => idx !== i))}
+                className="absolute top-2 right-2 bg-transparent border-0 text-danger-600 cursor-pointer text-lg p-1 rounded hover:bg-danger-50" title="Xóa câu này">&times;</button>
+              <div className="mb-2.5"><span className="font-bold text-xs text-primary-600">Câu {i + 1}</span></div>
+              <input type="text" value={q.prompt} onChange={e => { const nq = [...questions]; nq[i] = { ...nq[i], prompt: e.target.value }; setQuestions(nq); }}
+                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm font-medium mb-3 focus:border-primary-500 outline-none" placeholder="Nội dung câu hỏi" />
+              <div className="mb-2">
+                {q.options.map((opt, oi) => (
+                  <div key={oi} className="flex items-center gap-2.5 mb-1.5 p-1.5 rounded-lg hover:bg-slate-50">
+                    <input type="checkbox" checked={q.correctIndices.includes(oi)}
+                      onChange={e => {
+                        const nq = [...questions];
+                        if (e.target.checked) nq[i] = { ...nq[i], correctIndices: [...nq[i].correctIndices, oi] };
+                        else nq[i] = { ...nq[i], correctIndices: nq[i].correctIndices.filter(ci => ci !== oi) };
+                        setQuestions(nq);
+                      }} className="w-4 h-4 cursor-pointer" title="Đánh dấu là đáp án đúng" />
+                    <span className="font-bold text-xs text-slate-500 min-w-[24px]">{opt.label}.</span>
+                    <input type="text" value={opt.text} onChange={e => { const nq = [...questions]; const no = [...nq[i].options]; no[oi] = { ...no[oi], text: e.target.value }; nq[i] = { ...nq[i], options: no }; setQuestions(nq); }}
+                      className="flex-1 px-2 py-1.5 border border-slate-200 rounded text-xs focus:border-primary-500 outline-none" placeholder={`Nội dung đáp án ${opt.label}`} />
+                    <button onClick={() => {
+                      if (q.options.length <= 2) { alert('Mỗi câu hỏi cần ít nhất 2 đáp án.'); return; }
+                      const nq = [...questions];
+                      nq[i] = { ...nq[i], options: nq[i].options.filter((_, idx) => idx !== oi), correctIndices: nq[i].correctIndices.filter(ci => ci !== oi).map(ci => ci > oi ? ci - 1 : ci) };
+                      setQuestions(nq);
+                    }} className="border border-slate-200 px-1.5 py-0.5 rounded text-[0.6rem] text-slate-500">&times;</button>
+                  </div>
+                ))}
+              </div>
+              <button onClick={() => { const nq = [...questions]; const labels = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'; nq[i] = { ...nq[i], options: [...nq[i].options, { label: labels[nq[i].options.length] || '?', text: '' }] }; setQuestions(nq); }}
+                className="border border-slate-200 px-2.5 py-1 rounded text-[0.7rem] font-semibold text-slate-600">+ Thêm đáp án</button>
+              <input type="text" value={q.explanation || ''} onChange={e => { const nq = [...questions]; nq[i] = { ...nq[i], explanation: e.target.value }; setQuestions(nq); }}
+                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs mt-3 focus:border-primary-500 outline-none" placeholder="Giải thích (tùy chọn)" />
+            </div>
+          ))
+        )}
+      </div>
+
+      <div className="mb-5">
+        <button onClick={handleAddManual} className="border border-slate-200 px-4 py-2 rounded-lg text-sm font-semibold text-slate-600 hover:bg-slate-50">+ Thêm câu hỏi thủ công</button>
+      </div>
+
+      <div className="flex gap-2 mt-5">
+        <button onClick={handleSave} className="flex-1 bg-primary-600 text-white px-4 py-3 rounded-lg text-base font-semibold hover:bg-primary-700 active:scale-95 transition-all">Lưu bài</button>
+        <button onClick={() => navigate('/')} className="border border-slate-200 px-4 py-3 rounded-lg text-sm font-semibold hover:bg-slate-50 text-slate-600">Hủy</button>
+      </div>
+    </div>
+  );
+}
