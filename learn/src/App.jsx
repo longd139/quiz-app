@@ -2,7 +2,6 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { useQuizData } from './hooks/useQuizData';
 import Header from './components/Header';
 import TabNav from './components/TabNav';
-import FooterNav from './components/FooterNav';
 import ConfirmDialog from './components/ConfirmDialog';
 import Dashboard from './pages/Dashboard';
 import Editor from './pages/Editor';
@@ -39,7 +38,7 @@ export default function App() {
   return (
     <QuizContext.Provider value={ctx}>
       <BrowserRouter>
-        <div className="max-w-2xl mx-auto px-4 pb-32">
+        <div className="max-w-2xl mx-auto px-4 pb-8">
           <Header syncStatus={quiz.syncStatus} conflictRef={quiz.conflictRef} resolveConflict={quiz.resolveConflict} />
           <TabNav />
           <div className="page-enter">
@@ -55,7 +54,6 @@ export default function App() {
             </Routes>
           </div>
         </div>
-        <FooterNav />
         {confirmMsg && (
           <ConfirmDialog message={confirmMsg} onYes={() => { confirmCallback?.(); hideConfirm(); }} onNo={hideConfirm} />
         )}

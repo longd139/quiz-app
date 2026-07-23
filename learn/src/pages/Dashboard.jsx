@@ -65,7 +65,7 @@ export default function Dashboard() {
 
       {filteredTests.length === 0 ? (
         <div className="text-center py-16 px-5 text-slate-500 bg-white rounded-xl border-2 border-dashed border-slate-200">
-          <div className="text-4xl mb-3 text-slate-300">&cir;</div>
+          <div className="w-12 h-12 rounded-full border-2 border-slate-300 mx-auto mb-3" />
           <p className="text-sm mb-4">Chưa có bài nào.<br />Nhấn "<strong>+ Thêm bài mới</strong>" để bắt đầu!</p>
         </div>
       ) : (
