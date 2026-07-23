@@ -98,8 +98,8 @@ function ResultsWrapper({ session, data, navigate }) {
               return (
                 <div key={oi} className={`py-2 px-3 mb-1 rounded-md text-sm flex items-center gap-2 ${cls}`}>
                   <span className="font-bold min-w-[24px]">{opt.label}.</span><span>{escHtml(opt.text)}</span>
-                  {ic && <span className="ml-auto">&check;</span>}
-                  {up && !ic && <span className="ml-auto">&times;</span>}
+                  {ic && <span className="ml-auto">{'✓'}</span>}
+                  {up && !ic && <span className="ml-auto">{'×'}</span>}
                 </div>
               );
             })}

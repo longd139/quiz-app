@@ -185,14 +185,14 @@ export default function Editor() {
             <div className="mt-3 p-3 bg-slate-50 rounded-lg border border-slate-200">
               <div className="flex justify-between items-start mb-2">
                 <strong className="text-sm">{escHtml(previewQuestion.prompt)}</strong>
-                <button onClick={() => setPreviewQuestion(null)} className="text-slate-400 text-lg">&times;</button>
+                <button onClick={() => setPreviewQuestion(null)} className="text-slate-400 text-lg">{'×'}</button>
               </div>
               {previewQuestion.options.map(opt => {
                 const isCorrect = previewQuestion.correctIndices.includes(previewQuestion.options.indexOf(opt));
                 return (
                   <div key={opt.label} className={`py-1 px-2 rounded text-xs flex items-center gap-2 ${isCorrect ? 'bg-success-100 text-success-700 font-semibold' : ''}`}>
                     <span>{opt.label}.</span><span>{escHtml(opt.text)}</span>
-                    {isCorrect && <span className="ml-auto">&check;</span>}
+                    {isCorrect && <span className="ml-auto">{'✓'}</span>}
                   </div>
                 );
               })}
@@ -237,7 +237,7 @@ export default function Editor() {
           questions.map((q, i) => (
             <div key={i} className="bg-white border border-slate-200 rounded-xl p-4 mb-3 relative">
               <button onClick={() => setQuestions(questions.filter((_, idx) => idx !== i))}
-                className="absolute top-2 right-2 bg-transparent border-0 text-danger-600 cursor-pointer text-lg p-1 rounded hover:bg-danger-50" title="Xóa câu này">&times;</button>
+                className="absolute top-2 right-2 bg-transparent border-0 text-danger-600 cursor-pointer text-lg p-1 rounded hover:bg-danger-50" title="Xóa câu này">{'×'}</button>
               <div className="mb-2.5"><span className="font-bold text-xs text-primary-600">Câu {i + 1}</span></div>
               <input type="text" value={q.prompt} onChange={e => { const nq = [...questions]; nq[i] = { ...nq[i], prompt: e.target.value }; setQuestions(nq); }}
                 className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm font-medium mb-3 focus:border-primary-500 outline-none" placeholder="Nội dung câu hỏi" />
@@ -259,7 +259,7 @@ export default function Editor() {
                       const nq = [...questions];
                       nq[i] = { ...nq[i], options: nq[i].options.filter((_, idx) => idx !== oi), correctIndices: nq[i].correctIndices.filter(ci => ci !== oi).map(ci => ci > oi ? ci - 1 : ci) };
                       setQuestions(nq);
-                    }} className="border border-slate-200 px-1.5 py-0.5 rounded text-[0.6rem] text-slate-500">&times;</button>
+                    }} className="border border-slate-200 px-1.5 py-0.5 rounded text-[0.6rem] text-slate-500">{'×'}</button>
                   </div>
                 ))}
               </div>

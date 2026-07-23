@@ -114,7 +114,8 @@ export default function Practice() {
     return () => window.removeEventListener('keydown', handler);
   }, [currentIdx, showingResult, answers, q]);
 
-  const progress = ((currentIdx + 1) / questions.length) * 100;
+  const answeredCount = Object.values(answers).filter(a => a && a.length > 0).length;
+  const progress = (answeredCount / questions.length) * 100;
   const stats = data.questionStats || {};
   const ws = stats[q.id];
 
@@ -128,8 +129,8 @@ export default function Practice() {
         <div className="flex-1 h-2 bg-slate-200 rounded-full overflow-hidden">
           <div className="h-full bg-primary-600 transition-all duration-300 rounded-full" style={{ width: `${progress}%` }} />
         </div>
-        <span className="text-xs font-semibold text-slate-500 whitespace-nowrap">{currentIdx + 1} / {questions.length}</span>
-        <button onClick={handleQuit} className="border border-slate-200 px-2.5 py-1.5 rounded-lg text-xs font-semibold hover:bg-slate-50 text-slate-500" title="Thoát">&times;</button>
+        <span className="text-xs font-semibold text-slate-500 whitespace-nowrap">{answeredCount} / {questions.length}</span>
+        <button onClick={handleQuit} className="border border-slate-200 px-2.5 py-1.5 rounded-lg text-xs font-semibold hover:bg-slate-50 text-slate-500" title="Thoát">{'×'}</button>
       </div>
 
       {/* Question */}
@@ -145,9 +146,9 @@ export default function Practice() {
             let cls = '', marker = '';
             if (showingResult) {
               const ic = q.correctIndices.includes(oi);
-              if (sel && ic) { cls = 'border-2 border-success-600 bg-success-50 font-semibold'; marker = <span className="ml-auto text-success-600">&check;</span>; }
-              else if (sel && !ic) { cls = 'border-2 border-danger-600 bg-danger-50 font-semibold'; marker = <span className="ml-auto text-danger-600">&times;</span>; }
-              else if (!sel && ic) { cls = 'border-2 border-warning-500 bg-warning-50'; marker = <span className="ml-auto text-warning-600">&check;</span>; }
+              if (sel && ic) { cls = 'border-2 border-success-600 bg-success-50 font-semibold'; marker = <span className="ml-auto text-success-600">{'✓'}</span>; }
+              else if (sel && !ic) { cls = 'border-2 border-danger-600 bg-danger-50 font-semibold'; marker = <span className="ml-auto text-danger-600">{'×'}</span>; }
+              else if (!sel && ic) { cls = 'border-2 border-warning-500 bg-warning-50'; marker = <span className="ml-auto text-warning-600">{'✓'}</span>; }
               else { cls = 'border-2 border-slate-200 bg-white opacity-60'; }
             } else if (sel) { cls = 'opt-selected border-2 border-primary-500 bg-primary-50 font-semibold'; }
             else { cls = 'border-2 border-slate-200 bg-white hover:border-blue-300'; }

@@ -135,6 +135,44 @@ export default function DataManagement() {
         </div>
       </div>
 
+      {/* Manage collections */}
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 mb-4">
+        <h3 className="text-base font-semibold mb-1">Quản lý collection</h3>
+        <p className="text-xs text-slate-500 mb-3">Xóa collection trống (không chứa bài test nào).</p>
+        {data.collections.length === 0 ? (
+          <p className="text-xs text-slate-400 italic">Chưa có collection nào.</p>
+        ) : (
+          <div className="flex flex-col gap-1 max-h-48 overflow-y-auto">
+            {data.collections.map(c => {
+              const testCount = data.tests.filter(t => t.collectionId === c.id).length;
+              return (
+                <div key={c.id} className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-slate-50">
+                  <span className="text-sm">{c.name} <span className="text-xs text-slate-400">({testCount} bài)</span></span>
+                  <button
+                    onClick={() => {
+                      if (testCount > 0) {
+                        showConfirm(`Collection "${c.name}" có ${testCount} bài test. Xóa collection này, các bài sẽ chuyển về "Chưa phân loại". Tiếp tục?`, () => {
+                          const d = { ...data, collections: data.collections.filter(col => col.id !== c.id) };
+                          d.tests = d.tests.map(t => t.collectionId === c.id ? { ...t, collectionId: null } : t);
+                          update(d);
+                        });
+                      } else {
+                        showConfirm(`Xóa collection "${c.name}"?`, () => {
+                          update({ ...data, collections: data.collections.filter(col => col.id !== c.id) });
+                        });
+                      }
+                    }}
+                    className="text-[0.65rem] text-danger-600 underline hover:text-danger-700"
+                  >
+                    Xóa
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
       {/* Danger zone */}
       <div className="bg-white rounded-xl shadow-sm border border-danger-600 p-4">
         <h3 className="text-base font-semibold mb-1 text-danger-600">Vùng nguy hiểm</h3>
