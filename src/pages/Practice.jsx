@@ -18,6 +18,7 @@ export default function Practice() {
   });
   const [showingResult, setShowingResult] = useState(false);
   const [reviewedIds, setReviewedIds] = useState(new Set());
+  const [slideFrom, setSlideFrom] = useState('right'); // 'right' | 'left' - direction card slides in from
 
   // Touch swipe for mobile navigation
   const touchStartX = useRef(0);
@@ -104,15 +105,18 @@ export default function Practice() {
       }
       setShowingResult(false);
       if (isLast && !insertedRetry) { handleSubmit(); return; }
+      setSlideFrom('right');
       setCurrentIdx(prev => prev + 1);
       return;
     }
     if (isLast) { handleSubmit(); return; }
+    setSlideFrom('right');
     setCurrentIdx(prev => prev + 1);
   };
 
   const handlePrev = () => {
     if (currentIdx <= 0) return;
+    setSlideFrom('left');
     setCurrentIdx(prev => prev - 1);
   };
 
@@ -191,7 +195,8 @@ export default function Practice() {
       </div>
 
       {/* Question */}
-      <div className="bg-white rounded-xl p-5 sm:p-6 shadow-sm border border-slate-200 mb-5">
+      <div key={currentIdx} className={slideFrom === 'right' ? 'slide-from-right' : 'slide-from-left'}>
+        <div className="bg-white rounded-xl p-5 sm:p-6 shadow-sm border border-slate-200 mb-5">
         <div className="text-base sm:text-lg font-semibold mb-5 leading-relaxed">{q.prompt}</div>
         {isMulti && !showingResult && (
           <span className="text-xs text-warning-600 font-medium mb-3 inline-block bg-warning-50 px-2.5 py-0.5 rounded-full">(Chọn nhiều đáp án)</span>
@@ -230,6 +235,7 @@ export default function Practice() {
         {showingResult && ws && ws.wrongCount > 0 && (
           <div className="mt-2 text-xs text-slate-500">Bạn đã sai câu này <strong className="text-danger-600">{ws.wrongCount}</strong> lần.</div>
         )}
+      </div>
       </div>
 
       {/* Navigation */}
