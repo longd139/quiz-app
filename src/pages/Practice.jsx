@@ -101,30 +101,36 @@ export default function Practice() {
   const handleSubmit = () => {
     let correctCount = 0;
     const d = { ...data, questionStats: { ...data.questionStats } };
+    const originalQuestions = questions.filter(q => !q._retryOf);
 
     questions.forEach(q => {
       const ua = answers[q.id] || [];
       const c = q.correctIndices.slice().sort((a, b) => a - b);
       const us = ua.slice().sort((a, b) => a - b);
       const statsId = q._retryOf || q.id;
-      if (arraysEqual(c, us)) correctCount++;
-      else {
-        if (!d.questionStats[statsId]) d.questionStats[statsId] = { wrongCount: 0 };
-        d.questionStats[statsId].wrongCount++;
-        d.questionStats[statsId].lastWrong = new Date().toISOString();
+      const isCorrect = arraysEqual(c, us);
+      // Only count original questions toward score
+      if (!q._retryOf) {
+        if (isCorrect) correctCount++;
+        else {
+          if (!d.questionStats[statsId]) d.questionStats[statsId] = { wrongCount: 0 };
+          d.questionStats[statsId].wrongCount++;
+          d.questionStats[statsId].lastWrong = new Date().toISOString();
+        }
       }
     });
 
-    const score = Math.round((correctCount / questions.length) * 100);
+    const total = originalQuestions.length;
+    const score = Math.round((correctCount / total) * 100);
     const session = {
-      id: uid(), testNames: sessionNames, questions, answers, totalQuestions: questions.length,
+      id: uid(), testNames: sessionNames, questions, answers, totalQuestions: total,
       correctCount, score, startedAt: new Date().toISOString(), completedAt: new Date().toISOString()
     };
 
     d.history = [session, ...d.history].slice(0, 100);
     update(d);
 
-    navigate('/results', { state: { session, score, correctCount, total: questions.length } });
+    navigate('/results', { state: { session, score, correctCount, total } });
   };
 
   const handleQuit = () => {
