@@ -19,23 +19,32 @@ export default function Practice() {
   const [showingResult, setShowingResult] = useState(false);
   const [reviewedIds, setReviewedIds] = useState(new Set());
   const [slideFrom, setSlideFrom] = useState('right'); // 'right' | 'left' - direction card slides in from
+  const [toast, setToast] = useState('');
 
   // Touch swipe for mobile navigation
   const touchStartX = useRef(0);
   const touchStartY = useRef(0);
+  const isSwiping = useRef(false);
 
   const handleTouchStart = (e) => {
     touchStartX.current = e.touches[0].clientX;
     touchStartY.current = e.touches[0].clientY;
+    isSwiping.current = false;
   };
 
   const handleTouchEnd = (e) => {
     const dx = e.changedTouches[0].clientX - touchStartX.current;
     const dy = e.changedTouches[0].clientY - touchStartY.current;
-    // Only trigger if horizontal swipe > 50px and more horizontal than vertical
     if (Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(dy)) return;
+    isSwiping.current = true;
+    setTimeout(() => { isSwiping.current = false; }, 100);
     if (dx < 0) handleNext();  // swipe left → next
     else handlePrev();          // swipe right → prev
+  };
+
+  const showToast = (msg) => {
+    setToast(msg);
+    setTimeout(() => setToast(''), 2000);
   };
 
   // Redirect if no session
@@ -61,7 +70,7 @@ export default function Practice() {
   const isLast = currentIdx >= questions.length - 1;
 
   const handleOptionClick = (oi) => {
-    if (showingResult) return;
+    if (showingResult || isSwiping.current) return;
     setAnswers(prev => {
       const a = { ...prev };
       const cur = [...(a[q.id] || [])];
@@ -78,8 +87,17 @@ export default function Practice() {
     });
   };
 
+  const requireAnswer = () => {
+    if (currentAnswers.length === 0) {
+      showToast('Vui lòng chọn đáp án trước khi tiếp tục');
+      return false;
+    }
+    return true;
+  };
+
   const handleNext = () => {
     if (isInstant && !showingResult) {
+      if (!requireAnswer()) return;
       setShowingResult(true);
       setReviewedIds(prev => new Set([...prev, q.id]));
       return;
@@ -109,6 +127,7 @@ export default function Practice() {
       setCurrentIdx(prev => prev + 1);
       return;
     }
+    if (!requireAnswer()) return;
     if (isLast) { handleSubmit(); return; }
     setSlideFrom('right');
     setCurrentIdx(prev => prev + 1);
@@ -193,6 +212,13 @@ export default function Practice() {
         <span className="text-xs font-semibold text-slate-500 whitespace-nowrap">{answeredCount} / {questions.length}</span>
         <button onClick={handleQuit} className="border border-slate-200 px-2.5 py-1.5 rounded-lg text-xs font-semibold hover:bg-slate-50 text-slate-500" title="Thoát">{'×'}</button>
       </div>
+
+      {/* Toast */}
+      {toast && (
+        <div className="mb-3 py-2.5 px-4 bg-warning-50 text-warning-700 text-sm text-center rounded-lg border border-warning-100 toast-in">
+          {toast}
+        </div>
+      )}
 
       {/* Question */}
       <div key={currentIdx} className={slideFrom === 'right' ? 'slide-from-right' : 'slide-from-left'}>
