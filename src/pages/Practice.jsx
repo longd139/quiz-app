@@ -9,7 +9,7 @@ export default function Practice() {
   const location = useLocation();
   const { sessionQuestions, sessionNames, practiceMode } = location.state || {};
 
-  const [questions] = useState(() => sessionQuestions || []);
+  const [questions, setQuestions] = useState(() => sessionQuestions || []);
   const [currentIdx, setCurrentIdx] = useState(0);
   const [answers, setAnswers] = useState(() => {
     const a = {};
@@ -17,11 +17,22 @@ export default function Practice() {
     return a;
   });
   const [showingResult, setShowingResult] = useState(false);
+  const [reviewedIds, setReviewedIds] = useState(new Set());
+  const [retryCounts, setRetryCounts] = useState({});
 
   // Redirect if no session
   useEffect(() => {
     if (!sessionQuestions || sessionQuestions.length === 0) navigate('/practice-setup');
   }, [sessionQuestions, navigate]);
+
+  // Auto-show result when going back to a previously reviewed question
+  useEffect(() => {
+    if (reviewedIds.has(q.id)) {
+      setShowingResult(true);
+    } else {
+      setShowingResult(false);
+    }
+  }, [currentIdx]);
 
   if (!sessionQuestions || sessionQuestions.length === 0) return null;
 
@@ -50,10 +61,33 @@ export default function Practice() {
   };
 
   const handleNext = () => {
-    if (isInstant && !showingResult) { setShowingResult(true); return; }
+    if (isInstant && !showingResult) {
+      setShowingResult(true);
+      setReviewedIds(prev => new Set([...prev, q.id]));
+      return;
+    }
     if (isInstant && showingResult) {
+      let insertedRetry = false;
+      const correct = arraysEqual(
+        currentAnswers.slice().sort((a,b)=>a-b),
+        q.correctIndices.slice().sort((a,b)=>a-b)
+      );
+      const origId = q._retryOf || q.id;
+      if (!correct && (retryCounts[origId] || 0) < 1) {
+        const gap = 2;
+        const insertPos = Math.min(currentIdx + gap + 1, questions.length);
+        const retryQuestion = { ...q, id: uid(), _retryOf: origId };
+        setQuestions(prev => {
+          const next = [...prev];
+          next.splice(insertPos, 0, retryQuestion);
+          return next;
+        });
+        setRetryCounts(prev => ({ ...prev, [origId]: (prev[origId] || 0) + 1 }));
+        setAnswers(prev => ({ ...prev, [retryQuestion.id]: [] }));
+        insertedRetry = true;
+      }
       setShowingResult(false);
-      if (isLast) { handleSubmit(); return; }
+      if (isLast && !insertedRetry) { handleSubmit(); return; }
       setCurrentIdx(prev => prev + 1);
       return;
     }
@@ -62,7 +96,7 @@ export default function Practice() {
   };
 
   const handlePrev = () => {
-    if (currentIdx <= 0 || showingResult) return;
+    if (currentIdx <= 0) return;
     setCurrentIdx(prev => prev - 1);
   };
 
@@ -177,7 +211,7 @@ export default function Practice() {
 
       {/* Navigation */}
       <div className="flex gap-3 justify-between mt-3">
-        <button onClick={handlePrev} disabled={currentIdx === 0 || showingResult}
+        <button onClick={handlePrev} disabled={currentIdx === 0}
           className="border border-slate-200 px-4 py-2.5 rounded-lg text-sm font-semibold hover:bg-slate-50 transition-all text-slate-600 disabled:opacity-50">
           Trước
         </button>
