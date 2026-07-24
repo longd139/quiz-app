@@ -222,7 +222,7 @@ export default function Editor() {
       <div className="mb-5">
         <label className="font-semibold text-sm block mb-1.5">Paste câu hỏi hàng loạt:</label>
         <textarea value={bulkText} onChange={e => setBulkText(e.target.value)}
-          placeholder={`Paste câu hỏi vào đây...\n\n<1> SWT là viết tắt của?\nA. Software Testing\nB. Software Technology\nC. System Web Testing\nD. Software Writing Tool\nĐáp án: A\nGiải thích: SWT = Software Testing\n\n<2> Câu hỏi tiếp theo...\n...`}
+          placeholder={`Paste câu hỏi vào đây...\n\nSWT là viết tắt của?\nA. Software Testing\nB. Software Technology\nC. System Web Testing\nD. Software Writing Tool\nĐáp án: A\nGiải thích: SWT = Software Testing\n\nKiểm thử hộp trắng là gì?\nA. Kiểm thử không cần code\nB. Kiểm thử dựa trên cấu trúc bên trong\nC. Kiểm thử giao diện\nD. Kiểm thử chức năng\nĐáp án: B\n\n(Hoặc dùng <1>, Câu 1:, 1. để đánh dấu đầu câu)`}
           className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:border-primary-500 focus:ring-2 focus:ring-primary-100 outline-none transition-all min-h-[180px] resize-y" />
         <button onClick={handleParse} className="mt-3 bg-primary-600 text-white px-4 py-2.5 rounded-lg text-sm font-semibold hover:bg-primary-700 active:scale-95 transition-all">Phân tích câu hỏi</button>
         {parseFeedback && <div className="mt-2" dangerouslySetInnerHTML={{ __html: parseFeedback }} />}

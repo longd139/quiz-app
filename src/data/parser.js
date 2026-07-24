@@ -23,10 +23,35 @@ export function parseBulkPaste(text) {
 function splitIntoBlocks(text) {
   const lines = text.split('\n'), blocks = [];
   let current = [];
+  let seenAnswer = false; // đã gặp dòng "Đáp án:" trong block hiện tại chưa?
+
   for (let i = 0; i < lines.length; i++) {
-    if (isQuestionStart(lines[i]) && current.length > 0 && !isEmptyBlock(current)) { blocks.push(current.join('\n')); current = []; }
+    const trimmed = lines[i].trim();
+
+    // Có marker rõ ràng (Câu 1:, <1>, 1., Q1:) → chắc chắn là câu mới
+    if (isQuestionStart(trimmed) && current.length > 0 && !isEmptyBlock(current)) {
+      blocks.push(current.join('\n'));
+      current = [];
+      seenAnswer = false;
+      current.push(lines[i]);
+      continue;
+    }
+
+    // Không có marker: sau khi đã thấy "Đáp án:", nếu gặp dòng không phải
+    // option / đáp án / giải thích / trống → đó là câu hỏi mới
+    if (seenAnswer && trimmed && !isMetaLine(trimmed) && !isQuestionStart(trimmed)) {
+      blocks.push(current.join('\n'));
+      current = [];
+      seenAnswer = false;
+    }
+
+    if (isAnswerLine(trimmed)) {
+      seenAnswer = true;
+    }
+
     current.push(lines[i]);
   }
+
   if (current.length > 0 && !isEmptyBlock(current)) blocks.push(current.join('\n'));
   return blocks;
 }
@@ -34,6 +59,14 @@ function splitIntoBlocks(text) {
 function isEmptyBlock(lines) { return lines.every(l => !l.trim()); }
 
 function isQuestionStart(line) { return /^(Câu\s+\d+|Q\d+|\d+|< *\d+ *>)\s*[.:)]?\s*.+/i.test(line.trim()); }
+
+function isOptionLine(line) { return /^[A-Da-d]\s*[.)]\s*.+/.test(line); }
+
+function isAnswerLine(line) { return /^(Đ[aá]p\s*[aá]n|DA|ĐA|Answer|ANS?)\s*[:=]/i.test(line); }
+
+function isExplanationLine(line) { return /^(Gi[aả]i\s*th[ií]ch|GT|Explanation|Explain)\s*[:=]/i.test(line); }
+
+function isMetaLine(line) { return isOptionLine(line) || isAnswerLine(line) || isExplanationLine(line); }
 
 function parseBlock(block) {
   const lines = block.split('\n');
