@@ -43,14 +43,30 @@ export default function History() {
           const pct = s.score || 0;
           const color = pct >= 80 ? 'text-success-600' : pct >= 50 ? 'text-warning-600' : 'text-danger-600';
           return (
-            <div key={idx} onClick={() => setViewingSession(s)}
+            <div key={idx}
               className="flex items-center justify-between gap-3 p-3.5 bg-white rounded-xl shadow-sm border border-slate-200 mb-2 cursor-pointer hover:border-primary-500 transition-all">
-              <div className={`text-xl font-extrabold min-w-[56px] text-center ${color}`}>{pct}%</div>
-              <div className="flex-1">
-                <div className="font-semibold text-sm">{escHtml((s.testNames || []).join(' + '))}</div>
-                <div className="text-[0.7rem] text-slate-500">{fmtDate(s.completedAt)} &middot; {s.correctCount}/{s.totalQuestions} đúng</div>
+              <div onClick={() => setViewingSession(s)} className="flex items-center gap-3 flex-1">
+                <div className={`text-xl font-extrabold min-w-[56px] text-center ${color}`}>{pct}%</div>
+                <div className="flex-1">
+                  <div className="font-semibold text-sm">{escHtml((s.testNames || []).join(' + '))}</div>
+                  <div className="text-[0.7rem] text-slate-500">{fmtDate(s.completedAt)} &middot; {s.correctCount}/{s.totalQuestions} đúng</div>
+                </div>
+                <span className="text-slate-400">&rsaquo;</span>
               </div>
-              <span className="text-slate-400">&rsaquo;</span>
+              <button onClick={(e) => {
+                e.stopPropagation();
+                const origQuestions = (s.questions || []).filter(q => !q._retryOf);
+                if (origQuestions.length === 0) { alert('Không có câu hỏi nào để làm lại.'); return; }
+                navigate('/practice', {
+                  state: {
+                    sessionQuestions: origQuestions,
+                    sessionNames: s.testNames || [],
+                    practiceMode: 'instant'
+                  }
+                });
+              }} className="bg-primary-600 text-white px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-primary-700 active:scale-95 transition-all whitespace-nowrap">
+                Làm lại
+              </button>
             </div>
           );
         })
