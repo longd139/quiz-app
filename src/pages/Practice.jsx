@@ -108,11 +108,12 @@ export default function Practice() {
       const ua = answers[q.id] || [];
       const c = q.correctIndices.slice().sort((a, b) => a - b);
       const us = ua.slice().sort((a, b) => a - b);
+      const statsId = q._retryOf || q.id;
       if (arraysEqual(c, us)) correctCount++;
       else {
-        if (!d.questionStats[q.id]) d.questionStats[q.id] = { wrongCount: 0 };
-        d.questionStats[q.id].wrongCount++;
-        d.questionStats[q.id].lastWrong = new Date().toISOString();
+        if (!d.questionStats[statsId]) d.questionStats[statsId] = { wrongCount: 0 };
+        d.questionStats[statsId].wrongCount++;
+        d.questionStats[statsId].lastWrong = new Date().toISOString();
       }
     });
 
