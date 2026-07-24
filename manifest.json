@@ -2,7 +2,7 @@
   "name": "Quiz Luyện Tập",
   "short_name": "Quiz",
   "description": "Ứng dụng luyện thi trắc nghiệm - paste câu hỏi, luyện tập, ghi nhớ",
-  "start_url": "./index.html",
+  "start_url": "/",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#f1f5f9",
