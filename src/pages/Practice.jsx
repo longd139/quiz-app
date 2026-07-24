@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useQuiz } from '../App';
 import { uid, escHtml, arraysEqual } from '../data/storage';
@@ -18,6 +18,24 @@ export default function Practice() {
   });
   const [showingResult, setShowingResult] = useState(false);
   const [reviewedIds, setReviewedIds] = useState(new Set());
+
+  // Touch swipe for mobile navigation
+  const touchStartX = useRef(0);
+  const touchStartY = useRef(0);
+
+  const handleTouchStart = (e) => {
+    touchStartX.current = e.touches[0].clientX;
+    touchStartY.current = e.touches[0].clientY;
+  };
+
+  const handleTouchEnd = (e) => {
+    const dx = e.changedTouches[0].clientX - touchStartX.current;
+    const dy = e.changedTouches[0].clientY - touchStartY.current;
+    // Only trigger if horizontal swipe > 50px and more horizontal than vertical
+    if (Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(dy)) return;
+    if (dx < 0) handleNext();  // swipe left → next
+    else handlePrev();          // swipe right → prev
+  };
 
   // Redirect if no session
   useEffect(() => {
@@ -159,7 +177,7 @@ export default function Practice() {
   const ws = stats[q.id];
 
   return (
-    <div>
+    <div onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
       {/* Progress */}
       <div className="flex items-center gap-3 mb-6 sticky top-[73px] z-[5] bg-slate-100 py-2">
         <span className="text-xs font-semibold text-slate-500 whitespace-nowrap max-w-[120px] overflow-hidden text-ellipsis">
