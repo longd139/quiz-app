@@ -60,7 +60,7 @@ function isEmptyBlock(lines) { return lines.every(l => !l.trim()); }
 
 function isQuestionStart(line) { return /^(Câu\s+\d+|Q\d+|\d+|< *\d+ *>)\s*[.:)]?\s*.+/i.test(line.trim()); }
 
-function isOptionLine(line) { return /^[A-Da-d]\s*[.)]\s*.+/.test(line); }
+function isOptionLine(line) { return /^[A-Ha-h]\s*[.)]\s*.+/.test(line); }
 
 function isAnswerLine(line) { return /^(Đ[aá]p\s*[aá]n|DA|ĐA|Answer|ANS?)\s*[:=]/i.test(line); }
 
@@ -82,7 +82,7 @@ function parseBlock(block) {
     const line = lines[i].trim();
     if (!line) continue;
 
-    const optMatch = line.match(/^([A-Da-d])\s*[.)]\s*(.+)/);
+    const optMatch = line.match(/^([A-Ha-h])\s*[.)]\s*(.+)/);
     const ansMatch = line.match(/^(Đ[aá]p\s*[aá]n|DA|ĐA|Answer|ANS?)\s*[:=]\s*(.+)/i);
     const expMatch = line.match(/^(Gi[aả]i\s*th[ií]ch|GT|Explanation|Explain)\s*[:=]\s*(.+)/i);
 
@@ -118,5 +118,5 @@ function parseBlock(block) {
 function parseAnswerLetters(value) {
   if (!value) return [];
   const cleaned = value.replace(/\s+v[àa]\s+/g, ',').replace(/\s+/g, ',');
-  return cleaned.split(',').map(s => s.trim().toUpperCase()).filter(s => /^[A-D]$/.test(s)).map(s => s.charCodeAt(0) - 65);
+  return cleaned.split(',').map(s => s.trim().toUpperCase()).filter(s => /^[A-H]$/.test(s)).map(s => s.charCodeAt(0) - 65);
 }
