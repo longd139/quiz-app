@@ -18,7 +18,6 @@ export default function Practice() {
   });
   const [showingResult, setShowingResult] = useState(false);
   const [reviewedIds, setReviewedIds] = useState(new Set());
-  const [retryCounts, setRetryCounts] = useState({});
 
   // Redirect if no session
   useEffect(() => {
@@ -73,7 +72,7 @@ export default function Practice() {
         q.correctIndices.slice().sort((a,b)=>a-b)
       );
       const origId = q._retryOf || q.id;
-      if (!correct && (retryCounts[origId] || 0) < 1) {
+      if (!correct) {
         const gap = 2;
         const insertPos = Math.min(currentIdx + gap + 1, questions.length);
         const retryQuestion = { ...q, id: uid(), _retryOf: origId };
@@ -82,7 +81,6 @@ export default function Practice() {
           next.splice(insertPos, 0, retryQuestion);
           return next;
         });
-        setRetryCounts(prev => ({ ...prev, [origId]: (prev[origId] || 0) + 1 }));
         setAnswers(prev => ({ ...prev, [retryQuestion.id]: [] }));
         insertedRetry = true;
       }
