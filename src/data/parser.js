@@ -5,7 +5,7 @@ export function parseBulkPaste(text) {
   if (!normalized) return { questions: [], warnings: ['Văn bản trống.'] };
 
   const blocks = splitIntoBlocks(normalized);
-  if (blocks.length === 0) return { questions: [], warnings: ['Không tìm thấy câu hỏi nào. Hãy dùng định dạng "Câu 1: ..." hoặc "1. ..."'] };
+  if (blocks.length === 0) return { questions: [], warnings: ['Không tìm thấy câu hỏi nào. Hãy dùng định dạng "<1> ...", "Câu 1: ..." hoặc "1. ..."'] };
 
   const questions = [], warnings = [];
   for (let i = 0; i < blocks.length; i++) {
@@ -33,7 +33,7 @@ function splitIntoBlocks(text) {
 
 function isEmptyBlock(lines) { return lines.every(l => !l.trim()); }
 
-function isQuestionStart(line) { return /^(Câu\s+\d+|Q\d+|\d+)\s*[.:)]\s*.+/i.test(line.trim()); }
+function isQuestionStart(line) { return /^(Câu\s+\d+|Q\d+|\d+|< *\d+ *>)\s*[.:)]?\s*.+/i.test(line.trim()); }
 
 function parseBlock(block) {
   const lines = block.split('\n');
@@ -42,7 +42,7 @@ function parseBlock(block) {
 
   let state = 'PROMPT', promptLines = [];
   const firstLine = lines[0].trim();
-  const promptStart = firstLine.replace(/^(Câu\s+\d+|Q\d+|\d+)\s*[.:)]\s*/i, '');
+  const promptStart = firstLine.replace(/^(Câu\s+\d+|Q\d+|\d+|< *\d+ *>)\s*[.:)]?\s*/i, '');
   if (promptStart) promptLines.push(promptStart);
 
   for (let i = 1; i < lines.length; i++) {
