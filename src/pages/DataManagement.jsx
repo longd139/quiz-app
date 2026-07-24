@@ -5,6 +5,7 @@ import { getSyncConfig, isSyncConfigured } from '../data/sync';
 export default function DataManagement() {
   const { data, update, syncStatus, doPush, doPull, doSetupSync, doDisconnectSync, showConfirm } = useQuiz();
   const [token, setToken] = useState(() => getSyncConfig()?.github_token || '');
+  const [gistId, setGistId] = useState(() => getSyncConfig()?.gist_id || '');
   const [showToken, setShowToken] = useState(false);
   const [importText, setImportText] = useState('');
   const [importFeedback, setImportFeedback] = useState('');
@@ -51,7 +52,7 @@ export default function DataManagement() {
   };
 
   const handleSetupSync = async () => {
-    try { await doSetupSync(token); setShowConfig(false); alert('✅ Đã kết nối GitHub Gist thành công!'); }
+    try { await doSetupSync(token, gistId); setShowConfig(false); alert('✅ Đã kết nối GitHub Gist thành công!'); }
     catch (e) { alert('❌ Lỗi kết nối: ' + e.message); }
   };
 
@@ -82,6 +83,10 @@ export default function DataManagement() {
                 className="flex-1 px-3 py-2.5 border border-slate-200 rounded-lg text-xs font-mono focus:border-primary-500 outline-none" />
               <button onClick={() => setShowToken(!showToken)} className="border border-slate-200 px-3 py-2 rounded-lg text-sm text-slate-500">{showToken ? 'Ẩn' : 'Hiện'}</button>
             </div>
+            <label className="font-semibold text-sm block mb-1.5 mt-3">Gist ID (bỏ trống để tạo mới):</label>
+            <input type="text" value={gistId} onChange={e => setGistId(e.target.value)}
+              placeholder="Nhập Gist ID từ thiết bị kia, hoặc bỏ trống để tạo Gist mới"
+              className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-xs font-mono focus:border-primary-500 outline-none" />
             <div className="text-xs text-slate-500 leading-relaxed bg-slate-50 p-2.5 rounded-lg mt-2">
               <strong>Cách lấy token:</strong> Vào <code className="bg-white px-1 py-0.5 rounded text-xs">github.com/settings/tokens</code> &rarr; Generate new token (classic) &rarr; Chọn scope <strong>gist</strong> &rarr; Copy token paste vào đây.
             </div>

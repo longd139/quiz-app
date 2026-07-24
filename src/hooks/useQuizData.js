@@ -75,15 +75,22 @@ export function useQuizData() {
     setSyncStatus('synced');
   }, []);
 
-  const doSetupSync = useCallback(async (token) => {
+  const doSetupSync = useCallback(async (token, existingGistId) => {
     token = token.trim();
     if (!token) throw new Error('Vui lòng nhập GitHub token.');
     setSyncStatus('syncing');
     try {
-      const currentData = loadData();
-      const gistId = await createGist(token, currentData);
+      const gistId = existingGistId?.trim() || await createGist(token, { collections: [], tests: [], history: [], settings: { shuffleQuestions: true, shuffleOptions: false, practiceMode: 'submit' }, questionStats: {} });
       const cfg = { github_token: token, gist_id: gistId, last_synced_at: new Date().toISOString(), last_pushed_at: new Date().toISOString() };
       setSyncConfig(cfg);
+      if (existingGistId?.trim()) {
+        // Kết nối vào Gist có sẵn: pull data từ cloud về
+        const result = await pullFromCloud();
+        setData(result);
+      } else {
+        // Tạo Gist mới: push data local lên
+        await pushToCloud();
+      }
       setSyncStatus('synced');
     } catch (e) { setSyncStatus('error'); throw e; }
   }, []);
