@@ -51,7 +51,8 @@ export default function PracticeSetup() {
         const indices = q.options.map((_, i) => i);
         for (let i = indices.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [indices[i], indices[j]] = [indices[j], indices[i]]; }
         const map = {}; indices.forEach((o, n) => { map[o] = n; });
-        return { ...q, options: indices.map(i => q.options[i]), correctIndices: q.correctIndices.map(ci => map[ci]).sort((a, b) => a - b) };
+        const labels = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+        return { ...q, options: indices.map((i, n) => ({ ...q.options[i], label: labels[n] })), correctIndices: q.correctIndices.map(ci => map[ci]).sort((a, b) => a - b) };
       });
     }
 
@@ -92,8 +93,7 @@ export default function PracticeSetup() {
             return (
               <label key={test.id}
                 onClick={() => toggleTest(test.id)}
-                className={`flex items-center gap-3 p-3.5 bg-white border-2 rounded-xl cursor-pointer transition-all ${selected ? 'border-primary-500 bg-primary-50' : 'border-slate-200 hover:border-primary-500 hover:bg-primary-50'}`}>
-                <input type="checkbox" checked={selected} onChange={() => {}} className="w-5 h-5 cursor-pointer" />
+                className={`flex items-center gap-3 p-3.5 border-2 rounded-xl cursor-pointer transition-all ${selected ? 'border-primary-500 bg-primary-100 shadow-sm' : 'border-slate-200 bg-white hover:border-primary-500 hover:bg-primary-50'}`}>
                 <div className="flex-1">
                   <div className="font-semibold text-sm">{escHtml(test.name)}</div>
                   <div className="text-[0.7rem] text-slate-500">{escHtml(getCollectionName(data.collections, test.collectionId))} &middot; {test.questions.length} câu</div>
