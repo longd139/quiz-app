@@ -1,4 +1,8 @@
 // Data storage helpers + model factories
+import { marked } from 'marked';
+
+// Configure marked for safe rendering (no raw HTML from user input)
+marked.setOptions({ breaks: true, gfm: true });
 
 const STORAGE_KEY = 'quiz_data';
 
@@ -67,6 +71,103 @@ export function ensureCollections(data) {
 export function escHtml(s) {
   if (!s) return '';
   return s;
+}
+
+// LaTeX command to Unicode symbol mapping
+const LATEX_UNICODE = {
+  '\\rightarrow': '→',   // →
+  '\\leftarrow': '←',    // ←
+  '\\Rightarrow': '⇒',   // ⇒
+  '\\Leftarrow': '⇐',    // ⇐
+  '\\leftrightarrow': '↔', // ↔
+  '\\uparrow': '↑',      // ↑
+  '\\downarrow': '↓',    // ↓
+  '\\nearrow': '↗',      // ↗
+  '\\searrow': '↘',      // ↘
+  '\\infty': '∞',        // ∞
+  '\\pm': '±',           // ±
+  '\\times': '×',        // ×
+  '\\div': '÷',          // ÷
+  '\\cdot': '·',         // ·
+  '\\dots': '…',         // …
+  '\\geq': '≥',          // ≥
+  '\\leq': '≤',          // ≤
+  '\\neq': '≠',          // ≠
+  '\\approx': '≈',       // ≈
+  '\\equiv': '≡',        // ≡
+  '\\sim': '∼',          // ∼
+  '\\propto': '∝',       // ∝
+  '\\alpha': 'α',        // α
+  '\\beta': 'β',         // β
+  '\\gamma': 'γ',        // γ
+  '\\delta': 'δ',        // δ
+  '\\epsilon': 'ε',      // ε
+  '\\lambda': 'λ',       // λ
+  '\\mu': 'μ',           // μ
+  '\\pi': 'π',           // π
+  '\\sigma': 'σ',        // σ
+  '\\theta': 'θ',        // θ
+  '\\omega': 'ω',        // ω
+  '\\sum': '∑',          // ∑
+  '\\prod': '∏',         // ∏
+  '\\int': '∫',          // ∫
+  '\\angle': '∠',        // ∠
+  '\\triangle': '△',     // △
+  '\\sqrt': '√',         // √
+  '\\forall': '∀',       // ∀
+  '\\exists': '∃',       // ∃
+  '\\in': '∈',           // ∈
+  '\\notin': '∉',        // ∉
+  '\\subset': '⊂',       // ⊂
+  '\\subseteq': '⊆',     // ⊆
+  '\\cup': '∪',          // ∪
+  '\\cap': '∩',          // ∩
+  '\\land': '∧',         // ∧
+  '\\lor': '∨',          // ∨
+  '\\neg': '¬',          // ¬
+  '\\to': '→',           // →
+  '\\implies': '⇒',      // ⇒
+  '\\iff': '⇔',          // ⇔
+  '\\mapsto': '↦',       // ↦
+  '\\circ': '∘',         // ∘
+  '\\bullet': '•',       // •
+  '\\oplus': '⊕',        // ⊕
+  '\\otimes': '⊗',       // ⊗
+  '\\perp': '⟂',         // ⟂
+  '\\parallel': '∥',     // ∥
+  '\\partial': '∂',      // ∂
+  '\\nabla': '∇',        // ∇
+  '\\aleph': 'ℵ',        // ℵ
+  '\\emptyset': '∅',     // ∅
+  '\\degree': '°',       // °
+};
+
+// Render Markdown text to HTML, with LaTeX $...$ math support
+export function renderMd(text) {
+  if (!text) return '';
+  // Step 1: Escape HTML special chars so <tag> displays as text, not HTML elements
+  let processed = text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+  // Step 2: Replace LaTeX $...$ expressions
+  processed = processed.replace(/\$([^$]+)\$/g, (match, inner) => {
+    // Try to replace known LaTeX commands with Unicode
+    let result = inner;
+    // Sort keys by length descending so longer commands match first
+    const keys = Object.keys(LATEX_UNICODE).sort((a, b) => b.length - a.length);
+    for (const cmd of keys) {
+      if (result.includes(cmd)) {
+        result = result.replace(new RegExp(cmd.replace(/\\/g, '\\\\'), 'g'), LATEX_UNICODE[cmd]);
+      }
+    }
+    // Remove remaining backslash-prefixed commands we don't know
+    result = result.replace(/\\[a-zA-Z]+/g, '');
+    // Return the processed content (unwrap $...$ since it's now Unicode or plain text)
+    return result || inner;
+  });
+  // Step 3: Parse Markdown
+  return marked.parse(processed);
 }
 
 export function escAttr(s) {

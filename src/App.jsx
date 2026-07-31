@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { useQuizData } from './hooks/useQuizData';
+import { useDarkMode } from './hooks/useDarkMode';
 import Header from './components/Header';
 import TabNav from './components/TabNav';
 import ConfirmDialog from './components/ConfirmDialog';
@@ -20,6 +21,7 @@ export function useQuiz() {
 
 export default function App() {
   const quiz = useQuizData();
+  const { dark, toggle: toggleDark } = useDarkMode();
   const [confirmMsg, setConfirmMsg] = useState(null);
   const [confirmCallback, setConfirmCallback] = useState(null);
 
@@ -38,8 +40,8 @@ export default function App() {
   return (
     <QuizContext.Provider value={ctx}>
       <BrowserRouter>
-        <div className="max-w-2xl mx-auto px-4 pb-8">
-          <Header syncStatus={quiz.syncStatus} conflictRef={quiz.conflictRef} resolveConflict={quiz.resolveConflict} />
+        <div className="max-w-2xl mx-auto px-4 pb-8 dark:text-slate-200">
+          <Header syncStatus={quiz.syncStatus} conflictRef={quiz.conflictRef} resolveConflict={quiz.resolveConflict} dark={dark} toggleDark={toggleDark} />
           <TabNav />
           <div className="page-enter">
             <Routes>

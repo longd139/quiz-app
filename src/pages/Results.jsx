@@ -1,6 +1,6 @@
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useQuiz } from '../App';
-import { escHtml, arraysEqual } from '../data/storage';
+import { arraysEqual, renderMd } from '../data/storage';
 
 export default function Results() {
   const navigate = useNavigate();
@@ -16,10 +16,10 @@ export default function Results() {
 
   return (
     <div>
-      <div className="text-center p-8 bg-white rounded-xl shadow-sm border-2 border-primary-600 mb-6">
+      <div className="text-center p-8 bg-white dark:bg-slate-800 rounded-xl shadow-sm dark:shadow-none border-2 border-primary-600 mb-6">
         <div className="text-5xl font-extrabold text-primary-600 leading-none">{pct}%</div>
-        <div className="text-sm text-slate-500 mt-2">Đúng {correctCount}/{total} câu</div>
-        <div className="h-2 bg-slate-200 rounded-full mt-3 overflow-hidden">
+        <div className="text-sm text-slate-500 dark:text-slate-400 mt-2">Đúng {correctCount}/{total} câu</div>
+        <div className="h-2 bg-slate-200 dark:bg-slate-700 rounded-full mt-3 overflow-hidden">
           <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, background: barColor }} />
         </div>
       </div>
@@ -33,9 +33,9 @@ export default function Results() {
           const ws = stats[q.id];
 
           return (
-            <div key={i} className={`bg-white rounded-xl shadow-sm border border-slate-200 p-4 mb-3 ${ok ? 'border-l-4 border-l-success-600' : 'border-l-4 border-l-danger-600'}`}>
+            <div key={i} className={`bg-white dark:bg-slate-800 rounded-xl shadow-sm dark:shadow-none border border-slate-200 dark:border-slate-700 p-4 mb-3 ${ok ? 'border-l-4 border-l-success-600' : 'border-l-4 border-l-danger-600'}`}>
               <div className="font-semibold mb-3">
-                {ok ? '✓' : '×'} Câu {i + 1}: {escHtml(q.prompt)}
+                {ok ? '✓' : '×'} Câu {i + 1}: <span dangerouslySetInnerHTML={{ __html: renderMd(q.prompt) }} />
                 {q.correctIndices.length > 1 && <span className="text-[0.7rem] text-warning-600 ml-2">(Chọn nhiều)</span>}
                 {ws && ws.wrongCount > 0 && <span className="text-[0.7rem] text-danger-500 ml-2">(Đã sai {ws.wrongCount} lần)</span>}
               </div>
@@ -49,7 +49,7 @@ export default function Results() {
                 return (
                   <div key={oi} className={`py-2 px-3 mb-1 rounded-md text-sm flex items-center gap-2 ${cls}`}>
                     <span className="font-bold min-w-[24px]">{opt.label}.</span>
-                    <span>{escHtml(opt.text)}</span>
+                    <span dangerouslySetInnerHTML={{ __html: renderMd(opt.text) }} />
                     {ic && <span className="ml-auto">{'✓'}</span>}
                     {up && !ic && <span className="ml-auto">{'×'}</span>}
                   </div>
@@ -58,7 +58,7 @@ export default function Results() {
 
               {q.explanation && (
                 <div className="mt-3 p-3 bg-primary-50 rounded-lg text-[0.8rem] leading-relaxed">
-                  <strong>Giải thích:</strong> {escHtml(q.explanation)}
+                  <strong>Giải thích:</strong> <span dangerouslySetInnerHTML={{ __html: renderMd(q.explanation) }} />
                 </div>
               )}
             </div>
@@ -68,7 +68,7 @@ export default function Results() {
 
       <div className="flex gap-2 mt-5">
         <button onClick={() => navigate('/practice-setup')} className="flex-1 bg-primary-600 text-white px-4 py-3 rounded-lg text-base font-semibold hover:bg-primary-700 active:scale-95 transition-all">Làm lại</button>
-        <button onClick={() => navigate('/')} className="border border-slate-200 px-4 py-3 rounded-lg text-sm font-semibold hover:bg-slate-50 text-slate-600">Về trang chủ</button>
+        <button onClick={() => navigate('/')} className="border border-slate-200 dark:border-slate-700 px-4 py-3 rounded-lg text-sm font-semibold hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-800 text-slate-600">Về trang chủ</button>
       </div>
     </div>
   );

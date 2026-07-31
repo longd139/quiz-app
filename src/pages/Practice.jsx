@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useQuiz } from '../App';
-import { uid, escHtml, arraysEqual } from '../data/storage';
+import { uid, arraysEqual, renderMd } from '../data/storage';
 
 export default function Practice() {
   const { data, update } = useQuiz();
@@ -76,8 +76,15 @@ export default function Practice() {
       const cur = [...(a[q.id] || [])];
       if (isMulti) {
         const idx = cur.indexOf(oi);
-        if (idx >= 0) cur.splice(idx, 1);
-        else cur.push(oi);
+        if (idx >= 0) {
+          cur.splice(idx, 1);
+        } else {
+          cur.push(oi);
+          // Keep only the last N selections (FIFO: remove oldest)
+          if (cur.length > q.correctIndices.length) {
+            cur.shift();
+          }
+        }
       } else {
         cur.length = 0;
         cur.push(oi);
@@ -202,15 +209,15 @@ export default function Practice() {
   return (
     <div onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
       {/* Progress */}
-      <div className="flex items-center gap-3 mb-6 sticky top-[73px] z-[5] bg-slate-100 py-2">
-        <span className="text-xs font-semibold text-slate-500 whitespace-nowrap max-w-[120px] overflow-hidden text-ellipsis">
+      <div className="flex items-center gap-3 mb-6 sticky top-[73px] z-[5] bg-slate-100 dark:bg-slate-900 py-2">
+        <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 whitespace-nowrap max-w-[120px] overflow-hidden text-ellipsis">
           {(sessionNames || []).join(' + ')}
         </span>
-        <div className="flex-1 h-2 bg-slate-200 rounded-full overflow-hidden">
+        <div className="flex-1 h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
           <div className="h-full bg-primary-600 transition-all duration-300 rounded-full" style={{ width: `${progress}%` }} />
         </div>
-        <span className="text-xs font-semibold text-slate-500 whitespace-nowrap">{answeredCount} / {questions.length}</span>
-        <button onClick={handleQuit} className="border border-slate-200 px-2.5 py-1.5 rounded-lg text-xs font-semibold hover:bg-slate-50 text-slate-500" title="Thoát">{'×'}</button>
+        <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 whitespace-nowrap">{answeredCount} / {questions.length}</span>
+        <button onClick={handleQuit} className="border border-slate-200 dark:border-slate-700 px-2.5 py-1.5 rounded-lg text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-800 text-slate-500" title="Thoát">{'×'}</button>
       </div>
 
       {/* Toast */}
@@ -222,8 +229,8 @@ export default function Practice() {
 
       {/* Question */}
       <div key={currentIdx} className={slideFrom === 'right' ? 'slide-from-right' : 'slide-from-left'}>
-        <div className="bg-white rounded-xl p-5 sm:p-6 shadow-sm border border-slate-200 mb-5">
-        <div className="text-base sm:text-lg font-semibold mb-5 leading-relaxed">{q.prompt}</div>
+        <div className="bg-white dark:bg-slate-800 rounded-xl p-5 sm:p-6 shadow-sm dark:shadow-none border border-slate-200 dark:border-slate-700 mb-5">
+        <div className="text-base sm:text-lg font-semibold mb-5 leading-relaxed" dangerouslySetInnerHTML={{ __html: renderMd(q.prompt) }} />
         {isMulti && !showingResult && (
           <span className="text-xs text-warning-600 font-medium mb-3 inline-block bg-warning-50 px-2.5 py-0.5 rounded-full">(Chọn nhiều đáp án)</span>
         )}
@@ -237,15 +244,15 @@ export default function Practice() {
               if (sel && ic) { cls = 'border-2 border-success-600 bg-success-50 font-semibold'; marker = <span className="ml-auto text-success-600">{'✓'}</span>; }
               else if (sel && !ic) { cls = 'border-2 border-danger-600 bg-danger-50 font-semibold'; marker = <span className="ml-auto text-danger-600">{'×'}</span>; }
               else if (!sel && ic) { cls = 'border-2 border-warning-500 bg-warning-50'; marker = <span className="ml-auto text-warning-600">{'✓'}</span>; }
-              else { cls = 'border-2 border-slate-200 bg-white opacity-60'; }
+              else { cls = 'border-2 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 opacity-60'; }
             } else if (sel) { cls = 'opt-selected border-2 border-primary-500 bg-primary-50 font-semibold'; }
-            else { cls = 'border-2 border-slate-200 bg-white hover:border-blue-300'; }
+            else { cls = 'border-2 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-blue-300'; }
 
             return (
               <button key={oi} onClick={() => handleOptionClick(oi)} disabled={showingResult}
                 className={`opt-btn flex items-center gap-3 w-full p-3.5 mb-2 rounded-lg cursor-pointer text-sm text-left transition-all ${cls}`}>
                 <span className={`font-bold text-xs min-w-[24px] ${showingResult ? '' : 'text-primary-600'}`}>{opt.label}.</span>
-                <span>{escHtml(opt.text)}</span>
+                <span dangerouslySetInnerHTML={{ __html: renderMd(opt.text) }} />
                 {marker}
               </button>
             );
@@ -254,7 +261,8 @@ export default function Practice() {
 
         {showingResult && q.explanation && (
           <div className="mt-3 p-3 bg-primary-50 rounded-lg text-[0.8rem] leading-relaxed">
-            <strong>{arraysEqual(currentAnswers.slice().sort((a,b)=>a-b), q.correctIndices.slice().sort((a,b)=>a-b)) ? 'Giải thích:' : 'Đáp án đúng - Giải thích:'}</strong> {escHtml(q.explanation)}
+            <strong>{arraysEqual(currentAnswers.slice().sort((a,b)=>a-b), q.correctIndices.slice().sort((a,b)=>a-b)) ? 'Giải thích:' : 'Đáp án đúng - Giải thích:'}</strong>
+            <span dangerouslySetInnerHTML={{ __html: renderMd(q.explanation) }} />
           </div>
         )}
 
@@ -267,10 +275,10 @@ export default function Practice() {
       {/* Navigation */}
       <div className="flex gap-3 justify-between mt-3">
         <button onClick={handlePrev} disabled={currentIdx === 0}
-          className="border border-slate-200 px-4 py-2.5 rounded-lg text-sm font-semibold hover:bg-slate-50 transition-all text-slate-600 disabled:opacity-50">
+          className="border border-slate-200 dark:border-slate-700 px-4 py-2.5 rounded-lg text-sm font-semibold hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-800 transition-all text-slate-600 dark:text-slate-300 disabled:opacity-50">
           Trước
         </button>
-        <span className="text-xs text-slate-500 self-center">Câu {currentIdx + 1} / {questions.length}</span>
+        <span className="text-xs text-slate-500 dark:text-slate-400 self-center">Câu {currentIdx + 1} / {questions.length}</span>
         <button onClick={handleNext} className={`px-4 py-2.5 rounded-lg text-sm font-semibold active:scale-95 transition-all text-white ${
           (isInstant && showingResult && isLast) || (!isInstant && isLast) ? 'bg-success-600 hover:bg-success-700' : 'bg-primary-600 hover:bg-primary-700'
         }`}>

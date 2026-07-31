@@ -65,14 +65,14 @@ export default function DataManagement() {
   const handleReconfig = () => { setShowConfig(true); };
 
   const statusLabels = { synced: 'Đã đồng bộ', syncing: 'Đang đồng bộ...', error: 'Lỗi đồng bộ', unconfigured: 'Chưa cấu hình' };
-  const statusColors = { synced: 'bg-success-50 text-success-700', syncing: 'bg-warning-50 text-warning-700', error: 'bg-danger-50 text-danger-700', unconfigured: 'bg-slate-50 text-slate-500' };
+  const statusColors = { synced: 'bg-success-50 text-success-700', syncing: 'bg-warning-50 text-warning-700', error: 'bg-danger-50 text-danger-700', unconfigured: 'bg-slate-50 dark:bg-slate-800 text-slate-500' };
 
   return (
     <div>
       {/* Sync */}
-      <div className="bg-white rounded-xl shadow-sm border-t-2 border-primary-600 p-4 mb-4">
+      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm dark:shadow-none border-t-2 border-primary-600 p-4 mb-4">
         <h3 className="text-base font-semibold mb-1">Đồng bộ GitHub Gist</h3>
-        <p className="text-xs text-slate-500 mb-0">Đồng bộ dữ liệu giữa laptop và điện thoại qua GitHub Gist (miễn phí, private).</p>
+        <p className="text-xs text-slate-500 dark:text-slate-400 mb-0">Đồng bộ dữ liệu giữa laptop và điện thoại qua GitHub Gist (miễn phí, private).</p>
 
         {!configured || showConfig ? (
           <div className="mt-3">
@@ -80,18 +80,18 @@ export default function DataManagement() {
             <div className="flex gap-2">
               <input type={showToken ? 'text' : 'password'} value={token} onChange={e => setToken(e.target.value)}
                 placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
-                className="flex-1 px-3 py-2.5 border border-slate-200 rounded-lg text-xs font-mono focus:border-primary-500 outline-none" />
-              <button onClick={() => setShowToken(!showToken)} className="border border-slate-200 px-3 py-2 rounded-lg text-sm text-slate-500">{showToken ? 'Ẩn' : 'Hiện'}</button>
+                className="flex-1 px-3 py-2.5 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-mono focus:border-primary-500 outline-none" />
+              <button onClick={() => setShowToken(!showToken)} className="border border-slate-200 dark:border-slate-700 px-3 py-2 rounded-lg text-sm text-slate-500">{showToken ? 'Ẩn' : 'Hiện'}</button>
             </div>
             <label className="font-semibold text-sm block mb-1.5 mt-3">Gist ID (bỏ trống để tạo mới):</label>
             <input type="text" value={gistId} onChange={e => setGistId(e.target.value)}
               placeholder="Nhập Gist ID từ thiết bị kia, hoặc bỏ trống để tạo Gist mới"
-              className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-xs font-mono focus:border-primary-500 outline-none" />
-            <div className="text-xs text-slate-500 leading-relaxed bg-slate-50 p-2.5 rounded-lg mt-2">
-              <strong>Cách lấy token:</strong> Vào <code className="bg-white px-1 py-0.5 rounded text-xs">github.com/settings/tokens</code> &rarr; Generate new token (classic) &rarr; Chọn scope <strong>gist</strong> &rarr; Copy token paste vào đây.
+              className="w-full px-3 py-2.5 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-mono focus:border-primary-500 outline-none" />
+            <div className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed bg-slate-50 dark:bg-slate-800 p-2.5 rounded-lg mt-2">
+              <strong>Cách lấy token:</strong> Vào <code className="bg-white dark:bg-slate-800 px-1 py-0.5 rounded text-xs">github.com/settings/tokens</code> &rarr; Generate new token (classic) &rarr; Chọn scope <strong>gist</strong> &rarr; Copy token paste vào đây.
             </div>
             <button onClick={handleSetupSync} className="mt-3 bg-primary-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-primary-700 active:scale-95">Lưu token & Kết nối</button>
-            {configured && <button onClick={() => setShowConfig(false)} className="mt-3 ml-2 border border-slate-200 px-4 py-2 rounded-lg text-sm text-slate-600">Hủy</button>}
+            {configured && <button onClick={() => setShowConfig(false)} className="mt-3 ml-2 border border-slate-200 dark:border-slate-700 px-4 py-2 rounded-lg text-sm text-slate-600">Hủy</button>}
           </div>
         ) : (
           <div>
@@ -100,50 +100,50 @@ export default function DataManagement() {
               {cfg?.last_synced_at && <span className="text-xs ml-auto">Lúc {new Date(cfg.last_synced_at).toLocaleTimeString('vi-VN')}</span>}
             </div>
             {cfg?.gist_id && (
-              <div className="text-xs text-slate-500 my-2">
+              <div className="text-xs text-slate-500 dark:text-slate-400 my-2">
                 Gist ID: <code className="text-xs">{cfg.gist_id}</code>
                 <a href={`https://gist.github.com/${cfg.gist_id}`} target="_blank" className="text-xs ml-1 text-primary-600 underline" rel="noreferrer">Mở trên GitHub</a>
               </div>
             )}
             <div className="flex flex-wrap gap-2">
               <button onClick={doPush} className="bg-primary-600 text-white px-3 py-2 rounded-lg text-xs font-semibold hover:bg-primary-700 active:scale-95">Push lên cloud</button>
-              <button onClick={doPull} className="border border-slate-200 px-3 py-2 rounded-lg text-xs font-semibold hover:bg-slate-50 text-slate-600">Pull từ cloud</button>
-              <button onClick={handleReconfig} className="border border-slate-200 px-3 py-2 rounded-lg text-xs font-semibold hover:bg-slate-50 text-slate-600">Cấu hình lại</button>
-              <button onClick={handleDisconnect} className="border border-slate-200 px-3 py-2 rounded-lg text-xs font-semibold hover:bg-slate-50 text-slate-600">Ngắt kết nối</button>
+              <button onClick={doPull} className="border border-slate-200 dark:border-slate-700 px-3 py-2 rounded-lg text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-800 text-slate-600">Pull từ cloud</button>
+              <button onClick={handleReconfig} className="border border-slate-200 dark:border-slate-700 px-3 py-2 rounded-lg text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-800 text-slate-600">Cấu hình lại</button>
+              <button onClick={handleDisconnect} className="border border-slate-200 dark:border-slate-700 px-3 py-2 rounded-lg text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-800 text-slate-600">Ngắt kết nối</button>
             </div>
           </div>
         )}
       </div>
 
       {/* Export */}
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 mb-4">
+      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm dark:shadow-none border border-slate-200 dark:border-slate-700 p-4 mb-4">
         <h3 className="text-base font-semibold mb-1">Xuất dữ liệu</h3>
-        <p className="text-xs text-slate-500 mb-3">Sao lưu toàn bộ câu hỏi, bài test và lịch sử ra file JSON.</p>
-        <textarea readOnly value={exportJson} className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-xs font-mono outline-none min-h-[120px] resize-y bg-slate-50" />
+        <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">Sao lưu toàn bộ câu hỏi, bài test và lịch sử ra file JSON.</p>
+        <textarea readOnly value={exportJson} className="w-full px-3 py-2.5 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-mono outline-none min-h-[120px] resize-y bg-slate-50 dark:bg-slate-800 dark:text-slate-300" />
         <div className="flex flex-wrap gap-2 mt-3">
           <button onClick={handleCopy} className="bg-primary-600 text-white px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-primary-700 active:scale-95">Sao chép</button>
-          <button onClick={handleDownload} className="border border-slate-200 px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-slate-50 text-slate-600">Tải xuống file</button>
+          <button onClick={handleDownload} className="border border-slate-200 dark:border-slate-700 px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-800 text-slate-600">Tải xuống file</button>
         </div>
       </div>
 
       {/* Import */}
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 mb-4">
+      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm dark:shadow-none border border-slate-200 dark:border-slate-700 p-4 mb-4">
         <h3 className="text-base font-semibold mb-1">Nhập dữ liệu</h3>
-        <p className="text-xs text-slate-500 mb-3">Nhập file JSON đã xuất trước đó. Dữ liệu hiện tại sẽ bị ghi đè.</p>
+        <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">Nhập file JSON đã xuất trước đó. Dữ liệu hiện tại sẽ bị ghi đè.</p>
         <textarea value={importText} onChange={e => setImportText(e.target.value)} placeholder="Paste JSON vào đây..."
-          className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-xs font-mono outline-none min-h-[120px] resize-y" />
+          className="w-full px-3 py-2.5 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-mono outline-none min-h-[120px] resize-y" />
         {importFeedback && <div className={`text-sm py-2 px-3 rounded-lg mt-2 ${importFeedback.includes('✅') ? 'bg-success-50 text-success-700' : 'bg-danger-50 text-danger-700'}`}>{importFeedback}</div>}
         <div className="flex flex-wrap gap-2 mt-3">
           <button onClick={handleImport} className="bg-warning-600 text-white px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-warning-700 active:scale-95">Nhập (ghi đè)</button>
           <input type="file" ref={fileRef} accept=".json" className="hidden" onChange={e => { const f = e.target.files[0]; if (!f) return; const r = new FileReader(); r.onload = ev => setImportText(ev.target.result); r.readAsText(f); }} />
-          <button onClick={() => fileRef.current?.click()} className="border border-slate-200 px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-slate-50 text-slate-600">Chọn file</button>
+          <button onClick={() => fileRef.current?.click()} className="border border-slate-200 dark:border-slate-700 px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-800 text-slate-600">Chọn file</button>
         </div>
       </div>
 
       {/* Manage collections */}
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 mb-4">
+      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm dark:shadow-none border border-slate-200 dark:border-slate-700 p-4 mb-4">
         <h3 className="text-base font-semibold mb-1">Quản lý collection</h3>
-        <p className="text-xs text-slate-500 mb-3">Xóa collection trống (không chứa bài test nào).</p>
+        <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">Xóa collection trống (không chứa bài test nào).</p>
         {data.collections.length === 0 ? (
           <p className="text-xs text-slate-400 italic">Chưa có collection nào.</p>
         ) : (
@@ -151,7 +151,7 @@ export default function DataManagement() {
             {data.collections.map(c => {
               const testCount = data.tests.filter(t => t.collectionId === c.id).length;
               return (
-                <div key={c.id} className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-slate-50">
+                <div key={c.id} className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700">
                   <span className="text-sm">{c.name} <span className="text-xs text-slate-400">({testCount} bài)</span></span>
                   <button
                     onClick={() => {
@@ -179,7 +179,7 @@ export default function DataManagement() {
       </div>
 
       {/* Danger zone */}
-      <div className="bg-white rounded-xl shadow-sm border border-danger-600 p-4">
+      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm dark:shadow-none border border-danger-600 p-4">
         <h3 className="text-base font-semibold mb-1 text-danger-600">Vùng nguy hiểm</h3>
         <button onClick={() => showConfirm('⚠️ XÓA TOÀN BỘ dữ liệu? Tất cả bài test, câu hỏi, lịch sử sẽ mất vĩnh viễn.', () => {
           localStorage.removeItem('quiz_data');

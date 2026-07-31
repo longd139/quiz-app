@@ -73,17 +73,17 @@ export default function PracticeSetup() {
     <div>
       <div className="mb-4">
         <label className="font-semibold text-sm block mb-1.5">Lọc theo collection:</label>
-        <select value={filterId} onChange={e => setFilterId(e.target.value)} className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm bg-white outline-none">
+        <select value={filterId} onChange={e => setFilterId(e.target.value)} className="w-full px-3 py-2.5 border border-slate-200 dark:border-slate-700 rounded-lg text-sm bg-white dark:bg-slate-800 outline-none">
           <option value="">Tất cả collection</option>
           {data.collections.map(c => <option key={c.id} value={c.id}>{escHtml(c.name)}</option>)}
         </select>
       </div>
 
       <h3 className="text-base font-semibold mb-2">Chọn bài để luyện tập</h3>
-      <p className="text-xs text-slate-500 mb-4">Có thể chọn nhiều bài để gộp chung.</p>
+      <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">Có thể chọn nhiều bài để gộp chung.</p>
 
       {filteredTests.length === 0 ? (
-        <div className="text-center py-16 px-5 text-slate-500 bg-white rounded-xl border-2 border-dashed border-slate-200 mb-5">
+        <div className="text-center py-16 px-5 text-slate-500 dark:text-slate-400 bg-white dark:bg-slate-800 rounded-xl border-2 border-dashed border-slate-200 dark:border-slate-700 mb-5">
           <p className="text-sm">Chưa có bài nào để luyện tập.<br />Hãy thêm bài mới trước!</p>
         </div>
       ) : (
@@ -93,7 +93,7 @@ export default function PracticeSetup() {
             return (
               <label key={test.id}
                 onClick={() => toggleTest(test.id)}
-                className={`flex items-center gap-3 p-3.5 border-2 rounded-xl cursor-pointer transition-all ${selected ? 'border-primary-500 bg-primary-100 shadow-sm' : 'border-slate-200 bg-white hover:border-primary-500 hover:bg-primary-50'}`}>
+                className={`flex items-center gap-3 p-3.5 border-2 rounded-xl cursor-pointer transition-all ${selected ? 'border-primary-500 bg-primary-100 shadow-sm' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-primary-500 hover:bg-primary-50'}`}>
                 <div className="flex-1">
                   <div className="font-semibold text-sm">{escHtml(test.name)}</div>
                   <div className="text-[0.7rem] text-slate-500">{escHtml(getCollectionName(data.collections, test.collectionId))} &middot; {test.questions.length} câu</div>
@@ -114,7 +114,7 @@ export default function PracticeSetup() {
       </div>
 
       <label className="font-semibold text-sm block mb-1.5">Chế độ luyện tập:</label>
-      <select value={practiceMode} onChange={e => setPracticeMode(e.target.value)} className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm mb-5">
+      <select value={practiceMode} onChange={e => setPracticeMode(e.target.value)} className="w-full px-3 py-2.5 border border-slate-200 dark:border-slate-700 rounded-lg text-sm mb-5">
         <option value="instant">Xem đáp án ngay (sau mỗi câu)</option>
         <option value="submit">Nộp bài mới xem kết quả</option>
       </select>

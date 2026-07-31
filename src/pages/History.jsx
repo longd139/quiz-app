@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuiz } from '../App';
-import { escHtml, fmtDate } from '../data/storage';
+import { escHtml, fmtDate, renderMd } from '../data/storage';
 import Results from './Results';
 
 export default function History() {
@@ -12,7 +12,7 @@ export default function History() {
   if (viewingSession) {
     return (
       <div>
-        <button onClick={() => setViewingSession(null)} className="border border-slate-200 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-slate-50 text-slate-600 mb-4">
+        <button onClick={() => setViewingSession(null)} className="border border-slate-200 dark:border-slate-700 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-800 text-slate-600 dark:text-slate-300 mb-4">
           Quay lại lịch sử
         </button>
         <ResultsWrapper session={viewingSession} data={data} navigate={navigate} />
@@ -29,13 +29,13 @@ export default function History() {
         <span className="flex-1" />
         <button onClick={() => {
           showConfirm('Xóa toàn bộ lịch sử luyện tập?', () => update({ ...data, history: [] }));
-        }} className="border border-slate-200 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-500 hover:bg-slate-50">
+        }} className="border border-slate-200 dark:border-slate-700 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700">
           Xóa lịch sử
         </button>
       </div>
 
       {sessions.length === 0 ? (
-        <div className="text-center py-16 px-5 text-slate-500 bg-white rounded-xl border-2 border-dashed border-slate-200">
+        <div className="text-center py-16 px-5 text-slate-500 dark:text-slate-400 bg-white dark:bg-slate-800 rounded-xl border-2 border-dashed border-slate-200">
           <p className="text-sm">Chưa có lịch sử luyện tập nào.</p>
         </div>
       ) : (
@@ -44,7 +44,7 @@ export default function History() {
           const color = pct >= 80 ? 'text-success-600' : pct >= 50 ? 'text-warning-600' : 'text-danger-600';
           return (
             <div key={idx}
-              className="flex items-center justify-between gap-3 p-3.5 bg-white rounded-xl shadow-sm border border-slate-200 mb-2 cursor-pointer hover:border-primary-500 transition-all">
+              className="flex items-center justify-between gap-3 p-3.5 bg-white dark:bg-slate-800 rounded-xl shadow-sm dark:shadow-none border border-slate-200 dark:border-slate-700 mb-2 cursor-pointer hover:border-primary-500 transition-all">
               <div onClick={() => setViewingSession(s)} className="flex items-center gap-3 flex-1">
                 <div className={`text-xl font-extrabold min-w-[56px] text-center ${color}`}>{pct}%</div>
                 <div className="flex-1">
@@ -84,10 +84,10 @@ function ResultsWrapper({ session, data, navigate }) {
 
   return (
     <div>
-      <div className="text-center p-8 bg-white rounded-xl shadow-sm border-2 border-primary-600 mb-6">
+      <div className="text-center p-8 bg-white dark:bg-slate-800 rounded-xl shadow-sm dark:shadow-none border-2 border-primary-600 mb-6">
         <div className="text-5xl font-extrabold text-primary-600 leading-none">{pct}%</div>
-        <div className="text-sm text-slate-500 mt-2">Đúng {session.correctCount}/{session.totalQuestions} câu</div>
-        <div className="h-2 bg-slate-200 rounded-full mt-3 overflow-hidden">
+        <div className="text-sm text-slate-500 dark:text-slate-400 mt-2">Đúng {session.correctCount}/{session.totalQuestions} câu</div>
+        <div className="h-2 bg-slate-200 dark:bg-slate-700 rounded-full mt-3 overflow-hidden">
           <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, background: barColor }} />
         </div>
       </div>
@@ -99,9 +99,9 @@ function ResultsWrapper({ session, data, navigate }) {
         const ok = arraysEqual(c, us);
         const ws = stats[q.id];
         return (
-          <div key={i} className={`bg-white rounded-xl shadow-sm border border-slate-200 p-4 mb-3 ${ok ? 'border-l-4 border-l-success-600' : 'border-l-4 border-l-danger-600'}`}>
+          <div key={i} className={`bg-white dark:bg-slate-800 rounded-xl shadow-sm dark:shadow-none border border-slate-200 dark:border-slate-700 p-4 mb-3 ${ok ? 'border-l-4 border-l-success-600' : 'border-l-4 border-l-danger-600'}`}>
             <div className="font-semibold mb-3">
-              {ok ? '✓' : '×'} Câu {i + 1}: {escHtml(q.prompt)}
+              {ok ? '✓' : '×'} Câu {i + 1}: <span dangerouslySetInnerHTML={{ __html: renderMd(q.prompt) }} />
               {q.correctIndices.length > 1 && <span className="text-[0.7rem] text-warning-600 ml-2">(Chọn nhiều)</span>}
               {ws && ws.wrongCount > 0 && <span className="text-[0.7rem] text-danger-500 ml-2">(Đã sai {ws.wrongCount} lần)</span>}
             </div>
@@ -113,19 +113,19 @@ function ResultsWrapper({ session, data, navigate }) {
               else if (!up && ic) cls = 'bg-warning-100 text-warning-700';
               return (
                 <div key={oi} className={`py-2 px-3 mb-1 rounded-md text-sm flex items-center gap-2 ${cls}`}>
-                  <span className="font-bold min-w-[24px]">{opt.label}.</span><span>{escHtml(opt.text)}</span>
+                  <span className="font-bold min-w-[24px]">{opt.label}.</span><span dangerouslySetInnerHTML={{ __html: renderMd(opt.text) }} />
                   {ic && <span className="ml-auto">{'✓'}</span>}
                   {up && !ic && <span className="ml-auto">{'×'}</span>}
                 </div>
               );
             })}
             {q.explanation && (
-              <div className="mt-3 p-3 bg-primary-50 rounded-lg text-[0.8rem] leading-relaxed"><strong>Giải thích:</strong> {escHtml(q.explanation)}</div>
+              <div className="mt-3 p-3 bg-primary-50 rounded-lg text-[0.8rem] leading-relaxed"><strong>Giải thích:</strong> <span dangerouslySetInnerHTML={{ __html: renderMd(q.explanation) }} /></div>
             )}
           </div>
         );
       })}
-      <button onClick={() => navigate('/history')} className="border border-slate-200 px-4 py-2.5 rounded-lg text-sm font-semibold hover:bg-slate-50 text-slate-600 mt-4 w-full">
+      <button onClick={() => navigate('/history')} className="border border-slate-200 dark:border-slate-700 px-4 py-2.5 rounded-lg text-sm font-semibold hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-800 text-slate-600 dark:text-slate-300 mt-4 w-full">
         Quay lại lịch sử
       </button>
     </div>
