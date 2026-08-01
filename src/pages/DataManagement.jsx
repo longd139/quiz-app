@@ -65,7 +65,7 @@ export default function DataManagement() {
   const handleReconfig = () => { setShowConfig(true); };
 
   const statusLabels = { synced: 'Đã đồng bộ', syncing: 'Đang đồng bộ...', error: 'Lỗi đồng bộ', unconfigured: 'Chưa cấu hình' };
-  const statusColors = { synced: 'bg-success-50 text-success-700', syncing: 'bg-warning-50 text-warning-700', error: 'bg-danger-50 text-danger-700', unconfigured: 'bg-slate-50 dark:bg-slate-800 text-slate-500' };
+  const statusColors = { synced: 'bg-success-50 dark:bg-success-700/20 text-success-700 dark:text-success-300', syncing: 'bg-warning-50 dark:bg-warning-700/20 text-warning-700 dark:text-warning-300', error: 'bg-danger-50 dark:bg-danger-700/20 text-danger-700 dark:text-danger-300', unconfigured: 'bg-slate-50 dark:bg-slate-800 text-slate-500' };
 
   return (
     <div>
@@ -132,7 +132,7 @@ export default function DataManagement() {
         <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">Nhập file JSON đã xuất trước đó. Dữ liệu hiện tại sẽ bị ghi đè.</p>
         <textarea value={importText} onChange={e => setImportText(e.target.value)} placeholder="Paste JSON vào đây..."
           className="w-full px-3 py-2.5 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-mono outline-none min-h-[120px] resize-y" />
-        {importFeedback && <div className={`text-sm py-2 px-3 rounded-lg mt-2 ${importFeedback.includes('✅') ? 'bg-success-50 text-success-700' : 'bg-danger-50 text-danger-700'}`}>{importFeedback}</div>}
+        {importFeedback && <div className={`text-sm py-2 px-3 rounded-lg mt-2 ${importFeedback.includes('✅') ? 'bg-success-50 dark:bg-success-700/20 text-success-700 dark:text-success-300' : 'bg-danger-50 dark:bg-danger-700/20 text-danger-700 dark:text-danger-300'}`}>{importFeedback}</div>}
         <div className="flex flex-wrap gap-2 mt-3">
           <button onClick={handleImport} className="bg-warning-600 text-white px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-warning-700 active:scale-95">Nhập (ghi đè)</button>
           <input type="file" ref={fileRef} accept=".json" className="hidden" onChange={e => { const f = e.target.files[0]; if (!f) return; const r = new FileReader(); r.onload = ev => setImportText(ev.target.result); r.readAsText(f); }} />

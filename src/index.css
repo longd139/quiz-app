@@ -26,6 +26,9 @@
 .dark body {
   background-color: #0f172a; /* slate-900 */
 }
+.dark select {
+  color-scheme: dark;
+}
 
 /* PWA safe area */
 .pb-safe { padding-bottom: env(safe-area-inset-bottom, 0); }
@@ -60,3 +63,46 @@ input[type=checkbox] { accent-color: #2563eb; }
 
 /* Option hover */
 .opt-btn:hover:not(.opt-selected) { border-color: #93c5fd; }
+
+/* Inline code */
+code {
+  background: #f1f5f9;
+  color: #dc2626;
+  padding: 0.15em 0.4em;
+  border-radius: 4px;
+  font-size: 0.875em;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+}
+.dark code {
+  background: #1e293b;
+  color: #fca5a5;
+}
+
+/* Code blocks */
+pre {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  padding: 0.75em 1em;
+  border-radius: 8px;
+  overflow-x: auto;
+  margin: 0.5em 0;
+}
+.dark pre {
+  background: #1e293b;
+  border-color: #334155;
+}
+pre code {
+  background: transparent;
+  padding: 0;
+  color: inherit;
+  font-size: 0.85em;
+}
+
+/* Dark mode overrides for light-background states */
+.dark .opt-selected {
+  background: rgba(37, 99, 235, 0.2) !important;
+  color: #93c5fd;
+}
+.dark .opt-selected .text-primary-600 {
+  color: #93c5fd;
+}

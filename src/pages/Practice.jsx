@@ -222,7 +222,7 @@ export default function Practice() {
 
       {/* Toast */}
       {toast && (
-        <div className="mb-3 py-2.5 px-4 bg-warning-50 text-warning-700 text-sm text-center rounded-lg border border-warning-100 toast-in">
+        <div className="mb-3 py-2.5 px-4 bg-warning-50 dark:bg-warning-700/20 text-warning-700 dark:text-warning-300 text-sm text-center rounded-lg border border-warning-100 dark:border-warning-700/50 toast-in">
           {toast}
         </div>
       )}
@@ -232,7 +232,7 @@ export default function Practice() {
         <div className="bg-white dark:bg-slate-800 rounded-xl p-5 sm:p-6 shadow-sm dark:shadow-none border border-slate-200 dark:border-slate-700 mb-5">
         <div className="text-base sm:text-lg font-semibold mb-5 leading-relaxed" dangerouslySetInnerHTML={{ __html: renderMd(q.prompt) }} />
         {isMulti && !showingResult && (
-          <span className="text-xs text-warning-600 font-medium mb-3 inline-block bg-warning-50 px-2.5 py-0.5 rounded-full">(Chọn nhiều đáp án)</span>
+          <span className="text-xs text-warning-600 dark:text-warning-400 font-medium mb-3 inline-block bg-warning-50 dark:bg-warning-700/20 px-2.5 py-0.5 rounded-full">(Chọn nhiều đáp án)</span>
         )}
 
         <div>
@@ -241,17 +241,17 @@ export default function Practice() {
             let cls = '', marker = '';
             if (showingResult) {
               const ic = q.correctIndices.includes(oi);
-              if (sel && ic) { cls = 'border-2 border-success-600 bg-success-50 font-semibold'; marker = <span className="ml-auto text-success-600">{'✓'}</span>; }
-              else if (sel && !ic) { cls = 'border-2 border-danger-600 bg-danger-50 font-semibold'; marker = <span className="ml-auto text-danger-600">{'×'}</span>; }
-              else if (!sel && ic) { cls = 'border-2 border-warning-500 bg-warning-50'; marker = <span className="ml-auto text-warning-600">{'✓'}</span>; }
+              if (sel && ic) { cls = 'border-2 border-success-600 bg-success-50 dark:bg-success-700/20 dark:text-success-200 font-semibold'; marker = <span className="ml-auto text-success-600 dark:text-success-400">{'✓'}</span>; }
+              else if (sel && !ic) { cls = 'border-2 border-danger-600 bg-danger-50 dark:bg-danger-700/20 dark:text-danger-200 font-semibold'; marker = <span className="ml-auto text-danger-600 dark:text-danger-400">{'×'}</span>; }
+              else if (!sel && ic) { cls = 'border-2 border-warning-500 bg-warning-50 dark:bg-warning-700/20 dark:text-warning-200'; marker = <span className="ml-auto text-warning-600 dark:text-warning-400">{'✓'}</span>; }
               else { cls = 'border-2 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 opacity-60'; }
-            } else if (sel) { cls = 'opt-selected border-2 border-primary-500 bg-primary-50 font-semibold'; }
+            } else if (sel) { cls = 'opt-selected border-2 border-primary-500 bg-primary-50 dark:bg-primary-700/20 dark:text-primary-200 font-semibold'; }
             else { cls = 'border-2 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-blue-300'; }
 
             return (
               <button key={oi} onClick={() => handleOptionClick(oi)} disabled={showingResult}
                 className={`opt-btn flex items-center gap-3 w-full p-3.5 mb-2 rounded-lg cursor-pointer text-sm text-left transition-all ${cls}`}>
-                <span className={`font-bold text-xs min-w-[24px] ${showingResult ? '' : 'text-primary-600'}`}>{opt.label}.</span>
+                <span className={`font-bold text-xs min-w-[24px] ${showingResult ? '' : 'text-primary-600 dark:text-primary-400'}`}>{opt.label}.</span>
                 <span dangerouslySetInnerHTML={{ __html: renderMd(opt.text) }} />
                 {marker}
               </button>
@@ -260,7 +260,7 @@ export default function Practice() {
         </div>
 
         {showingResult && q.explanation && (
-          <div className="mt-3 p-3 bg-primary-50 rounded-lg text-[0.8rem] leading-relaxed">
+          <div className="mt-3 p-3 bg-primary-50 dark:bg-primary-700/20 rounded-lg text-[0.8rem] leading-relaxed">
             <strong>{arraysEqual(currentAnswers.slice().sort((a,b)=>a-b), q.correctIndices.slice().sort((a,b)=>a-b)) ? 'Giải thích:' : 'Đáp án đúng - Giải thích:'}</strong>
             <span dangerouslySetInnerHTML={{ __html: renderMd(q.explanation) }} />
           </div>

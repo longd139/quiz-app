@@ -43,9 +43,9 @@ export default function Results() {
               {q.options.map((opt, oi) => {
                 const up = us.includes(oi), ic = c.includes(oi);
                 let cls = '';
-                if (up && ic) cls = 'bg-success-100 text-success-700';
-                else if (up && !ic) cls = 'bg-danger-100 text-danger-700';
-                else if (!up && ic) cls = 'bg-warning-100 text-warning-700';
+                if (up && ic) cls = 'bg-success-100 dark:bg-success-700/20 text-success-700 dark:text-success-300';
+                else if (up && !ic) cls = 'bg-danger-100 dark:bg-danger-700/20 text-danger-700 dark:text-danger-300';
+                else if (!up && ic) cls = 'bg-warning-100 dark:bg-warning-700/20 text-warning-700 dark:text-warning-300';
                 return (
                   <div key={oi} className={`py-2 px-3 mb-1 rounded-md text-sm flex items-center gap-2 ${cls}`}>
                     <span className="font-bold min-w-[24px]">{opt.label}.</span>
@@ -57,7 +57,7 @@ export default function Results() {
               })}
 
               {q.explanation && (
-                <div className="mt-3 p-3 bg-primary-50 rounded-lg text-[0.8rem] leading-relaxed">
+                <div className="mt-3 p-3 bg-primary-50 dark:bg-primary-700/20 rounded-lg text-[0.8rem] leading-relaxed">
                   <strong>Giải thích:</strong> <span dangerouslySetInnerHTML={{ __html: renderMd(q.explanation) }} />
                 </div>
               )}

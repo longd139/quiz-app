@@ -50,7 +50,7 @@ export default function Dashboard() {
   return (
     <div>
       <div className="flex flex-wrap gap-2 mb-5 items-center">
-        <select value={filterId} onChange={e => setFilterId(e.target.value)} className="px-3 py-2.5 border border-slate-200 dark:border-slate-700 dark:border-slate-600 rounded-lg text-sm font-semibold bg-white dark:bg-slate-800 dark:bg-slate-800 dark:text-slate-200 outline-none focus:border-primary-500">
+        <select value={filterId} onChange={e => setFilterId(e.target.value)} className="px-3 py-2.5 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-semibold bg-white dark:bg-slate-800 dark:text-slate-200 outline-none focus:border-primary-500">
           <option value="">Tất cả collection</option>
           {data.collections.map(c => (
             <option key={c.id} value={c.id}>{escHtml(c.name)}</option>

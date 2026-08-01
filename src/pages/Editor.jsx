@@ -28,6 +28,7 @@ export default function Editor() {
   const questionRefs = useRef({});
   const questionsSectionRef = useRef(null);
   const bulkSectionRef = useRef(null);
+  const saveRef = useRef(null);
 
   // Question picker from other tests
   const [showQuestionPicker, setShowQuestionPicker] = useState(false);
@@ -47,11 +48,11 @@ export default function Editor() {
   const handleParse = () => {
     const result = parseBulkPaste(bulkText);
     if (result.questions.length === 0) {
-      setParseFeedback(`<div class="text-sm py-2 px-3 rounded-lg bg-danger-50 text-danger-700 border border-danger-100">${result.warnings.join('<br>')}</div>`);
+      setParseFeedback(`<div class="text-sm py-2 px-3 rounded-lg bg-danger-50 dark:bg-danger-700/20 text-danger-700 dark:text-danger-300 border border-danger-100 dark:border-danger-700/50">${result.warnings.join('<br>')}</div>`);
       return;
     }
-    let msg = `<div class="text-sm py-2 px-3 rounded-lg bg-success-50 text-success-700 border border-success-100">&check; Đã phân tích được <strong>${result.questions.length}</strong> câu hỏi.</div>`;
-    if (result.warnings.length > 0) msg += `<div class="text-sm py-2 px-3 rounded-lg bg-warning-50 text-warning-700 border border-warning-100 mt-2">${result.warnings.join('<br>')}</div>`;
+    let msg = `<div class="text-sm py-2 px-3 rounded-lg bg-success-50 dark:bg-success-700/20 text-success-700 dark:text-success-300 border border-success-100 dark:border-success-700/50">&check; Đã phân tích được <strong>${result.questions.length}</strong> câu hỏi.</div>`;
+    if (result.warnings.length > 0) msg += `<div class="text-sm py-2 px-3 rounded-lg bg-warning-50 dark:bg-warning-700/20 text-warning-700 dark:text-warning-300 border border-warning-100 dark:border-warning-700/50 mt-2">${result.warnings.join('<br>')}</div>`;
     setParseFeedback(msg);
 
     if (questions.length > 0) {
@@ -191,6 +192,10 @@ export default function Editor() {
     navigate('/');
   };
 
+  const scrollToSave = () => {
+    saveRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  };
+
   const handleAddFromPicker = () => {
     const selectedIds = Object.entries(pickerSelections).filter(([, v]) => v).map(([id]) => id);
     if (selectedIds.length === 0) { alert('Vui lòng chọn ít nhất 1 câu hỏi.'); return; }
@@ -208,7 +213,7 @@ export default function Editor() {
       <div className="mb-5">
         <label className="font-semibold text-sm block mb-1.5">Collection <span className="text-danger-600">*</span>:</label>
         <select ref={collectionRef} value={collectionId} onChange={handleCollectionChange}
-          className={`w-full px-3 py-2.5 border rounded-lg text-sm focus:border-primary-500 focus:ring-2 focus:ring-primary-100 outline-none transition-all duration-200 ${errors.collectionId ? 'border-danger-600 bg-danger-50' : 'border-slate-200'}`}>
+          className={`w-full px-3 py-2.5 border rounded-lg text-sm focus:border-primary-500 focus:ring-2 focus:ring-primary-100 outline-none transition-all duration-200 ${errors.collectionId ? 'border-danger-600' : 'border-slate-200'} bg-white dark:bg-slate-800 dark:text-slate-200`}>
           <option value="">-- Chọn collection --</option>
           {data.collections.map(c => (
             <option key={c.id} value={c.id}>{escHtml(c.name)}</option>
@@ -226,9 +231,9 @@ export default function Editor() {
 
       {/* Import from other tests */}
       {collectionId && otherTests.length > 0 && (
-        <div className="mb-5 p-3 bg-primary-50 rounded-lg">
+        <div className="mb-5 p-3 bg-primary-50 dark:bg-primary-700/20 rounded-lg">
           <p className="text-xs text-slate-600 dark:text-slate-300 mb-2">Bạn có thể thêm câu hỏi từ bài khác trong cùng collection:</p>
-          <button onClick={() => setShowQuestionPicker(!showQuestionPicker)} className="border border-primary-300 px-3 py-1.5 rounded-lg text-xs font-semibold text-primary-600 hover:bg-primary-100 transition-all">
+          <button onClick={() => setShowQuestionPicker(!showQuestionPicker)} className="border border-primary-300 dark:border-primary-700 px-3 py-1.5 rounded-lg text-xs font-semibold text-primary-600 dark:text-primary-400 hover:bg-primary-100 dark:hover:bg-primary-700/20 transition-all">
             {showQuestionPicker ? 'Ẩn' : 'Chọn câu hỏi từ bài khác'} ({otherTests.length} bài)
           </button>
         </div>
@@ -273,7 +278,7 @@ export default function Editor() {
               {previewQuestion.options.map(opt => {
                 const isCorrect = previewQuestion.correctIndices.includes(previewQuestion.options.indexOf(opt));
                 return (
-                  <div key={opt.label} className={`py-1 px-2 rounded text-xs flex items-center gap-2 ${isCorrect ? 'bg-success-100 text-success-700 font-semibold' : ''}`}>
+                  <div key={opt.label} className={`py-1 px-2 rounded text-xs flex items-center gap-2 ${isCorrect ? 'bg-success-100 dark:bg-success-700/20 text-success-700 dark:text-success-300 font-semibold' : ''}`}>
                     <span>{opt.label}.</span><span dangerouslySetInnerHTML={{ __html: renderMd(opt.text) }} />
                     {isCorrect && <span className="ml-auto">{'✓'}</span>}
                   </div>
@@ -298,7 +303,7 @@ export default function Editor() {
         <label className="font-semibold text-sm block mb-1.5">Tên bài kiểm tra:</label>
         <input ref={testNameRef} type="text" value={testName} onChange={e => setTestName(e.target.value)}
           placeholder="VD: SWT Chương 1 - Tổng quan về kiểm thử"
-          className={`w-full px-3 py-2.5 border rounded-lg text-sm focus:border-primary-500 focus:ring-2 focus:ring-primary-100 outline-none transition-all duration-200 ${(errors.testName || errors.duplicateName) ? 'border-danger-600 bg-danger-50' : 'border-slate-200'}`} />
+          className={`w-full px-3 py-2.5 border rounded-lg text-sm focus:border-primary-500 focus:ring-2 focus:ring-primary-100 outline-none transition-all duration-200 ${(errors.testName || errors.duplicateName) ? 'border-danger-600' : 'border-slate-200'} bg-white dark:bg-slate-800 dark:text-slate-200`} />
         {errors.testName && <p className="text-xs text-danger-600 mt-1 error-msg">Vui lòng nhập tên bài kiểm tra.</p>}
         {errors.duplicateName && !errors.testName && <p className="text-xs text-danger-600 mt-1 error-msg">Tên bài kiểm tra đã tồn tại trong collection này.</p>}
       </div>
@@ -317,7 +322,7 @@ export default function Editor() {
       <div className="mb-5" ref={questionsSectionRef}>
         <h3 className="text-base font-semibold mb-3">Câu hỏi đã phân tích (<span className="text-slate-500 dark:text-slate-400 font-normal">{questions.length}</span>)</h3>
         {errors.noQuestions && (
-          <p className="text-sm text-danger-600 font-medium mb-3 bg-danger-50 border border-danger-200 rounded-lg px-3 py-2 error-msg">Vui lòng thêm ít nhất 1 câu hỏi.</p>
+          <p className="text-sm text-danger-600 dark:text-danger-300 font-medium mb-3 bg-danger-50 dark:bg-danger-700/20 border border-danger-200 dark:border-danger-700/50 rounded-lg px-3 py-2 error-msg">Vui lòng thêm ít nhất 1 câu hỏi.</p>
         )}
         {questions.length === 0 ? (
           <p className="text-slate-500 dark:text-slate-400 text-sm text-center py-5">Chưa có câu hỏi nào. Paste câu hỏi và nhấn "Phân tích".</p>
@@ -329,18 +334,18 @@ export default function Editor() {
             <div key={i} ref={el => questionRefs.current[i] = el}
               className={`bg-white dark:bg-slate-800 border rounded-xl p-4 mb-3 relative transition-all duration-200 ${hasErr ? 'border-danger-600' : 'border-slate-200'}`}>
               <button onClick={() => setQuestions(questions.filter((_, idx) => idx !== i))}
-                className="absolute top-2 right-2 bg-transparent border-0 text-danger-600 cursor-pointer text-lg p-1 rounded hover:bg-danger-50" title="Xóa câu này">{'×'}</button>
+                className="absolute top-2 right-2 bg-transparent border-0 text-danger-600 cursor-pointer text-lg p-1 rounded hover:bg-danger-50 dark:hover:bg-danger-700/20" title="Xóa câu này">{'×'}</button>
               <div className="mb-2.5 flex items-center gap-2">
                 <span className="font-bold text-xs text-primary-600">Câu {i + 1}</span>
-                {hasErr && <span className="text-[0.65rem] text-danger-600 font-medium bg-danger-50 px-2 py-0.5 rounded-full error-msg">Thiếu thông tin</span>}
+                {hasErr && <span className="text-[0.65rem] text-danger-600 dark:text-danger-300 font-medium bg-danger-50 dark:bg-danger-700/20 px-2 py-0.5 rounded-full error-msg">Thiếu thông tin</span>}
               </div>
               <input type="text" value={q.prompt} onChange={e => { const nq = [...questions]; nq[i] = { ...nq[i], prompt: e.target.value }; setQuestions(nq); }}
-                className={`w-full px-3 py-2 border rounded-lg text-sm font-medium mb-3 focus:border-primary-500 outline-none transition-all duration-200 ${qe.prompt ? 'border-danger-600 bg-danger-50' : 'border-slate-200'}`} placeholder="Nội dung câu hỏi" />
+                className={`w-full px-3 py-2 border rounded-lg text-sm font-medium mb-3 focus:border-primary-500 outline-none transition-all duration-200 ${qe.prompt ? 'border-danger-600' : 'border-slate-200'} bg-white dark:bg-slate-800 dark:text-slate-200`} placeholder="Nội dung câu hỏi" />
               {qe.prompt && <p className="text-xs text-danger-600 -mt-2 mb-2 error-msg">Vui lòng nhập nội dung câu hỏi.</p>}
               <div className="mb-2">
                 {qe.correct && <p className="text-xs text-danger-600 mb-1.5 error-msg">Vui lòng chọn ít nhất 1 đáp án đúng.</p>}
                 {q.options.map((opt, oi) => (
-                  <div key={oi} className={`flex items-center gap-2.5 mb-1.5 p-1.5 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-800 transition-all duration-200 ${qe.option?.[oi] ? 'bg-danger-50' : ''}`}>
+                  <div key={oi} className={`flex items-center gap-2.5 mb-1.5 p-1.5 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 transition-all duration-200`}>
                     <input type="checkbox" checked={q.correctIndices.includes(oi)}
                       onChange={e => {
                         const nq = [...questions];
@@ -350,7 +355,7 @@ export default function Editor() {
                       }} className="w-4 h-4 cursor-pointer" title="Đánh dấu là đáp án đúng" />
                     <span className="font-bold text-xs text-slate-500 dark:text-slate-400 min-w-[24px]">{opt.label}.</span>
                     <input type="text" value={opt.text} onChange={e => { const nq = [...questions]; const no = [...nq[i].options]; no[oi] = { ...no[oi], text: e.target.value }; nq[i] = { ...nq[i], options: no }; setQuestions(nq); }}
-                      className={`flex-1 px-2 py-1.5 border rounded text-xs focus:border-primary-500 outline-none transition-all duration-200 ${qe.option?.[oi] ? 'border-danger-600 bg-danger-50' : 'border-slate-200'}`} placeholder={`Nội dung đáp án ${opt.label}`} />
+                      className={`flex-1 px-2 py-1.5 border rounded text-xs focus:border-primary-500 outline-none transition-all duration-200 ${qe.option?.[oi] ? 'border-danger-600' : 'border-slate-200'} bg-white dark:bg-slate-800 dark:text-slate-200`} placeholder={`Nội dung đáp án ${opt.label}`} />
                     <button onClick={() => {
                       if (q.options.length <= 2) { alert('Mỗi câu hỏi cần ít nhất 2 đáp án.'); return; }
                       const nq = [...questions];
@@ -374,10 +379,19 @@ export default function Editor() {
         <button onClick={handleAddManual} className="border border-slate-200 dark:border-slate-700 px-4 py-2 rounded-lg text-sm font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700">+ Thêm câu hỏi thủ công</button>
       </div>
 
-      <div className="flex gap-2 mt-5">
+      <div ref={saveRef} className="flex gap-2 mt-5">
         <button onClick={handleSave} className="flex-1 bg-primary-600 text-white px-4 py-3 rounded-lg text-base font-semibold hover:bg-primary-700 active:scale-95 transition-all">Lưu bài</button>
         <button onClick={() => navigate('/')} className="border border-slate-200 dark:border-slate-700 px-4 py-3 rounded-lg text-sm font-semibold hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-800 text-slate-600">Hủy</button>
       </div>
+
+      {/* Floating scroll-to-save button */}
+      {questions.length > 0 && (
+        <button onClick={scrollToSave}
+          className="fixed bottom-6 right-6 z-50 w-12 h-12 bg-primary-600 text-white rounded-full shadow-lg hover:bg-primary-700 active:scale-90 transition-all flex items-center justify-center text-xl"
+          title="Xuống Lưu bài">
+          ↓
+        </button>
+      )}
     </div>
   );
 }
