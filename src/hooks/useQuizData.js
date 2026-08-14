@@ -1,6 +1,10 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { loadData, saveData, ensureCollections, uid } from '../data/storage';
-import { getSyncConfig, setSyncConfig, isSyncConfigured, schedulePush, pushToCloud, pullFromCloud, autoSync, clearSyncConfig, createGist } from '../data/sync';
+import { loadData, saveData, ensureCollections } from '../data/storage';
+import {
+  getRoomConfig, isConfigured, createRoom, finalizeRoom, joinRoom,
+  pullRoomData, pushRoomData, schedulePush, startPolling, stopPolling,
+  clearRoomConfig
+} from '../data/supabaseSync';
 
 export function useQuizData() {
   const [data, setData] = useState(() => {
@@ -9,101 +13,149 @@ export function useQuizData() {
     if (changed) saveData(migrated);
     return migrated;
   });
-  const [syncStatus, setSyncStatus] = useState(() => isSyncConfigured() ? 'synced' : (getSyncConfig() ? 'error' : 'unconfigured'));
-  const conflictRef = useRef(null);
+  const [syncStatus, setSyncStatus] = useState(() => {
+    if (!isConfigured()) return getRoomConfig() ? 'error' : 'unconfigured';
+    return 'synced';
+  });
+  const dataRef = useRef(data);
+  const mountedRef = useRef(false);
 
   const update = useCallback((newData) => {
+    dataRef.current = newData;
     saveData(newData);
     setData(newData);
-    if (isSyncConfigured()) schedulePush(2000);
+    const cfg = getRoomConfig();
+    if (cfg && cfg.secret) schedulePush(cfg.secret, newData);
   }, []);
 
   const refresh = useCallback(() => {
     const d = loadData();
+    dataRef.current = d;
     setData(d);
     return d;
   }, []);
 
-  // Auto-sync on mount
+  // Kết nối cloud + subscribe realtime khi mở app.
   useEffect(() => {
-    if (!isSyncConfigured()) return;
-    const timer = setTimeout(async () => {
-      setSyncStatus('syncing');
-      try {
-        const result = await autoSync();
-        if (result === 'synced' || result?.pushed) {
-          setSyncStatus('synced');
-        } else if (result?.pulled) {
-          setData(result.data);
-          setSyncStatus('synced');
-        } else if (result?.conflict) {
-          conflictRef.current = result;
-          setSyncStatus('conflict');
-        }
-      } catch (e) { setSyncStatus('error'); }
-    }, 1500);
-    return () => clearTimeout(timer);
-  }, []);
+    if (mountedRef.current) return;
+    const cfg = getRoomConfig();
+    if (!isConfigured() || !cfg) return;
+    mountedRef.current = true;
 
-  // Sync actions
-  const doPush = useCallback(async () => {
+    let active = true;
     setSyncStatus('syncing');
-    try { await pushToCloud(); setSyncStatus('synced'); }
-    catch (e) { setSyncStatus('error'); throw e; }
+
+    (async () => {
+      try {
+        // Làm mới nhanh từ cloud (nếu có dữ liệu mới hơn).
+        const { data: cloudData } = await pullRoomData(cfg.secret);
+        if (active && cloudData && (cloudData.tests?.length || cloudData.history?.length)) {
+          dataRef.current = cloudData;
+          saveData(cloudData);
+          setData(cloudData);
+        }
+        // Nếu dữ liệu local chưa có trên cloud, đẩy lên.
+        else if (active && dataRef.current && (dataRef.current.tests?.length || dataRef.current.history?.length)) {
+          await pushRoomData(cfg.secret, dataRef.current);
+        }
+      } catch (_e) {
+        setSyncStatus('error');
+      }
+
+      if (!active) return;
+      startPolling(cfg.secret, (update0) => {
+        if (update0.data) {
+          const { data: normalized } = ensureCollections(update0.data);
+          dataRef.current = normalized;
+          saveData(normalized);
+          setData(normalized);
+        }
+        setSyncStatus('synced');
+      });
+      setSyncStatus('synced');
+    })();
+
+    return () => { active = false; };
   }, []);
 
-  const doPull = useCallback(async () => {
+  // ---- Actions ----
+  const doCreateRoom = useCallback(async () => {
     setSyncStatus('syncing');
     try {
-      const result = await pullFromCloud();
-      setData(result);
+      const { secret, room_id } = await createRoom();
+      finalizeRoom(secret, room_id);
+      // Đưa dữ liệu local hiện có lên phòng mới.
+      await pushRoomData(secret, dataRef.current);
+      startPolling(secret, (u) => {
+        if (u.data) { const n = ensureCollections(u.data).data; dataRef.current = n; saveData(n); setData(n); }
+        setSyncStatus('synced');
+      });
       setSyncStatus('synced');
+      return { secret, room_id };
     } catch (e) { setSyncStatus('error'); throw e; }
   }, []);
 
-  const resolveConflict = useCallback((useCloud) => {
-    const conflict = conflictRef.current;
-    if (!conflict) return;
-    if (useCloud) {
-      saveData(conflict.cloudData);
-      setData(conflict.cloudData);
-    } else {
-      // Push local to cloud
-      schedulePush(500);
-    }
-    conflictRef.current = null;
-    setSyncStatus('synced');
-  }, []);
-
-  const doSetupSync = useCallback(async (token, existingGistId) => {
-    token = token.trim();
-    if (!token) throw new Error('Vui lòng nhập GitHub token.');
+  const doJoinRoom = useCallback(async (secret) => {
+    secret = (secret || '').trim();
+    if (!secret) throw new Error('Vui lòng nhập mã phòng.');
     setSyncStatus('syncing');
     try {
-      const gistId = existingGistId?.trim() || await createGist(token, { collections: [], tests: [], history: [], settings: { shuffleQuestions: true, shuffleOptions: false, practiceMode: 'submit' }, questionStats: {} });
-      const cfg = { github_token: token, gist_id: gistId, last_synced_at: new Date().toISOString(), last_pushed_at: new Date().toISOString() };
-      setSyncConfig(cfg);
-      if (existingGistId?.trim()) {
-        // Kết nối vào Gist có sẵn: pull data từ cloud về
-        const result = await pullFromCloud();
-        setData(result);
-      } else {
-        // Tạo Gist mới: push data local lên
-        await pushToCloud();
+      const cfg = getRoomConfig();
+      if (cfg && cfg.room_id) stopPolling();
+      const result = await joinRoom(secret);
+      // Nếu phòng đã có dữ liệu → lấy cloud; nếu rỗng → đẩy local lên.
+      const cloud = result.data;
+      const hasCloud = cloud && (cloud.tests?.length || cloud.history?.length);
+      const hasLocal = dataRef.current && (dataRef.current.tests?.length || dataRef.current.history?.length);
+      if (hasCloud) {
+        const n = ensureCollections(cloud).data;
+        dataRef.current = n; saveData(n); setData(n);
+      } else if (hasLocal) {
+        await pushRoomData(secret, dataRef.current);
       }
+      const newCfg = getRoomConfig();
+      if (newCfg) startPolling(newCfg.secret, (u) => {
+        if (u.data) { const n = ensureCollections(u.data).data; dataRef.current = n; saveData(n); setData(n); }
+        setSyncStatus('synced');
+      });
       setSyncStatus('synced');
+      return result;
     } catch (e) { setSyncStatus('error'); throw e; }
   }, []);
 
   const doDisconnectSync = useCallback(() => {
-    clearSyncConfig();
+    stopPolling();
+    clearRoomConfig();
     setSyncStatus('unconfigured');
+  }, []);
+
+  const doPush = useCallback(async () => {
+    const cfg = getRoomConfig();
+    if (!cfg || !cfg.secret) { setSyncStatus('unconfigured'); return; }
+    setSyncStatus('syncing');
+    try { await pushRoomData(cfg.secret, dataRef.current); setSyncStatus('synced'); }
+    catch (e) { setSyncStatus('error'); throw e; }
+  }, []);
+
+  const doPull = useCallback(async () => {
+    const cfg = getRoomConfig();
+    if (!cfg || !cfg.secret) { setSyncStatus('unconfigured'); return; }
+    setSyncStatus('syncing');
+    try {
+      const { data: cloud } = await pullRoomData(cfg.secret);
+      if (cloud && (cloud.tests?.length || cloud.history?.length)) {
+        const n = ensureCollections(cloud).data;
+        dataRef.current = n; saveData(n); setData(n);
+      }
+      setSyncStatus('synced');
+      return cloud;
+    } catch (e) { setSyncStatus('error'); throw e; }
   }, []);
 
   return {
     data, update, refresh,
-    syncStatus, conflictRef,
-    doPush, doPull, doSetupSync, doDisconnectSync, resolveConflict,
+    syncStatus,
+    doPush, doPull, doCreateRoom, doJoinRoom, doDisconnectSync,
     setSyncStatus
   };
 }

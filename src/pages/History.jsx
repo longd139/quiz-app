@@ -2,10 +2,9 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuiz } from '../App';
 import { escHtml, fmtDate, renderMd } from '../data/storage';
-import Results from './Results';
 
 export default function History() {
-  const { data, update, showConfirm } = useQuiz();
+  const { data, update, showConfirm, showAlert } = useQuiz();
   const navigate = useNavigate();
   const [viewingSession, setViewingSession] = useState(null);
 
@@ -56,7 +55,7 @@ export default function History() {
               <button onClick={(e) => {
                 e.stopPropagation();
                 const origQuestions = (s.questions || []).filter(q => !q._retryOf);
-                if (origQuestions.length === 0) { alert('Không có câu hỏi nào để làm lại.'); return; }
+                if (origQuestions.length === 0) { showAlert('Không thể làm lại', 'Không có câu hỏi nào để làm lại.', 'warning'); return; }
                 navigate('/practice', {
                   state: {
                     sessionQuestions: origQuestions,

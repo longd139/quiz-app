@@ -4,7 +4,7 @@ import { useQuiz } from '../App';
 import { getFilteredTests, getCollectionName, escHtml } from '../data/storage';
 
 export default function PracticeSetup() {
-  const { data, update } = useQuiz();
+  const { data, update, showAlert } = useQuiz();
   const navigate = useNavigate();
   const location = useLocation();
   const preSelectIdx = location.state?.preSelectIdx;
@@ -38,7 +38,7 @@ export default function PracticeSetup() {
     selectedTests.forEach(test => {
       test.questions.forEach(q => allQuestions.push({ ...q, _testName: test.name }));
     });
-    if (allQuestions.length === 0) { alert('Các bài đã chọn không có câu hỏi nào.'); return; }
+    if (allQuestions.length === 0) { showAlert('Không có câu hỏi', 'Các bài đã chọn không có câu hỏi nào.', 'warning'); return; }
 
     if (shuffleQuestions) {
       const arr = allQuestions.slice();

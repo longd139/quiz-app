@@ -1,11 +1,11 @@
 import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQuiz } from '../App';
-import { createQuestion, createTest, createCollection, uid, escHtml, escAttr, getFilteredTests, renderMd } from '../data/storage';
+import { createQuestion, createTest, createCollection, uid, escHtml, getFilteredTests, renderMd } from '../data/storage';
 import { parseBulkPaste } from '../data/parser';
 
 export default function Editor() {
-  const { data, update, showConfirm } = useQuiz();
+  const { data, update, showConfirm, showAlert, showToast } = useQuiz();
   const navigate = useNavigate();
   const { testId } = useParams();
 
@@ -20,7 +20,6 @@ export default function Editor() {
   const [showNewCollection, setShowNewCollection] = useState(false);
   const [newCollectionName, setNewCollectionName] = useState('');
   const [errors, setErrors] = useState({});
-  const [hasAttemptedSave, setHasAttemptedSave] = useState(false);
 
   // Refs for scroll-to-error
   const testNameRef = useRef(null);
@@ -56,11 +55,17 @@ export default function Editor() {
     setParseFeedback(msg);
 
     if (questions.length > 0) {
-      if (confirm(`Đã có ${questions.length} câu hỏi. Bạn muốn THÊM vào danh sách hiện tại (OK) hay THAY THẾ (Cancel)?`)) {
-        setQuestions([...questions, ...result.questions]);
-      } else {
-        setQuestions(result.questions);
-      }
+      showConfirm(
+        `Đã có ${questions.length} câu hỏi trong bài hiện tại. Bạn muốn làm gì?`,
+        () => setQuestions([...questions, ...result.questions]),
+        {
+          title: 'Nhập hàng loạt',
+          yesLabel: 'Thêm mới',
+          noLabel: 'Thay thế',
+          danger: false,
+          onNo: () => setQuestions(result.questions),
+        }
+      );
     } else {
       setQuestions(result.questions);
     }
@@ -73,7 +78,7 @@ export default function Editor() {
 
   const handleCreateCollection = () => {
     const name = newCollectionName.trim();
-    if (!name) { alert('Vui lòng nhập tên collection.'); return; }
+    if (!name) { showAlert('Chưa nhập tên', 'Vui lòng nhập tên collection.', 'warning'); return; }
     const newColl = createCollection(name);
     const d = { ...data, collections: [...data.collections, newColl] };
     update(d);
@@ -168,7 +173,6 @@ export default function Editor() {
   const handleSave = () => {
     const e = validate();
     setErrors(e);
-    setHasAttemptedSave(true);
 
     if (e.testName || e.collectionId || e.noQuestions || e.duplicateName || Object.keys(e.questions).length > 0) {
       scrollToError(e);
@@ -189,6 +193,11 @@ export default function Editor() {
       d = { ...data, tests: [...data.tests, test] };
     }
     update(d);
+    if (existingTest) {
+      showToast(`✅ Đã cập nhật bài test "${testName}" thành công.`, 'success');
+    } else {
+      showToast(`✅ Đã tạo bài test "${testName}" thành công!`, 'success');
+    }
     navigate('/');
   };
 
@@ -198,7 +207,7 @@ export default function Editor() {
 
   const handleAddFromPicker = () => {
     const selectedIds = Object.entries(pickerSelections).filter(([, v]) => v).map(([id]) => id);
-    if (selectedIds.length === 0) { alert('Vui lòng chọn ít nhất 1 câu hỏi.'); return; }
+    if (selectedIds.length === 0) { showAlert('Chưa chọn câu hỏi', 'Vui lòng chọn ít nhất 1 câu hỏi.', 'warning'); return; }
     if (!pickerTest) return;
     const selectedQuestions = pickerTest.questions.filter(q => selectedIds.includes(q.id));
     setQuestions([...questions, ...selectedQuestions.map(q => ({ ...q, id: uid() }))]);
@@ -357,7 +366,7 @@ export default function Editor() {
                     <input type="text" value={opt.text} onChange={e => { const nq = [...questions]; const no = [...nq[i].options]; no[oi] = { ...no[oi], text: e.target.value }; nq[i] = { ...nq[i], options: no }; setQuestions(nq); }}
                       className={`flex-1 px-2 py-1.5 border rounded text-xs focus:border-primary-500 outline-none transition-all duration-200 ${qe.option?.[oi] ? 'border-danger-600' : 'border-slate-200'} bg-white dark:bg-slate-800 dark:text-slate-200`} placeholder={`Nội dung đáp án ${opt.label}`} />
                     <button onClick={() => {
-                      if (q.options.length <= 2) { alert('Mỗi câu hỏi cần ít nhất 2 đáp án.'); return; }
+                      if (q.options.length <= 2) { showAlert('Chưa đủ đáp án', 'Mỗi câu hỏi cần ít nhất 2 đáp án.', 'warning'); return; }
                       const nq = [...questions];
                       nq[i] = { ...nq[i], options: nq[i].options.filter((_, idx) => idx !== oi), correctIndices: nq[i].correctIndices.filter(ci => ci !== oi).map(ci => ci > oi ? ci - 1 : ci) };
                       setQuestions(nq);

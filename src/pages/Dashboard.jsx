@@ -4,7 +4,7 @@ import { useQuiz } from '../App';
 import { getFilteredTests, getCollectionName, escHtml, truncate, fmtDate } from '../data/storage';
 
 export default function Dashboard() {
-  const { data, update, showConfirm } = useQuiz();
+  const { data, update, showConfirm, showAlert } = useQuiz();
   const navigate = useNavigate();
   const [filterId, setFilterId] = useState('');
 
@@ -36,7 +36,7 @@ export default function Dashboard() {
         }
       });
     });
-    if (wrongQuestions.length === 0) { alert('Chưa có câu nào bị sai. Hãy luyện tập thêm!'); return; }
+    if (wrongQuestions.length === 0) { showAlert('Không có câu sai', 'Chưa có câu nào bị sai. Hãy luyện tập thêm!', 'info'); return; }
     wrongQuestions.sort((a, b) => b._wrongCount - a._wrongCount);
     navigate('/practice', {
       state: {

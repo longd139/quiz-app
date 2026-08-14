@@ -1,10 +1,10 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useQuiz } from '../App';
 import { uid, arraysEqual, renderMd } from '../data/storage';
 
 export default function Practice() {
-  const { data, update } = useQuiz();
+  const { data, update, showConfirm } = useQuiz();
   const navigate = useNavigate();
   const location = useLocation();
   const { sessionQuestions, sessionNames, practiceMode } = location.state || {};
@@ -54,19 +54,17 @@ export default function Practice() {
 
   // Auto-show result when going back to a previously reviewed question
   useEffect(() => {
-    if (reviewedIds.has(q.id)) {
-      setShowingResult(true);
-    } else {
-      setShowingResult(false);
-    }
-  }, [currentIdx]);
-
-  if (!sessionQuestions || sessionQuestions.length === 0) return null;
+    if (!sessionQuestions || sessionQuestions.length === 0) return;
+    const cur = questions[currentIdx];
+    if (!cur) return;
+    setShowingResult(reviewedIds.has(cur.id));
+  }, [currentIdx, reviewedIds, sessionQuestions, questions]);
 
   const q = questions[currentIdx];
+  const qId = q ? q.id : null;
   const isInstant = practiceMode === 'instant';
-  const isMulti = q.correctIndices.length > 1;
-  const currentAnswers = answers[q.id] || [];
+  const isMulti = q ? q.correctIndices.length > 1 : false;
+  const currentAnswers = qId ? (answers[qId] || []) : [];
   const isLast = currentIdx >= questions.length - 1;
 
   const handleOptionClick = (oi) => {
@@ -182,12 +180,18 @@ export default function Practice() {
   };
 
   const handleQuit = () => {
-    if (confirm('Thoát bài làm? Kết quả sẽ không được lưu.')) navigate('/');
+    showConfirm('Thoát bài làm? Kết quả sẽ không được lưu.', () => navigate('/'), {
+      title: 'Thoát bài làm',
+      yesLabel: 'Thoát',
+      noLabel: 'Ở lại',
+      danger: false,
+    });
   };
 
   // Keyboard shortcuts
   useEffect(() => {
     const handler = (e) => {
+      if (!sessionQuestions || sessionQuestions.length === 0) return;
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
       if (e.key >= '1' && e.key <= '9') {
         const oi = parseInt(e.key) - 1;
@@ -199,12 +203,14 @@ export default function Practice() {
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [currentIdx, showingResult, answers, q]);
+  }, [sessionQuestions, currentIdx, showingResult, answers, q, handleOptionClick, handleNext, handlePrev]);
 
   const answeredCount = Object.values(answers).filter(a => a && a.length > 0).length;
   const progress = (answeredCount / questions.length) * 100;
   const stats = data.questionStats || {};
-  const ws = stats[q.id];
+  const ws = q ? stats[q.id] : undefined;
+
+  if (!sessionQuestions || sessionQuestions.length === 0) return null;
 
   return (
     <div onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
@@ -238,7 +244,7 @@ export default function Practice() {
         <div>
           {q.options.map((opt, oi) => {
             const sel = currentAnswers.includes(oi);
-            let cls = '', marker = '';
+            let cls, marker = '';
             if (showingResult) {
               const ic = q.correctIndices.includes(oi);
               if (sel && ic) { cls = 'border-2 border-success-600 bg-success-50 dark:bg-success-700/20 dark:text-success-200 font-semibold'; marker = <span className="ml-auto text-success-600 dark:text-success-400">{'✓'}</span>; }

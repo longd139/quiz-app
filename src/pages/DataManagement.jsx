@@ -1,25 +1,24 @@
 import { useState, useRef } from 'react';
 import { useQuiz } from '../App';
-import { getSyncConfig, isSyncConfigured } from '../data/sync';
+import { getRoomConfig, isConfigured } from '../data/supabaseSync';
 
 export default function DataManagement() {
-  const { data, update, syncStatus, doPush, doPull, doSetupSync, doDisconnectSync, showConfirm } = useQuiz();
-  const [token, setToken] = useState(() => getSyncConfig()?.github_token || '');
-  const [gistId, setGistId] = useState(() => getSyncConfig()?.gist_id || '');
-  const [showToken, setShowToken] = useState(false);
+  const { data, update, syncStatus, doPush, doPull, doCreateRoom, doJoinRoom, doDisconnectSync, showConfirm, showAlert, showToast } = useQuiz();
+  const [roomSecret, setRoomSecret] = useState('');
+  const [newRoomSecret, setNewRoomSecret] = useState('');
   const [importText, setImportText] = useState('');
   const [importFeedback, setImportFeedback] = useState('');
-  const [showConfig, setShowConfig] = useState(!isSyncConfigured());
+  const [showConfig, setShowConfig] = useState(!isConfigured());
   const fileRef = useRef(null);
 
-  const cfg = getSyncConfig();
-  const configured = isSyncConfigured();
+  const cfg = getRoomConfig();
+  const configured = isConfigured();
 
   const exportJson = JSON.stringify(data, null, 2);
 
-  const handleCopy = async () => {
-    await navigator.clipboard.writeText(exportJson);
-    alert('✅ Đã sao chép JSON vào clipboard!');
+  const handleCopy = async (text, label) => {
+    await navigator.clipboard.writeText(text);
+    showToast(`✅ Đã sao chép ${label} vào clipboard!`, 'success');
   };
 
   const handleDownload = () => {
@@ -51,14 +50,23 @@ export default function DataManagement() {
     } catch (e) { setImportFeedback('❌ Lỗi: ' + e.message); }
   };
 
-  const handleSetupSync = async () => {
-    try { await doSetupSync(token, gistId); setShowConfig(false); alert('✅ Đã kết nối GitHub Gist thành công!'); }
-    catch (e) { alert('❌ Lỗi kết nối: ' + e.message); }
+  const handleCreateRoom = async () => {
+    try {
+      const result = await doCreateRoom();
+      setNewRoomSecret(result.secret);
+      setShowConfig(false);
+      showToast('✅ Đã tạo phòng. Hãy copy mã phòng để dùng ở thiết bị khác.', 'success');
+    } catch (e) { showAlert('Lỗi tạo phòng', e.message, 'error'); }
+  };
+
+  const handleJoinRoom = async () => {
+    try { await doJoinRoom(roomSecret); setShowConfig(false); showToast('✅ Đã kết nối phòng thành công!', 'success'); }
+    catch (e) { showAlert('Lỗi kết nối', e.message, 'error'); }
   };
 
   const handleDisconnect = () => {
-    showConfirm('⚠️ Ngắt kết nối GitHub Gist? Dữ liệu local vẫn được giữ nguyên.', () => {
-      doDisconnectSync(); setShowConfig(true); setToken('');
+    showConfirm('⚠️ Ngắt kết nối phòng? Dữ liệu local vẫn được giữ nguyên.', () => {
+      doDisconnectSync(); setShowConfig(true); setRoomSecret('');
     });
   };
 
@@ -71,44 +79,49 @@ export default function DataManagement() {
     <div>
       {/* Sync */}
       <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm dark:shadow-none border-t-2 border-primary-600 p-4 mb-4">
-        <h3 className="text-base font-semibold mb-1">Đồng bộ GitHub Gist</h3>
-        <p className="text-xs text-slate-500 dark:text-slate-400 mb-0">Đồng bộ dữ liệu giữa laptop và điện thoại qua GitHub Gist (miễn phí, private).</p>
+        <h3 className="text-base font-semibold mb-1">Đồng bộ Cloud (Supabase)</h3>
+        <p className="text-xs text-slate-500 dark:text-slate-400 mb-0">Đồng bộ dữ liệu giữa các thiết bị qua Supabase (Postgres, realtime). Cùng một mã phòng = chung dữ liệu.</p>
 
         {!configured || showConfig ? (
           <div className="mt-3">
-            <label className="font-semibold text-sm block mb-1.5">GitHub Token:</label>
+            <label className="font-semibold text-sm block mb-1.5">Nhập mã phòng:</label>
             <div className="flex gap-2">
-              <input type={showToken ? 'text' : 'password'} value={token} onChange={e => setToken(e.target.value)}
-                placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
+              <input type="text" value={roomSecret} onChange={e => setRoomSecret(e.target.value)}
+                placeholder="Dán mã phòng đã tạo ở thiết bị kia"
                 className="flex-1 px-3 py-2.5 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-mono focus:border-primary-500 outline-none" />
-              <button onClick={() => setShowToken(!showToken)} className="border border-slate-200 dark:border-slate-700 px-3 py-2 rounded-lg text-sm text-slate-500">{showToken ? 'Ẩn' : 'Hiện'}</button>
+              <button onClick={handleJoinRoom} className="bg-primary-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-primary-700 active:scale-95">Kết nối</button>
             </div>
-            <label className="font-semibold text-sm block mb-1.5 mt-3">Gist ID (bỏ trống để tạo mới):</label>
-            <input type="text" value={gistId} onChange={e => setGistId(e.target.value)}
-              placeholder="Nhập Gist ID từ thiết bị kia, hoặc bỏ trống để tạo Gist mới"
-              className="w-full px-3 py-2.5 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-mono focus:border-primary-500 outline-none" />
-            <div className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed bg-slate-50 dark:bg-slate-800 p-2.5 rounded-lg mt-2">
-              <strong>Cách lấy token:</strong> Vào <code className="bg-white dark:bg-slate-800 px-1 py-0.5 rounded text-xs">github.com/settings/tokens</code> &rarr; Generate new token (classic) &rarr; Chọn scope <strong>gist</strong> &rarr; Copy token paste vào đây.
+            <div className="flex items-center gap-3 mt-3 border-t border-slate-200 dark:border-slate-700 pt-3">
+              <span className="text-xs text-slate-500 dark:text-slate-400">Chưa có phòng?</span>
+              <button onClick={handleCreateRoom} className="bg-success-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-success-700 active:scale-95">Tạo phòng mới</button>
             </div>
-            <button onClick={handleSetupSync} className="mt-3 bg-primary-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-primary-700 active:scale-95">Lưu token & Kết nối</button>
-            {configured && <button onClick={() => setShowConfig(false)} className="mt-3 ml-2 border border-slate-200 dark:border-slate-700 px-4 py-2 rounded-lg text-sm text-slate-600">Hủy</button>}
+            {newRoomSecret && (
+              <div className="mt-3 bg-slate-50 dark:bg-slate-700/40 p-3 rounded-lg">
+                <div className="text-xs font-semibold mb-1">✅ Phòng đã tạo. Sao chép mã này và dán vào thiết bị khác:</div>
+                <div className="flex gap-2 items-center">
+                  <code className="flex-1 break-all bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-2 rounded text-xs">{newRoomSecret}</code>
+                  <button onClick={() => handleCopy(newRoomSecret, 'mã phòng')} className="bg-primary-600 text-white px-3 py-2 rounded-lg text-xs font-semibold hover:bg-primary-700 active:scale-95">Copy</button>
+                </div>
+              </div>
+            )}
+            {configured && <button onClick={() => setShowConfig(false)} className="mt-3 border border-slate-200 dark:border-slate-700 px-4 py-2 rounded-lg text-sm text-slate-600 dark:bg-slate-800">Hủy</button>}
           </div>
         ) : (
           <div>
-            <div className={`flex items-center gap-1.5 text-sm py-2 px-3 rounded-lg mt-3 ${statusColors[syncStatus] || 'bg-slate-50'}`}>
+            <div className={`flex items-center gap-1.5 text-sm py-2 px-3 rounded-lg mt-3 ${statusColors[syncStatus] || 'bg-slate-50 dark:bg-slate-800'}`}>
               <span>{statusLabels[syncStatus] || statusLabels.synced}</span>
               {cfg?.last_synced_at && <span className="text-xs ml-auto">Lúc {new Date(cfg.last_synced_at).toLocaleTimeString('vi-VN')}</span>}
             </div>
-            {cfg?.gist_id && (
-              <div className="text-xs text-slate-500 dark:text-slate-400 my-2">
-                Gist ID: <code className="text-xs">{cfg.gist_id}</code>
-                <a href={`https://gist.github.com/${cfg.gist_id}`} target="_blank" className="text-xs ml-1 text-primary-600 underline" rel="noreferrer">Mở trên GitHub</a>
+            {cfg?.secret && (
+              <div className="text-xs text-slate-500 dark:text-slate-400 my-2 flex items-center gap-2">
+                <span className="flex-1 break-all">Mã phòng: <code className="text-xs">{cfg.secret}</code></span>
+                <button onClick={() => handleCopy(cfg.secret, 'mã phòng')} className="text-primary-600 underline text-xs">Copy</button>
               </div>
             )}
             <div className="flex flex-wrap gap-2">
               <button onClick={doPush} className="bg-primary-600 text-white px-3 py-2 rounded-lg text-xs font-semibold hover:bg-primary-700 active:scale-95">Push lên cloud</button>
               <button onClick={doPull} className="border border-slate-200 dark:border-slate-700 px-3 py-2 rounded-lg text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-800 text-slate-600">Pull từ cloud</button>
-              <button onClick={handleReconfig} className="border border-slate-200 dark:border-slate-700 px-3 py-2 rounded-lg text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-800 text-slate-600">Cấu hình lại</button>
+              <button onClick={handleReconfig} className="border border-slate-200 dark:border-slate-700 px-3 py-2 rounded-lg text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-800 text-slate-600">Đổi phòng</button>
               <button onClick={handleDisconnect} className="border border-slate-200 dark:border-slate-700 px-3 py-2 rounded-lg text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-800 text-slate-600">Ngắt kết nối</button>
             </div>
           </div>
@@ -121,7 +134,7 @@ export default function DataManagement() {
         <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">Sao lưu toàn bộ câu hỏi, bài test và lịch sử ra file JSON.</p>
         <textarea readOnly value={exportJson} className="w-full px-3 py-2.5 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-mono outline-none min-h-[120px] resize-y bg-slate-50 dark:bg-slate-800 dark:text-slate-300" />
         <div className="flex flex-wrap gap-2 mt-3">
-          <button onClick={handleCopy} className="bg-primary-600 text-white px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-primary-700 active:scale-95">Sao chép</button>
+          <button onClick={() => handleCopy(exportJson, 'JSON')} className="bg-primary-600 text-white px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-primary-700 active:scale-95">Sao chép</button>
           <button onClick={handleDownload} className="border border-slate-200 dark:border-slate-700 px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-800 text-slate-600">Tải xuống file</button>
         </div>
       </div>

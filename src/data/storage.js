@@ -18,7 +18,7 @@ export function loadData() {
       settings: data.settings || { shuffleQuestions: true, shuffleOptions: false, practiceMode: 'submit' },
       questionStats: data.questionStats || {}
     };
-  } catch (e) { return defaultData(); }
+  } catch (_e) { return defaultData(); }
 }
 
 function defaultData() {

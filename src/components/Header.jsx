@@ -1,22 +1,13 @@
 import { useNavigate } from 'react-router-dom';
 
-export default function Header({ syncStatus, conflictRef, resolveConflict, dark, toggleDark }) {
+export default function Header({ syncStatus, dark, toggleDark }) {
   const navigate = useNavigate();
 
-  const colors = { synced: 'bg-success-600', syncing: 'bg-warning-600 sync-pulse', error: 'bg-danger-600', unconfigured: 'bg-slate-300', conflict: 'bg-warning-600' };
-  const titles = { synced: 'Đã đồng bộ', syncing: 'Đang đồng bộ...', error: 'Lỗi đồng bộ', unconfigured: 'Chưa cấu hình đồng bộ', conflict: 'Xung đột - Nhấn để giải quyết' };
+  const colors = { synced: 'bg-success-600', syncing: 'bg-warning-600 sync-pulse', error: 'bg-danger-600', unconfigured: 'bg-slate-300' };
+  const titles = { synced: 'Đã đồng bộ', syncing: 'Đang đồng bộ...', error: 'Lỗi đồng bộ', unconfigured: 'Chưa cấu hình đồng bộ' };
 
   const handleDotClick = () => {
-    if (syncStatus === 'conflict' && conflictRef.current) {
-      const c = conflictRef.current;
-      if (confirm(`⚠️ Dữ liệu trên cloud và local khác nhau.\n\nCloud: ${c.cloudData.tests.length} bài test, ${c.cloudData.history.length} lần làm\nLocal: ${c.localData.tests.length} bài test, ${c.localData.history.length} lần làm\n\nNhấn OK để GIỮ BẢN CLOUD.\nNhấn Cancel để GIỮ BẢN LOCAL.`)) {
-        resolveConflict(true);
-      } else {
-        resolveConflict(false);
-      }
-    } else {
-      navigate('/data');
-    }
+    navigate('/data');
   };
 
   return (

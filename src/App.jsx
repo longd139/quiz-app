@@ -4,6 +4,8 @@ import { useDarkMode } from './hooks/useDarkMode';
 import Header from './components/Header';
 import TabNav from './components/TabNav';
 import ConfirmDialog from './components/ConfirmDialog';
+import AlertDialog from './components/AlertDialog';
+import Toast from './components/Toast';
 import Dashboard from './pages/Dashboard';
 import Editor from './pages/Editor';
 import PracticeSetup from './pages/PracticeSetup';
@@ -24,24 +26,42 @@ export default function App() {
   const { dark, toggle: toggleDark } = useDarkMode();
   const [confirmMsg, setConfirmMsg] = useState(null);
   const [confirmCallback, setConfirmCallback] = useState(null);
+  const [confirmOpts, setConfirmOpts] = useState({});
+  const [toasts, setToasts] = useState([]);
+  const [alertInfo, setAlertInfo] = useState(null);
 
-  const showConfirm = useCallback((msg, cb) => {
+  const showConfirm = useCallback((msg, cb, opts = {}) => {
     setConfirmMsg(msg);
     setConfirmCallback(() => cb);
+    setConfirmOpts(opts);
   }, []);
 
   const hideConfirm = useCallback(() => {
     setConfirmMsg(null);
     setConfirmCallback(null);
+    setConfirmOpts({});
   }, []);
 
-  const ctx = { ...quiz, showConfirm };
+  const showToast = useCallback((message, type = 'success', duration = 3000) => {
+    const id = `${Date.now()}-${Math.random()}`;
+    setToasts(t => [...t, { id, message, type }]);
+    setTimeout(() => {
+      setToasts(t => t.filter(x => x.id !== id));
+    }, duration);
+  }, []);
+
+  const showAlert = useCallback((title, message, type = 'info') => {
+    setAlertInfo({ title, message, type });
+  }, []);
+  const hideAlert = useCallback(() => setAlertInfo(null), []);
+
+  const ctx = { ...quiz, showConfirm, showToast, showAlert };
 
   return (
     <QuizContext.Provider value={ctx}>
       <BrowserRouter>
         <div className="max-w-2xl mx-auto px-4 pb-8 dark:text-slate-200">
-          <Header syncStatus={quiz.syncStatus} conflictRef={quiz.conflictRef} resolveConflict={quiz.resolveConflict} dark={dark} toggleDark={toggleDark} />
+          <Header syncStatus={quiz.syncStatus} dark={dark} toggleDark={toggleDark} />
           <TabNav />
           <div className="page-enter">
             <Routes>
@@ -57,8 +77,25 @@ export default function App() {
           </div>
         </div>
         {confirmMsg && (
-          <ConfirmDialog message={confirmMsg} onYes={() => { confirmCallback?.(); hideConfirm(); }} onNo={hideConfirm} />
+          <ConfirmDialog
+            title={confirmOpts.title}
+            message={confirmMsg}
+            danger={confirmOpts.danger !== false}
+            yesLabel={confirmOpts.yesLabel}
+            noLabel={confirmOpts.noLabel}
+            onYes={() => { confirmCallback?.(); hideConfirm(); }}
+            onNo={() => { confirmOpts.onNo?.(); hideConfirm(); }}
+          />
         )}
+        {alertInfo && (
+          <AlertDialog
+            title={alertInfo.title}
+            message={alertInfo.message}
+            type={alertInfo.type}
+            onClose={hideAlert}
+          />
+        )}
+        <Toast toasts={toasts} />
       </BrowserRouter>
     </QuizContext.Provider>
   );

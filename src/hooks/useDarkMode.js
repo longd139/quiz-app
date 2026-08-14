@@ -7,13 +7,13 @@ export function useDarkMode() {
     try {
       const saved = localStorage.getItem(KEY);
       if (saved !== null) return saved === 'true';
-    } catch {}
+    } catch { /* localStorage có thể bị chặn (private mode) */ }
     return window.matchMedia('(prefers-color-scheme: dark)').matches;
   });
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', dark);
-    try { localStorage.setItem(KEY, String(dark)); } catch {}
+    try { localStorage.setItem(KEY, String(dark)); } catch { /* bỏ qua lỗi ghi */ }
   }, [dark]);
 
   const toggle = useCallback(() => setDark(prev => !prev), []);
