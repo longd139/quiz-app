@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useQuiz } from '../App';
 import { uid, arraysEqual, renderMd } from '../data/storage';
@@ -7,7 +7,35 @@ export default function Practice() {
   const { data, update, showConfirm } = useQuiz();
   const navigate = useNavigate();
   const location = useLocation();
-  const { sessionQuestions, sessionNames, practiceMode } = location.state || {};
+  const { sessionQuestions, sessionNames, practiceMode, timeLimit, isExam } = location.state || {};
+
+  // ---- Exam timer ----
+  const timeLimitMs = (timeLimit && timeLimit > 0) ? timeLimit * 60000 : 0;
+  const startRef = useRef(Date.now());
+  const [timeLeftMs, setTimeLeftMs] = useState(timeLimitMs);
+  const submittedRef = useRef(false);
+  const submitRef = useRef(null);
+  const isTimed = timeLimitMs > 0;
+
+  const handleSubmitRef = useCallback(() => {
+    if (submittedRef.current) return;
+    submittedRef.current = true;
+    submitRef.current?.();
+  }, []);
+
+  useEffect(() => {
+    if (!isTimed) return;
+    const id = setInterval(() => {
+      const elapsed = Date.now() - startRef.current;
+      const remaining = Math.max(0, timeLimitMs - elapsed);
+      setTimeLeftMs(remaining);
+      if (remaining <= 0) {
+        clearInterval(id);
+        handleSubmitRef();
+      }
+    }, 250);
+    return () => clearInterval(id);
+  }, [isTimed, timeLimitMs, handleSubmitRef]);
 
   const [questions, setQuestions] = useState(() => sessionQuestions || []);
   const [currentIdx, setCurrentIdx] = useState(0);
@@ -42,10 +70,10 @@ export default function Practice() {
     else handlePrev();          // swipe right → prev
   };
 
-  const showToast = (msg) => {
+  const showToast = useCallback((msg) => {
     setToast(msg);
     setTimeout(() => setToast(''), 2000);
-  };
+  }, []);
 
   // Redirect if no session
   useEffect(() => {
@@ -64,10 +92,57 @@ export default function Practice() {
   const qId = q ? q.id : null;
   const isInstant = practiceMode === 'instant';
   const isMulti = q ? q.correctIndices.length > 1 : false;
-  const currentAnswers = qId ? (answers[qId] || []) : [];
+  const currentAnswers = useMemo(() => qId ? (answers[qId] || []) : [], [qId, answers]);
   const isLast = currentIdx >= questions.length - 1;
 
-  const handleOptionClick = (oi) => {
+  const handleSubmit = useCallback(() => {
+    let correctCount = 0;
+    const d = { ...data, questionStats: { ...data.questionStats } };
+    const originalQuestions = questions.filter(qq => !qq._retryOf);
+
+    questions.forEach(qq => {
+      const ua = answers[qq.id] || [];
+      const c = qq.correctIndices.slice().sort((a, b) => a - b);
+      const us = ua.slice().sort((a, b) => a - b);
+      const statsId = qq._retryOf || qq.id;
+      const isCorrect = arraysEqual(c, us);
+      // Only count original questions toward score
+      if (!qq._retryOf) {
+        if (isCorrect) correctCount++;
+        else {
+          if (!d.questionStats[statsId]) d.questionStats[statsId] = { wrongCount: 0 };
+          d.questionStats[statsId].wrongCount++;
+          d.questionStats[statsId].lastWrong = new Date().toISOString();
+        }
+      }
+    });
+
+    const total = originalQuestions.length;
+    const score = Math.round((correctCount / total) * 100);
+    const session = {
+      id: uid(), testNames: sessionNames, questions, answers, totalQuestions: total,
+      correctCount, score, startedAt: new Date().toISOString(), completedAt: new Date().toISOString(),
+      ...(isTimed ? { timeLimit, isExam, elapsedMs: Math.min(timeLimitMs, Date.now() - startRef.current) } : {})
+    };
+
+    d.history = [session, ...d.history].slice(0, 100);
+    update(d);
+
+    navigate('/results', { state: { session, score, correctCount, total } });
+  }, [data, update, navigate, sessionNames, questions, answers, isTimed, timeLimit, isExam, timeLimitMs]);
+
+  // Keep latest handleSubmit available to the timer (avoids stale closure)
+  useEffect(() => { submitRef.current = handleSubmit; });
+
+  const requireAnswer = useCallback(() => {
+    if (currentAnswers.length === 0) {
+      showToast('Vui lòng chọn đáp án trước khi tiếp tục');
+      return false;
+    }
+    return true;
+  }, [currentAnswers, showToast]);
+
+  const handleOptionClick = useCallback((oi) => {
     if (showingResult || isSwiping.current) return;
     setAnswers(prev => {
       const a = { ...prev };
@@ -90,17 +165,9 @@ export default function Practice() {
       a[q.id] = cur;
       return a;
     });
-  };
+  }, [showingResult, q, isMulti]);
 
-  const requireAnswer = () => {
-    if (currentAnswers.length === 0) {
-      showToast('Vui lòng chọn đáp án trước khi tiếp tục');
-      return false;
-    }
-    return true;
-  };
-
-  const handleNext = () => {
+  const handleNext = useCallback(() => {
     if (isInstant && !showingResult) {
       if (!requireAnswer()) return;
       setShowingResult(true);
@@ -114,7 +181,7 @@ export default function Practice() {
         q.correctIndices.slice().sort((a,b)=>a-b)
       );
       const origId = q._retryOf || q.id;
-      if (!correct) {
+      if (!correct && !isExam) {
         const gap = 2;
         const insertPos = Math.min(currentIdx + gap + 1, questions.length);
         const retryQuestion = { ...q, id: uid(), _retryOf: origId };
@@ -136,48 +203,13 @@ export default function Practice() {
     if (isLast) { handleSubmit(); return; }
     setSlideFrom('right');
     setCurrentIdx(prev => prev + 1);
-  };
+  }, [isInstant, showingResult, requireAnswer, q, currentAnswers, isExam, currentIdx, questions, isLast, handleSubmit]);
 
-  const handlePrev = () => {
+  const handlePrev = useCallback(() => {
     if (currentIdx <= 0) return;
     setSlideFrom('left');
     setCurrentIdx(prev => prev - 1);
-  };
-
-  const handleSubmit = () => {
-    let correctCount = 0;
-    const d = { ...data, questionStats: { ...data.questionStats } };
-    const originalQuestions = questions.filter(q => !q._retryOf);
-
-    questions.forEach(q => {
-      const ua = answers[q.id] || [];
-      const c = q.correctIndices.slice().sort((a, b) => a - b);
-      const us = ua.slice().sort((a, b) => a - b);
-      const statsId = q._retryOf || q.id;
-      const isCorrect = arraysEqual(c, us);
-      // Only count original questions toward score
-      if (!q._retryOf) {
-        if (isCorrect) correctCount++;
-        else {
-          if (!d.questionStats[statsId]) d.questionStats[statsId] = { wrongCount: 0 };
-          d.questionStats[statsId].wrongCount++;
-          d.questionStats[statsId].lastWrong = new Date().toISOString();
-        }
-      }
-    });
-
-    const total = originalQuestions.length;
-    const score = Math.round((correctCount / total) * 100);
-    const session = {
-      id: uid(), testNames: sessionNames, questions, answers, totalQuestions: total,
-      correctCount, score, startedAt: new Date().toISOString(), completedAt: new Date().toISOString()
-    };
-
-    d.history = [session, ...d.history].slice(0, 100);
-    update(d);
-
-    navigate('/results', { state: { session, score, correctCount, total } });
-  };
+  }, [currentIdx]);
 
   const handleQuit = () => {
     showConfirm('Thoát bài làm? Kết quả sẽ không được lưu.', () => navigate('/'), {
@@ -216,6 +248,20 @@ export default function Practice() {
     <div onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
       {/* Progress */}
       <div className="flex items-center gap-3 mb-6 sticky top-[73px] z-[5] bg-slate-100 dark:bg-slate-900 py-2">
+        {/* Exam countdown */}
+        {isTimed && (() => {
+          const s = Math.max(0, Math.ceil(timeLeftMs / 1000));
+          const mm = Math.floor(s / 60);
+          const ss = s % 60;
+          let chipCls = 'text-success-600 bg-success-50 dark:bg-success-700/20 border-success-200 dark:border-success-700/50';
+          if (s <= 60) chipCls = 'text-danger-600 bg-danger-50 dark:bg-danger-700/20 border-danger-200 dark:border-danger-700/50';
+          else if (s <= 300) chipCls = 'text-warning-600 bg-warning-50 dark:bg-warning-700/20 border-warning-200 dark:border-warning-700/50';
+          return (
+            <span className={`px-2.5 py-1 rounded-lg border text-xs font-bold whitespace-nowrap flex items-center gap-1.5 tabular-nums ${chipCls}`}>
+              {mm}:{String(ss).padStart(2, '0')}
+            </span>
+          );
+        })()}
         <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 whitespace-nowrap max-w-[120px] overflow-hidden text-ellipsis">
           {(sessionNames || []).join(' + ')}
         </span>

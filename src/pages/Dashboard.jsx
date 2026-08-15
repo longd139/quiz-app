@@ -57,6 +57,7 @@ export default function Dashboard() {
           ))}
         </select>
         <button onClick={() => navigate('/editor')} className="bg-primary-600 text-white px-4 py-2.5 rounded-lg text-sm font-semibold hover:bg-primary-700 active:scale-95 transition-all">+ Thêm bài mới</button>
+        <button onClick={() => navigate('/exam-setup')} className="bg-success-600 text-white px-4 py-2.5 rounded-lg text-sm font-semibold hover:bg-success-700 active:scale-95 transition-all">Tạo bài kiểm tra</button>
         <button onClick={handleReviewWrong} className="bg-warning-600 text-white px-4 py-2.5 rounded-lg text-sm font-semibold hover:bg-warning-700 active:scale-95 transition-all">Ôn lại câu sai</button>
         <span className="flex-1" />
         <button onClick={() => navigate('/data')} className="border border-slate-200 dark:border-slate-700 px-3 py-2 rounded-lg text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-800 transition-all text-slate-600">Xuất JSON</button>

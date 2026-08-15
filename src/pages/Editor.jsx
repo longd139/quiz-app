@@ -218,6 +218,15 @@ export default function Editor() {
 
   return (
     <div>
+      {/* Create exam entry point */}
+      <div className="mb-5 p-4 bg-gradient-to-r from-primary-600 to-primary-700 rounded-xl text-white">
+        <div className="text-sm font-semibold mb-1">Tạo bài kiểm tra từ nhiều bài</div>
+        <p className="text-xs text-primary-100 mb-3">Chọn nhiều bài đã soạn, bốc ngẫu nhiên đủ số câu và đặt thời gian làm bài.</p>
+        <button onClick={() => navigate('/exam-setup')} className="bg-white text-primary-700 px-4 py-2 rounded-lg text-sm font-semibold hover:opacity-90 active:scale-95 transition-all">
+          Tạo bài kiểm tra
+        </button>
+      </div>
+
       {/* Collection */}
       <div className="mb-5">
         <label className="font-semibold text-sm block mb-1.5">Collection <span className="text-danger-600">*</span>:</label>

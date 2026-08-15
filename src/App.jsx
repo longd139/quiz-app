@@ -9,6 +9,7 @@ import Toast from './components/Toast';
 import Dashboard from './pages/Dashboard';
 import Editor from './pages/Editor';
 import PracticeSetup from './pages/PracticeSetup';
+import ExamSetup from './pages/ExamSetup';
 import Practice from './pages/Practice';
 import Results from './pages/Results';
 import History from './pages/History';
@@ -69,6 +70,7 @@ export default function App() {
               <Route path="/editor" element={<Editor />} />
               <Route path="/editor/:testId" element={<Editor />} />
               <Route path="/practice-setup" element={<PracticeSetup />} />
+              <Route path="/exam-setup" element={<ExamSetup />} />
               <Route path="/practice" element={<Practice />} />
               <Route path="/results" element={<Results />} />
               <Route path="/history" element={<History />} />

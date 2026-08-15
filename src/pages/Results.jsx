@@ -19,6 +19,11 @@ export default function Results() {
       <div className="text-center p-8 bg-white dark:bg-slate-800 rounded-xl shadow-sm dark:shadow-none border-2 border-primary-600 mb-6">
         <div className="text-5xl font-extrabold text-primary-600 leading-none">{pct}%</div>
         <div className="text-sm text-slate-500 dark:text-slate-400 mt-2">Đúng {correctCount}/{total} câu</div>
+        {session.timeLimit > 0 && (() => {
+          const sec = Math.round((session.elapsedMs || 0) / 1000);
+          const mm = Math.floor(sec / 60); const ss = sec % 60;
+          return <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">⏱ Thời gian làm bài: <span className="tabular-nums">{mm}:{String(ss).padStart(2, '0')}</span> / {session.timeLimit} phút</div>;
+        })()}
         <div className="h-2 bg-slate-200 dark:bg-slate-700 rounded-full mt-3 overflow-hidden">
           <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, background: barColor }} />
         </div>
