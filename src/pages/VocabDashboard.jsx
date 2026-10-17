@@ -2,7 +2,8 @@ import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuiz } from '../App';
 import { escHtml, getVocabCollectionName, createVocabCollection } from '../data/storage';
-import { IconCards, IconTarget, IconEdit, IconTrash, IconPlus, IconFolder, IconSearch, IconRotate, IconCross } from '../components/Icons';
+import { IconCards, IconTarget, IconEdit, IconTrash, IconPlus, IconFolder, IconSearch, IconRotate, IconCross, IconSpeaker } from '../components/Icons';
+import { speakWord } from '../lib/tts';
 import CreateFlashcardModal from '../components/CreateFlashcardModal';
 
 export default function VocabDashboard() {
@@ -15,6 +16,7 @@ export default function VocabDashboard() {
   const [newColName, setNewColName] = useState('');
   const [createModalDeck, setCreateModalDeck] = useState(null);
   const [studyOptionDeck, setStudyOptionDeck] = useState(null);
+  const [viewingMistakesDeck, setViewingMistakesDeck] = useState(null);
 
   const vocabDecks = data?.vocabDecks || [];
   const vocabCollections = data?.vocabCollections || [];
@@ -214,6 +216,28 @@ export default function VocabDashboard() {
                     <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200/60 dark:border-slate-700/60 truncate">
                       {escHtml(colName)}
                     </span>
+
+                    {(() => {
+                      const countGe2 = deck.cards?.filter(c => (vocabStats[c.id]?.wrongCount || 0) >= 2).length || 0;
+                      const mistakeCount = countGe2 > 0
+                        ? countGe2
+                        : (deck.cards?.filter(c => (vocabStats[c.id]?.wrongCount || 0) > 0).length || 0);
+
+                      if (mistakeCount === 0) return null;
+                      return (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setViewingMistakesDeck(deck);
+                          }}
+                          className="text-[11px] font-medium text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/50 hover:bg-rose-100 dark:hover:bg-rose-900/60 px-2 py-0.5 rounded-md border border-rose-200/80 dark:border-rose-900/60 shrink-0 transition-all cursor-pointer active:scale-95 shadow-2xs hover:shadow-xs"
+                          title="Bấm để xem danh sách các từ hay làm sai"
+                        >
+                          {mistakeCount} từ hay làm sai
+                        </button>
+                      );
+                    })()}
                   </div>
 
                   {/* Title */}
@@ -239,15 +263,6 @@ export default function VocabDashboard() {
                         style={{ width: `${percent}%` }}
                       />
                     </div>
-                    {(() => {
-                      const mistakeCount = deck.cards?.filter(c => (vocabStats[c.id]?.wrongCount || 0) >= 2).length || 0;
-                      if (mistakeCount === 0) return null;
-                      return (
-                        <div className="mt-2 text-[11px] font-medium text-rose-600 dark:text-rose-400 flex items-center gap-1 bg-rose-50 dark:bg-rose-950/40 px-2 py-0.5 rounded border border-rose-200/60 dark:border-rose-900/60 w-fit">
-                          <span>⚠️ {mistakeCount} từ hay làm sai</span>
-                        </div>
-                      );
-                    })()}
                   </div>
                 </div>
 
@@ -529,6 +544,135 @@ export default function VocabDashboard() {
           </div>
         </div>
       )}
+      {/* Modal hiển thị danh sách từ hay làm sai khi bấm vào badge */}
+      {viewingMistakesDeck && (() => {
+        const countGe2List = (viewingMistakesDeck.cards || [])
+          .filter(c => (vocabStats[c.id]?.wrongCount || 0) >= 2)
+          .sort((a, b) => (vocabStats[b.id]?.wrongCount || 0) - (vocabStats[a.id]?.wrongCount || 0));
+
+        const mistakeList = countGe2List.length > 0
+          ? countGe2List
+          : (viewingMistakesDeck.cards || [])
+              .filter(c => (vocabStats[c.id]?.wrongCount || 0) > 0)
+              .sort((a, b) => (vocabStats[b.id]?.wrongCount || 0) - (vocabStats[a.id]?.wrongCount || 0));
+
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-fadeIn">
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-lg w-full p-5 sm:p-6 shadow-2xl flex flex-col max-h-[85vh]">
+              {/* Header */}
+              <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3.5">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">
+                      Từ hay làm sai
+                    </h3>
+                    <span className="px-2 py-0.5 rounded-full text-[11px] font-mono font-semibold bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-400 border border-rose-200/60 dark:border-rose-900/60">
+                      {mistakeList.length} từ
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 truncate max-w-[280px] sm:max-w-[360px]">
+                    Bộ từ: <strong className="text-slate-800 dark:text-slate-200">{viewingMistakesDeck.name}</strong>
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setViewingMistakesDeck(null)}
+                  className="w-7 h-7 flex items-center justify-center rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs transition-colors cursor-pointer"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* Danh sách từ làm sai */}
+              <div className="overflow-y-auto space-y-2.5 py-4 flex-1 pr-1">
+                {mistakeList.length === 0 ? (
+                  <div className="text-center py-8 text-slate-400 text-xs">
+                    Chưa có từ nào bị làm sai trong bộ từ này.
+                  </div>
+                ) : (
+                  mistakeList.map(card => {
+                    const wrongCount = vocabStats[card.id]?.wrongCount || 0;
+                    return (
+                      <div
+                        key={card.id}
+                        className="p-3.5 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 hover:border-slate-300 dark:hover:border-slate-700 transition-all flex items-start justify-between gap-3"
+                      >
+                        <div className="space-y-1 flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-bold text-sm text-slate-900 dark:text-slate-100">
+                              {card.term}
+                            </span>
+                            {card.partOfSpeech && (
+                              <span className="text-[10px] font-mono italic px-1.5 py-0.2 rounded bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
+                                {card.partOfSpeech}
+                              </span>
+                            )}
+                            {card.phonetic && (
+                              <span className="text-xs text-slate-400 dark:text-slate-500 font-mono">
+                                {card.phonetic}
+                              </span>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => speakWord(card.term, viewingMistakesDeck.targetLanguage || 'en-US')}
+                              className="p-1 rounded-md text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                              title="Nghe phát âm"
+                            >
+                              <IconSpeaker className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+
+                          <p className="text-xs text-slate-700 dark:text-slate-300 font-medium">
+                            {card.meaning}
+                          </p>
+
+                          {card.example && (
+                            <p className="text-[11px] text-slate-500 dark:text-slate-400 italic font-serif">
+                              "{card.example}"
+                              {card.exampleMeaning && ` → ${card.exampleMeaning}`}
+                            </p>
+                          )}
+                        </div>
+
+                        <div className="shrink-0 text-right">
+                          <span className="text-[11px] font-mono font-semibold px-2 py-0.5 rounded-md bg-rose-50 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400 border border-rose-200/60 dark:border-rose-900/40 whitespace-nowrap">
+                            Sai {wrongCount} lần
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+
+              {/* Footer */}
+              <div className="flex items-center justify-between pt-3 border-t border-slate-100 dark:border-slate-800 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setViewingMistakesDeck(null)}
+                  className="px-4 py-2 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg text-xs font-semibold cursor-pointer text-slate-700 dark:text-slate-300"
+                >
+                  Đóng
+                </button>
+                {mistakeList.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const deckToStudy = viewingMistakesDeck;
+                      setViewingMistakesDeck(null);
+                      navigate('/vocab-quiz', { state: { deckId: deckToStudy.id, studyMode: 'wrong_only' } });
+                    }}
+                    className="bg-slate-900 dark:bg-white hover:bg-slate-800 dark:hover:bg-slate-100 text-white dark:text-slate-900 px-4 py-2 rounded-lg text-xs font-semibold tracking-tight transition-all active:scale-95 flex items-center gap-1.5 shadow-2xs cursor-pointer"
+                  >
+                    <IconTarget className="w-3.5 h-3.5" />
+                    <span>Ôn tập các từ này</span>
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
