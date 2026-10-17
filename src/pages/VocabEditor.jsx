@@ -153,46 +153,161 @@ export default function VocabEditor() {
   };
 
   const handleBatchImport = () => {
-    if (!batchText.trim()) return;
-    const lines = batchText.split('\n').map(l => l.trim()).filter(Boolean);
-    const newCards = [];
+    let raw = batchText.trim();
+    if (!raw) return;
 
-    for (const line of lines) {
-      let parts = [];
-      if (line.includes('|')) {
-        parts = line.split('|').map(s => s.trim());
-      } else if (line.includes(':')) {
-        parts = line.split(':').map(s => s.trim());
-      } else if (line.includes(' - ')) {
-        parts = line.split(' - ').map(s => s.trim());
-      } else {
-        parts = [line];
+    // Helper to clean quotes and trailing commas
+    const cleanStr = (s) => {
+      if (!s) return '';
+      let res = s.trim();
+      // Remove surrounding quotes ("...", '...')
+      if ((res.startsWith('"') && res.endsWith('"')) || (res.startsWith("'") && res.endsWith("'"))) {
+        res = res.slice(1, -1).trim();
+      }
+      // Remove trailing comma
+      if (res.endsWith(',')) {
+        res = res.slice(0, -1).trim();
+      }
+      // Remove surrounding quotes again if double quoted
+      if ((res.startsWith('"') && res.endsWith('"')) || (res.startsWith("'") && res.endsWith("'"))) {
+        res = res.slice(1, -1).trim();
+      }
+      return res;
+    };
+
+    // Helper to parse card attributes
+    const parseCardData = (rawTerm, rawMeaning, rawPos = '', rawExamples = []) => {
+      let term = cleanStr(rawTerm);
+      let meaning = cleanStr(rawMeaning);
+      let partOfSpeech = cleanStr(rawPos);
+      let example = '';
+      let examples = Array.isArray(rawExamples) ? rawExamples.map(cleanStr).filter(Boolean) : [];
+
+      // Skip JSON schema keys or empty strings
+      const jsonKeys = ['term', 'meaning', 'partofspeech', 'example', 'examples', 'phonetic', 'note', 'id'];
+      if (jsonKeys.includes(term.toLowerCase().replace(/[^a-z]/g, ''))) {
+        return null;
+      }
+      if (!term || !meaning || term === '[' || meaning === '[') return null;
+
+      // Extract [n], [v], [adj], etc. from term if not already set
+      const posMatch = term.match(/^(.*?)\s*\[([a-zA-Z/]+)\]$/);
+      if (posMatch) {
+        term = posMatch[1].trim();
+        if (!partOfSpeech) partOfSpeech = posMatch[2].trim();
       }
 
-      if (parts.length >= 2) {
-        const term = parts[0];
-        let phonetic = '';
-        let meaning = parts[1];
-        let example = '';
+      // Extract Ex: from meaning
+      if (examples.length === 0 && /\n\s*(?:Ex|Ví dụ|Example)\s*:/i.test(meaning)) {
+        const exSplit = meaning.split(/\n\s*(?:Ex|Ví dụ|Example)\s*:\s*\n?/i);
+        if (exSplit.length >= 2) {
+          meaning = exSplit[0].trim();
+          const rawEx = exSplit.slice(1).join('\n').trim();
+          examples = rawEx
+            .split(/\n\s*[-•*]\s*/g)
+            .map(s => s.replace(/^[-•*]\s*/, '').trim())
+            .filter(Boolean);
+        }
+      }
 
-        if (parts.length >= 3) {
-          if (parts[1].startsWith('/') || parts[1].startsWith('[')) {
-            phonetic = parts[1];
-            meaning = parts[2];
-            example = parts[3] || '';
-          } else {
-            meaning = parts[1];
-            example = parts[2] || '';
+      if (examples.length > 0 && !example) {
+        example = examples[0];
+      }
+
+      return createVocabCard(term, meaning, '', partOfSpeech, example, '', '', '', examples);
+    };
+
+    // 1. Try parsing JSON (supports full JSON or JSON array embedded inside text)
+    let jsonCandidates = [];
+    const firstBracket = raw.indexOf('[');
+    const lastBracket = raw.lastIndexOf(']');
+    if (firstBracket !== -1 && lastBracket > firstBracket) {
+      try {
+        const jsonSlice = raw.slice(firstBracket, lastBracket + 1);
+        const parsed = JSON.parse(jsonSlice);
+        if (Array.isArray(parsed)) jsonCandidates = parsed;
+      } catch (e) {
+        // Continue to fallback
+      }
+    }
+
+    if (jsonCandidates.length === 0 && (raw.startsWith('{') || raw.includes('"term"'))) {
+      try {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) jsonCandidates = parsed;
+        else if (Array.isArray(parsed.cards)) jsonCandidates = parsed.cards;
+      } catch (e) {
+        // Try regex matching objects { "term": "...", "meaning": "..." }
+        const itemRegex = /\{\s*"term"\s*:\s*"([^"]+)"[\s\S]*?"meaning"\s*:\s*"([^"]+)"[\s\S]*?\}/g;
+        let match;
+        while ((match = itemRegex.exec(raw)) !== null) {
+          try {
+            const obj = JSON.parse(match[0]);
+            jsonCandidates.push(obj);
+          } catch (err) {
+            jsonCandidates.push({ term: match[1], meaning: match[2] });
           }
         }
+      }
+    }
 
-        newCards.push(createVocabCard(term, meaning, phonetic, '', example));
+    if (jsonCandidates.length > 0) {
+      const newCards = jsonCandidates.map(item => {
+        return parseCardData(
+          item.term || item.word || '',
+          item.meaning || item.definition || '',
+          item.partOfSpeech || '',
+          item.examples || (item.example ? [item.example] : [])
+        );
+      }).filter(Boolean);
+
+      if (newCards.length > 0) {
+        setCards(prev => [...prev, ...newCards]);
+        showToast(`Đã nhập thành công ${newCards.length} từ vựng!`, 'success');
+        setBatchText('');
+        setShowBatchModal(false);
+        return;
+      }
+    }
+
+    // 2. Plain text / Tab / Pipe parsing
+    // Split cards by double newline if present (Quizlet standard), otherwise single newline
+    const cardBlocks = raw.includes('\n\n') ? raw.split(/\n\s*\n/) : raw.split('\n');
+    const newCards = [];
+
+    for (const block of cardBlocks) {
+      const trimmedBlock = block.trim();
+      if (!trimmedBlock) continue;
+
+      let term = '';
+      let meaning = '';
+
+      if (trimmedBlock.includes('\t')) {
+        const parts = trimmedBlock.split('\t').map(s => s.trim());
+        term = parts[0] || '';
+        meaning = parts.slice(1).join(' - ');
+      } else if (trimmedBlock.includes('|')) {
+        const parts = trimmedBlock.split('|').map(s => s.trim());
+        term = parts[0] || '';
+        meaning = parts.slice(1).join(' - ');
+      } else if (trimmedBlock.includes(' - ')) {
+        const parts = trimmedBlock.split(' - ').map(s => s.trim());
+        term = parts[0] || '';
+        meaning = parts.slice(1).join(' - ');
+      } else if (trimmedBlock.includes(':')) {
+        const idx = trimmedBlock.indexOf(':');
+        term = trimmedBlock.slice(0, idx).trim();
+        meaning = trimmedBlock.slice(idx + 1).trim();
+      }
+
+      const card = parseCardData(term, meaning);
+      if (card) {
+        newCards.push(card);
       }
     }
 
     if (newCards.length > 0) {
-      const existing = cards.filter(c => c.term.trim() || c.meaning.trim());
-      setCards([...existing, ...newCards]);
+      setCards(prev => [...prev, ...newCards]);
       showToast(`Đã thêm ${newCards.length} từ vào danh sách`, 'success');
       setBatchText('');
       setShowBatchModal(false);
