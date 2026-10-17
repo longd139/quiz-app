@@ -1,5 +1,6 @@
 import { useNavigate, useLocation } from 'react-router-dom';
 import { IconBook, IconCards, IconSpeaker, IconSpeakerMute } from './Icons';
+import { APP_VERSION } from '../version';
 
 export default function Header({ syncStatus, dark, toggleDark, appMode, setAppMode, ttsMuted, toggleTts }) {
   const navigate = useNavigate();
@@ -37,12 +38,19 @@ export default function Header({ syncStatus, dark, toggleDark, appMode, setAppMo
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         {/* Left: Logo / App title */}
         <div className="flex items-center justify-between sm:justify-start gap-2 sm:min-w-[180px]">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2">
             <span className="text-base font-extrabold tracking-tight text-slate-900 dark:text-slate-100">
               {appMode === 'language' ? 'Study' : 'Quiz'}
             </span>
             <span className="text-xs px-2 py-0.5 rounded-md font-mono font-medium bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200/60 dark:border-slate-700/60">
               {appMode === 'language' ? 'Language' : 'Practice'}
+            </span>
+            <span
+              className="text-[10px] sm:text-[11px] px-1.5 py-0.5 rounded-md font-mono font-semibold bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200/70 dark:border-purple-800/70 tracking-tight flex items-center gap-1 shadow-2xs select-none"
+              title={`Phiên bản ứng dụng: ${APP_VERSION}`}
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              <span>{APP_VERSION}</span>
             </span>
           </div>
 
