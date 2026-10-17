@@ -50,9 +50,10 @@ export function useQuizData() {
         // Làm mới nhanh từ cloud (nếu có dữ liệu mới hơn).
         const { data: cloudData } = await pullRoomData(cfg.secret);
         if (active && cloudData && (cloudData.tests?.length || cloudData.history?.length)) {
-          dataRef.current = cloudData;
-          saveData(cloudData);
-          setData(cloudData);
+          const { data: normalized } = ensureCollections(cloudData);
+          dataRef.current = normalized;
+          saveData(normalized);
+          setData(normalized);
         }
         // Nếu dữ liệu local chưa có trên cloud, đẩy lên.
         else if (active && dataRef.current && (dataRef.current.tests?.length || dataRef.current.history?.length)) {

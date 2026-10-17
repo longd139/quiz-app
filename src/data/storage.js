@@ -4,6 +4,8 @@ import { marked } from 'marked';
 // Configure marked for safe rendering (no raw HTML from user input)
 marked.setOptions({ breaks: true, gfm: true });
 
+import { getDefaultVocabDecks, getDefaultVocabCollections } from './defaultVocab';
+
 const STORAGE_KEY = 'quiz_data';
 
 export function loadData() {
@@ -16,13 +18,25 @@ export function loadData() {
       tests: data.tests || [],
       history: data.history || [],
       settings: data.settings || { shuffleQuestions: true, shuffleOptions: false, practiceMode: 'submit' },
-      questionStats: data.questionStats || {}
+      questionStats: data.questionStats || {},
+      vocabCollections: Array.isArray(data.vocabCollections) && data.vocabCollections.length > 0 ? data.vocabCollections : getDefaultVocabCollections(),
+      vocabDecks: Array.isArray(data.vocabDecks) && data.vocabDecks.length > 0 ? data.vocabDecks : getDefaultVocabDecks(),
+      vocabStats: data.vocabStats || {}
     };
   } catch (_e) { return defaultData(); }
 }
 
 function defaultData() {
-  return { collections: [], tests: [], history: [], settings: { shuffleQuestions: true, shuffleOptions: false, practiceMode: 'submit' }, questionStats: {} };
+  return {
+    collections: [],
+    tests: [],
+    history: [],
+    settings: { shuffleQuestions: true, shuffleOptions: false, practiceMode: 'submit' },
+    questionStats: {},
+    vocabCollections: getDefaultVocabCollections(),
+    vocabDecks: getDefaultVocabDecks(),
+    vocabStats: {}
+  };
 }
 
 export function saveData(data) {
@@ -51,10 +65,96 @@ export function getCollectionName(collections, id) {
   return c ? c.name : 'Chưa phân loại';
 }
 
-// Migrate old tests without collectionId
+export function createVocabCollection(name) {
+  return {
+    id: uid(),
+    name: name.trim() || 'Bộ sưu tập từ mới',
+    createdAt: new Date().toISOString()
+  };
+}
+
+export function getVocabCollectionName(vocabCollections, id) {
+  if (!vocabCollections) return 'Chưa phân loại';
+  const c = vocabCollections.find(c => c.id === id);
+  return c ? c.name : 'Chưa phân loại';
+}
+
+export function createVocabCard(
+  term = '',
+  meaning = '',
+  phonetic = '',
+  partOfSpeech = '',
+  example = '',
+  exampleMeaning = '',
+  image = '',
+  note = '',
+  examples = []
+) {
+  const exList = Array.isArray(examples) && examples.length > 0
+    ? examples
+    : (example.trim() ? [example.trim()] : []);
+
+  return {
+    id: uid(),
+    term: term.trim(),
+    phonetic: phonetic.trim(),
+    partOfSpeech: partOfSpeech.trim(),
+    meaning: meaning.trim(),
+    example: exList[0] || example.trim(),
+    exampleMeaning: exampleMeaning.trim(),
+    examples: exList,
+    image: image || '',
+    note: note.trim()
+  };
+}
+
+export function createVocabDeck(name = 'Bộ từ vựng mới', collectionId = null, description = '', targetLanguage = 'en-US') {
+  const now = new Date().toISOString();
+  return {
+    id: uid(),
+    name: name.trim() || 'Bộ từ vựng mới',
+    collectionId: collectionId || null,
+    description: description.trim(),
+    targetLanguage: targetLanguage || 'en-US',
+    cards: [],
+    createdAt: now,
+    updatedAt: now
+  };
+}
+
+// Migrate old tests without collectionId & ensure vocabCollections and vocabDecks exist
 export function ensureCollections(data) {
   let changed = false;
-  const hasUnclassified = data.tests.some(t => !t.collectionId);
+  if (!data) data = defaultData();
+
+  // Ensure vocabCollections (distinct from question collections)
+  if (!data.vocabCollections || !Array.isArray(data.vocabCollections) || data.vocabCollections.length === 0) {
+    data.vocabCollections = getDefaultVocabCollections();
+    changed = true;
+  }
+
+  // Ensure vocabDecks
+  if (!data.vocabDecks || !Array.isArray(data.vocabDecks) || data.vocabDecks.length === 0) {
+    data.vocabDecks = getDefaultVocabDecks();
+    changed = true;
+  }
+
+  // Link any orphaned vocab deck to a vocabCollection
+  const defaultVocabColId = data.vocabCollections[0]?.id;
+  data.vocabDecks.forEach(deck => {
+    if (!deck.collectionId || !data.vocabCollections.some(c => c.id === deck.collectionId)) {
+      deck.collectionId = defaultVocabColId;
+      changed = true;
+    }
+  });
+
+  if (!data.vocabStats) {
+    data.vocabStats = {};
+    changed = true;
+  }
+
+  // Question tests collection check
+  const hasUnclassified = data.tests?.some(t => !t.collectionId);
   if (hasUnclassified) {
     let uncat = data.collections.find(c => c.name === 'Chưa phân loại');
     if (!uncat) {
@@ -64,6 +164,7 @@ export function ensureCollections(data) {
     }
     data.tests.forEach(t => { if (!t.collectionId) { t.collectionId = uncat.id; changed = true; } });
   }
+
   return { data, changed };
 }
 

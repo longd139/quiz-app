@@ -70,7 +70,7 @@ export default function Dashboard() {
           <p className="text-sm mb-4">Chưa có bài nào.<br />Nhấn "<strong>+ Thêm bài mới</strong>" để bắt đầu!</p>
         </div>
       ) : (
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
           {filteredTests.map(test => {
             const idx = data.tests.indexOf(test);
             const collName = getCollectionName(data.collections, test.collectionId);

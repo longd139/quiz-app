@@ -5,3 +5,7 @@ dist/
 
 # Supabase CLI cache (riêng từng máy)
 supabase/.temp/
+
+# Agent IDE customizations
+.agents/
+skills-lock.json

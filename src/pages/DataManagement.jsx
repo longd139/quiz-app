@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react';
 import { useQuiz } from '../App';
 import { getRoomConfig, isConfigured } from '../data/supabaseSync';
+import { getCloudinaryConfig, setCloudinaryCloudName } from '../lib/cloudinary';
 
 export default function DataManagement() {
   const { data, update, syncStatus, doPush, doPull, doCreateRoom, doJoinRoom, doDisconnectSync, showConfirm, showAlert, showToast } = useQuiz();
@@ -10,6 +11,9 @@ export default function DataManagement() {
   const [importFeedback, setImportFeedback] = useState('');
   const [showConfig, setShowConfig] = useState(!isConfigured());
   const fileRef = useRef(null);
+
+  const cloudinaryCfg = getCloudinaryConfig();
+  const [cloudinaryCloudName, setCloudinaryCloudNameInput] = useState(cloudinaryCfg.cloudName);
 
   const cfg = getRoomConfig();
   const configured = isConfigured();
@@ -35,14 +39,19 @@ export default function DataManagement() {
     if (!importText.trim()) { setImportFeedback('Vui lòng paste JSON vào.'); return; }
     try {
       const imported = JSON.parse(importText);
-      if (!imported.tests) throw new Error('JSON không đúng định dạng: thiếu trường "tests".');
-      showConfirm(`⚠️ Dữ liệu hiện tại sẽ bị GHI ĐÈ bởi dữ liệu nhập vào (${imported.tests.length} bài test). Tiếp tục?`, () => {
+      if (!imported.tests && !imported.vocabDecks) throw new Error('JSON không đúng định dạng: cần có ít nhất "tests" hoặc "vocabDecks".');
+      const testCount = imported.tests ? imported.tests.length : 0;
+      const deckCount = imported.vocabDecks ? imported.vocabDecks.length : 0;
+      showConfirm(`⚠️ Dữ liệu hiện tại sẽ bị GHI ĐÈ bởi dữ liệu nhập vào (${testCount} bài test, ${deckCount} bộ từ vựng). Tiếp tục?`, () => {
         update({
           collections: imported.collections || [],
           tests: imported.tests || [],
           history: imported.history || [],
           settings: imported.settings || { shuffleQuestions: true, shuffleOptions: false, practiceMode: 'submit' },
-          questionStats: imported.questionStats || {}
+          questionStats: imported.questionStats || {},
+          vocabCollections: imported.vocabCollections || data.vocabCollections || [],
+          vocabDecks: imported.vocabDecks || data.vocabDecks || [],
+          vocabStats: imported.vocabStats || data.vocabStats || {}
         });
         setImportFeedback('✅ Đã nhập thành công!');
         setImportText('');
@@ -62,6 +71,15 @@ export default function DataManagement() {
   const handleJoinRoom = async () => {
     try { await doJoinRoom(roomSecret); setShowConfig(false); showToast('✅ Đã kết nối phòng thành công!', 'success'); }
     catch (e) { showAlert('Lỗi kết nối', e.message, 'error'); }
+  };
+
+  const handleSaveCloudinary = () => {
+    if (!cloudinaryCloudName.trim()) {
+      showToast('Vui lòng nhập Cloud Name từ Cloudinary', 'error');
+      return;
+    }
+    setCloudinaryCloudName(cloudinaryCloudName.trim());
+    showToast('✅ Đã lưu cấu hình Cloudinary thành công!', 'success');
   };
 
   const handleDisconnect = () => {
@@ -126,6 +144,70 @@ export default function DataManagement() {
             </div>
           </div>
         )}
+      </div>
+
+      {/* Cloudinary Configuration */}
+      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm dark:shadow-none border border-slate-200 dark:border-slate-700 p-4 mb-4">
+        <div className="flex items-center justify-between mb-1">
+          <h3 className="text-base font-semibold">Lưu trữ ảnh Cloudinary</h3>
+          {cloudinaryCloudName ? (
+            <span className="text-xs px-2 py-0.5 rounded font-mono font-medium bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
+              Đã cấu hình
+            </span>
+          ) : (
+            <span className="text-xs px-2 py-0.5 rounded font-mono font-medium bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800">
+              Cần nhập Cloud Name
+            </span>
+          )}
+        </div>
+        <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
+          Tải ảnh flashcard trực tiếp lên Cloudinary CDN với API Key và API Secret đã kết nối.
+        </p>
+
+        <div className="space-y-3">
+          <div>
+            <label className="text-xs font-semibold block mb-1">
+              Cloud Name <span className="text-rose-500">*</span>:
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={cloudinaryCloudName}
+                onChange={e => setCloudinaryCloudNameInput(e.target.value)}
+                placeholder="Nhập Cloud name từ dashboard Cloudinary (ví dụ: demo hoặc tên cloud của bạn)"
+                className="flex-1 px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-mono outline-none focus:border-primary-500 bg-white dark:bg-slate-900"
+              />
+              <button
+                type="button"
+                onClick={handleSaveCloudinary}
+                className="bg-primary-600 text-white px-4 py-2 rounded-lg text-xs font-semibold hover:bg-primary-700 active:scale-95 cursor-pointer whitespace-nowrap"
+              >
+                Lưu Cloud Name
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+            <div>
+              <label className="text-xs font-semibold block mb-1 text-slate-500">API Key:</label>
+              <input
+                type="text"
+                readOnly
+                value={cloudinaryCfg.apiKey}
+                className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-mono bg-slate-50 dark:bg-slate-800 text-slate-500"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-semibold block mb-1 text-slate-500">API Secret:</label>
+              <input
+                type="password"
+                readOnly
+                value="b1z1XZAwQKe58az9as900ORnnL8"
+                className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-mono bg-slate-50 dark:bg-slate-800 text-slate-500"
+              />
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Export */}
