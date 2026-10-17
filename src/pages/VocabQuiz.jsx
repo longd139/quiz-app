@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useQuiz } from '../App';
 import { shuffle } from '../data/storage';
@@ -19,7 +19,7 @@ function checkAnswerMatch(userInput, targetAnswer) {
     return str
       .normalize('NFC')
       .toLowerCase()
-      .replace(/[.,/#!$%^&*;:{}=\-_`~()?"'’“”…\[\]]/g, ' ')
+      .replace(/[.,/#!$%^&*;:{}=\-_`~()?"'’“”…[\]]/g, ' ')
       .replace(/\s+/g, ' ')
       .trim();
   };
