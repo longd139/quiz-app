@@ -46,11 +46,10 @@ export default function Header({ syncStatus, dark, toggleDark, appMode, setAppMo
               {appMode === 'language' ? 'Language' : 'Practice'}
             </span>
             <span
-              className="text-[10px] sm:text-[11px] px-1.5 py-0.5 rounded-md font-mono font-semibold bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200/70 dark:border-purple-800/70 tracking-tight flex items-center gap-1 shadow-2xs select-none"
+              className="text-[10px] sm:text-[11px] px-1.5 py-0.5 rounded-md font-mono font-semibold bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200/70 dark:border-purple-800/70 tracking-tight shadow-2xs select-none"
               title={`Phiên bản ứng dụng: ${APP_VERSION}`}
             >
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              <span>{APP_VERSION}</span>
+              {APP_VERSION}
             </span>
           </div>
 
