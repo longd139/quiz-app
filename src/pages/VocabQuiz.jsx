@@ -115,8 +115,17 @@ export default function VocabQuiz() {
   const vocabDecks = data.vocabDecks || [];
   const initialDeckId = location.state?.deckId || (vocabDecks[0]?.id || '');
   const initialMode = location.state?.mode;
+  const initialStudyMode = location.state?.studyMode || 'continue'; // 'continue' | 'restart' | 'wrong_only'
 
   const [selectedDeckId, setSelectedDeckId] = useState(initialDeckId);
+  const [studyMode, setStudyMode] = useState(initialStudyMode);
+
+  useEffect(() => {
+    if (location.state?.studyMode) {
+      setStudyMode(location.state.studyMode);
+    }
+  }, [location.state?.studyMode, location.key]);
+
   const [direction, setDirection] = useState('term-to-meaning'); // 'term-to-meaning' | 'meaning-to-term'
   const [allowChoice, setAllowChoice] = useState(initialMode === 'matching' ? false : (initialMode === 'flashcard' ? false : true));
   const [allowWritten, setAllowWritten] = useState(false);
@@ -187,6 +196,9 @@ export default function VocabQuiz() {
 
   // Helper lấy danh sách ID các từ đã học thuộc của bộ từ này từ vocabStats
   const getInitialMastered = useCallback(() => {
+    if (studyMode === 'restart' || studyMode === 'wrong_only') {
+      return new Set();
+    }
     const set = new Set();
     const curStats = dataRef.current?.vocabStats || data.vocabStats || {};
     if (currentDeck?.cards) {
@@ -197,16 +209,29 @@ export default function VocabQuiz() {
       });
     }
     return set;
-  }, [currentDeck, data.vocabStats]);
+  }, [currentDeck, data.vocabStats, studyMode]);
 
   const [masteredCardIds, setMasteredCardIds] = useState(() => getInitialMastered());
 
-  // Khi đổi deck, nạp lại tiến độ các từ đã thuộc của deck đó
+  // Khi đổi deck hoặc studyMode, nạp lại tiến độ các từ đã thuộc của deck đó
   useEffect(() => {
     setMasteredCardIds(getInitialMastered());
-  }, [selectedDeckId, getInitialMastered]);
+  }, [selectedDeckId, getInitialMastered, studyMode]);
 
-  const totalWords = currentDeck?.cards?.length || 0;
+  // Danh sách các từ đã từng làm sai trong bộ từ này
+  const wrongCards = useMemo(() => {
+    if (!currentDeck?.cards) return [];
+    const curStats = dataRef.current?.vocabStats || data.vocabStats || {};
+    return currentDeck.cards.filter(c => (curStats[c.id]?.wrongCount || 0) > 0);
+  }, [currentDeck, data.vocabStats]);
+
+  const totalWords = useMemo(() => {
+    if (studyMode === 'wrong_only') {
+      return wrongCards.length > 0 ? wrongCards.length : (currentDeck?.cards?.length || 0);
+    }
+    return currentDeck?.cards?.length || 0;
+  }, [studyMode, wrongCards.length, currentDeck?.cards?.length]);
+
   const masteredCount = masteredCardIds.size;
 
   // Ghi nhận ngay câu làm đúng vào vocabStats (Database) trong thời gian thực
@@ -223,6 +248,7 @@ export default function VocabQuiz() {
       [cardId]: {
         ...curStats,
         mastered: true,
+        wrongCount: studyMode === 'wrong_only' ? Math.max(0, (curStats.wrongCount || 1) - 1) : (curStats.wrongCount || 0),
         correctCount: (curStats.correctCount || 0) + 1,
         lastReviewed: new Date().toISOString()
       }
@@ -376,7 +402,17 @@ export default function VocabQuiz() {
   // Generate quiz questions
   const generateQuiz = () => {
     if (!currentDeck || !currentDeck.cards || currentDeck.cards.length < 2) return;
-    const cards = shuffle([...currentDeck.cards]);
+
+    let targetCards = [...currentDeck.cards];
+    if (studyMode === 'wrong_only') {
+      targetCards = wrongCards.length > 0 ? [...wrongCards] : [...currentDeck.cards];
+    } else if (studyMode === 'continue') {
+      const curMastered = getInitialMastered();
+      const unmastered = currentDeck.cards.filter(c => !curMastered.has(c.id));
+      targetCards = unmastered.length > 0 ? unmastered : [...currentDeck.cards];
+    }
+
+    const cards = shuffle(targetCards);
     const isTermToMeaning = direction === 'term-to-meaning';
 
     const enabledTypes = [];
@@ -389,37 +425,41 @@ export default function VocabQuiz() {
 
     // Case 1: ONLY Matching is selected
     if (enabledTypes.length === 1 && enabledTypes[0] === 'matching') {
-      const generated = [];
-      const pairCount = Math.min(4, cards.length);
-      for (let i = 0; i < cards.length; i += pairCount) {
-        let chunk = cards.slice(i, i + pairCount);
-        if (chunk.length < pairCount && cards.length >= pairCount) {
-          const fillers = cards.filter(c => !chunk.some(ch => ch.id === c.id));
-          chunk = [...chunk, ...fillers.slice(0, pairCount - chunk.length)];
+      if (cards.length < 2) {
+        enabledTypes[0] = 'choice';
+      } else {
+        const generated = [];
+        const pairCount = Math.min(4, cards.length);
+        for (let i = 0; i < cards.length; i += pairCount) {
+          let chunk = cards.slice(i, i + pairCount);
+          if (chunk.length < pairCount && cards.length >= pairCount) {
+            const fillers = cards.filter(c => !chunk.some(ch => ch.id === c.id));
+            chunk = [...chunk, ...fillers.slice(0, pairCount - chunk.length)];
+          }
+          if (chunk.length >= 2) {
+            const terms = shuffle(chunk.map(c => ({
+              id: c.id,
+              text: isTermToMeaning ? c.term : c.meaning,
+              card: c
+            })));
+            const meanings = shuffle(chunk.map(c => ({
+              id: c.id,
+              text: isTermToMeaning ? c.meaning : c.term,
+              card: c
+            })));
+            generated.push({
+              type: 'matching',
+              cards: chunk,
+              terms,
+              meanings,
+              totalPairs: chunk.length
+            });
+          }
         }
-        if (chunk.length >= 2) {
-          const terms = shuffle(chunk.map(c => ({
-            id: c.id,
-            text: isTermToMeaning ? c.term : c.meaning,
-            card: c
-          })));
-          const meanings = shuffle(chunk.map(c => ({
-            id: c.id,
-            text: isTermToMeaning ? c.meaning : c.term,
-            card: c
-          })));
-          generated.push({
-            type: 'matching',
-            cards: chunk,
-            terms,
-            meanings,
-            totalPairs: chunk.length
-          });
-        }
+        setQuestions(generated.length > 0 ? generated : []);
+        resetQuestionStates();
+        return;
       }
-      setQuestions(generated.length > 0 ? generated : []);
-      resetQuestionStates();
-      return;
     }
 
     // Case 2: Mixed modes or standard single-question modes
@@ -431,7 +471,7 @@ export default function VocabQuiz() {
       const qType = enabledTypes[qIdx % enabledTypes.length];
       qIdx++;
 
-      if (qType === 'matching') {
+      if (qType === 'matching' && cards.length >= 2) {
         const pairCount = Math.min(4, cards.length);
         let chunk = cards.slice(cardIndex, cardIndex + pairCount);
         if (chunk.length < pairCount && cards.length >= pairCount) {
@@ -459,6 +499,7 @@ export default function VocabQuiz() {
         }
         cardIndex += Math.max(1, chunk.length);
       } else {
+        const singleType = qType === 'matching' ? 'choice' : qType;
         const card = cards[cardIndex];
         const prompt = isTermToMeaning ? card.term : card.meaning;
         const correctAnswer = isTermToMeaning ? card.meaning : card.term;
@@ -472,7 +513,7 @@ export default function VocabQuiz() {
 
         generated.push({
           card,
-          type: qType,
+          type: singleType,
           prompt,
           correctAnswer,
           options: allOptions,
@@ -488,7 +529,7 @@ export default function VocabQuiz() {
 
   useEffect(() => {
     generateQuiz();
-  }, [currentDeck, direction, allowChoice, allowWritten, allowFlashcard, allowMatching]);
+  }, [currentDeck, direction, allowChoice, allowWritten, allowFlashcard, allowMatching, studyMode]);
 
   const currentQ = questions[currentIndex] || null;
 
@@ -1104,10 +1145,25 @@ export default function VocabQuiz() {
 
       {/* Deck Title Header */}
       {currentDeck && (
-        <div className="pt-0.5">
+        <div className="pt-0.5 flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-sm sm:text-base font-bold text-slate-900 dark:text-slate-100 break-words" title={currentDeck.name}>
             {currentDeck.name}
           </h2>
+          {studyMode === 'wrong_only' && (
+            <span className="text-[11px] font-semibold font-mono px-2.5 py-0.5 rounded-full bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border border-rose-300 dark:border-rose-800">
+              ⚠️ Ôn câu sai ({totalWords} từ)
+            </span>
+          )}
+          {studyMode === 'restart' && (
+            <span className="text-[11px] font-semibold font-mono px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700">
+              🔄 Ôn lại từ đầu ({totalWords} từ)
+            </span>
+          )}
+          {studyMode === 'continue' && (
+            <span className="text-[11px] font-semibold font-mono px-2.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800">
+              🎯 Tiếp tục học ({masteredCount}/{totalWords})
+            </span>
+          )}
         </div>
       )}
 

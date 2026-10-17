@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuiz } from '../App';
 import { escHtml, getVocabCollectionName, createVocabCollection } from '../data/storage';
-import { IconCards, IconTarget, IconEdit, IconTrash, IconPlus, IconFolder, IconSearch } from '../components/Icons';
+import { IconCards, IconTarget, IconEdit, IconTrash, IconPlus, IconFolder, IconSearch, IconRotate, IconCross } from '../components/Icons';
 import CreateFlashcardModal from '../components/CreateFlashcardModal';
 
 export default function VocabDashboard() {
@@ -14,6 +14,7 @@ export default function VocabDashboard() {
   const [showManageCols, setShowManageCols] = useState(false);
   const [newColName, setNewColName] = useState('');
   const [createModalDeck, setCreateModalDeck] = useState(null);
+  const [studyOptionDeck, setStudyOptionDeck] = useState(null);
 
   const vocabDecks = data?.vocabDecks || [];
   const vocabCollections = data?.vocabCollections || [];
@@ -95,6 +96,15 @@ export default function VocabDashboard() {
     const mastered = deck.cards.filter(c => vocabStats[c.id]?.mastered).length;
     const percent = Math.round((mastered / total) * 100);
     return { mastered, total, percent };
+  };
+
+  const handleStartStudy = (deck) => {
+    const { mastered } = getDeckProgress(deck);
+    if (mastered >= 10) {
+      setStudyOptionDeck(deck);
+    } else {
+      navigate('/vocab-quiz', { state: { deckId: deck.id, studyMode: 'continue' } });
+    }
   };
 
   return (
@@ -245,7 +255,7 @@ export default function VocabDashboard() {
                 <div className="flex items-center gap-1.5 pt-3 border-t border-slate-100 dark:border-slate-800">
                   {/* Nút Học (Đen) chính là Trắc nghiệm */}
                   <button
-                    onClick={() => navigate('/vocab-quiz', { state: { deckId: deck.id } })}
+                    onClick={() => handleStartStudy(deck)}
                     disabled={!deck.cards || deck.cards.length < 2}
                     className="flex-1 bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-white px-2.5 py-1.5 rounded-lg text-xs font-semibold tracking-tight disabled:opacity-40 transition-colors flex items-center justify-center gap-1 cursor-pointer"
                   >
@@ -374,6 +384,150 @@ export default function VocabDashboard() {
           onClose={() => setCreateModalDeck(null)}
           onSaveCard={handleSaveFlashcard}
         />
+      )}
+
+      {/* Modal hỏi: Em muốn ? (khi bộ từ có >= 10 câu đúng) */}
+      {studyOptionDeck && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-fadeIn">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-md w-full p-6 space-y-5 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3.5">
+              <div>
+                <h3 className="text-base font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                  <span>Em muốn ?</span>
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 truncate max-w-[280px]">
+                  Bộ từ: <strong className="text-slate-800 dark:text-slate-200">{studyOptionDeck.name}</strong>
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setStudyOptionDeck(null)}
+                className="w-7 h-7 flex items-center justify-center rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs transition-colors cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* 3 Option cards */}
+            <div className="space-y-3">
+              {(() => {
+                const { mastered, total } = getDeckProgress(studyOptionDeck);
+                const wrongCount = studyOptionDeck.cards?.filter(c => (vocabStats[c.id]?.wrongCount || 0) > 0).length || 0;
+
+                return (
+                  <>
+                    {/* Option 1: Tiếp tục học */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigate('/vocab-quiz', { state: { deckId: studyOptionDeck.id, studyMode: 'continue' } });
+                        setStudyOptionDeck(null);
+                      }}
+                      className="w-full text-left p-3.5 rounded-xl border border-emerald-500/30 bg-emerald-50/50 dark:bg-emerald-950/20 hover:bg-emerald-100/60 dark:hover:bg-emerald-950/40 hover:border-emerald-500 transition-all flex items-start gap-3 cursor-pointer group"
+                    >
+                      <div className="w-9 h-9 rounded-lg bg-emerald-600 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-2xs group-hover:scale-105 transition-transform">
+                        <IconTarget className="w-5 h-5" />
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-sm font-bold text-slate-900 dark:text-slate-100">
+                            Tiếp tục học
+                          </span>
+                          <span className="text-[11px] font-mono font-semibold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-300">
+                            {mastered}/{total} câu đúng
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
+                          Tiếp tục với {mastered} câu đang làm đúng, luyện tiếp các câu còn lại cho đến khi thuộc toàn bộ.
+                        </p>
+                      </div>
+                    </button>
+
+                    {/* Option 2: Ôn lại */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigate('/vocab-quiz', { state: { deckId: studyOptionDeck.id, studyMode: 'restart' } });
+                        setStudyOptionDeck(null);
+                      }}
+                      className="w-full text-left p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-slate-400 dark:hover:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-all flex items-start gap-3 cursor-pointer group"
+                    >
+                      <div className="w-9 h-9 rounded-lg bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 flex items-center justify-center shrink-0 mt-0.5 shadow-2xs group-hover:scale-105 transition-transform">
+                        <IconRotate className="w-5 h-5" />
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-sm font-bold text-slate-900 dark:text-slate-100">
+                            Ôn lại
+                          </span>
+                          <span className="text-[11px] font-mono font-semibold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                            Toàn bộ {total} từ
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
+                          Làm lại từ đầu cả những câu mình làm đúng và những câu mình làm sai.
+                        </p>
+                      </div>
+                    </button>
+
+                    {/* Option 3: Ôn lại câu sai */}
+                    <button
+                      type="button"
+                      disabled={wrongCount === 0}
+                      onClick={() => {
+                        if (wrongCount === 0) return;
+                        navigate('/vocab-quiz', { state: { deckId: studyOptionDeck.id, studyMode: 'wrong_only' } });
+                        setStudyOptionDeck(null);
+                      }}
+                      className={`w-full text-left p-3.5 rounded-xl border transition-all flex items-start gap-3 ${
+                        wrongCount > 0
+                          ? 'border-rose-300/80 dark:border-rose-900/60 bg-rose-50/50 dark:bg-rose-950/20 hover:bg-rose-100/60 dark:hover:bg-rose-950/40 hover:border-rose-500 cursor-pointer group'
+                          : 'border-slate-200 dark:border-slate-800/60 bg-slate-50/50 dark:bg-slate-900/30 opacity-50 cursor-not-allowed'
+                      }`}
+                    >
+                      <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 mt-0.5 shadow-2xs ${
+                        wrongCount > 0
+                          ? 'bg-rose-600 text-white group-hover:scale-105 transition-transform'
+                          : 'bg-slate-200 dark:bg-slate-800 text-slate-400'
+                      }`}>
+                        <IconCross className="w-5 h-5" />
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-sm font-bold text-slate-900 dark:text-slate-100">
+                            Ôn lại câu sai
+                          </span>
+                          <span className={`text-[11px] font-mono font-semibold px-2 py-0.5 rounded-full ${
+                            wrongCount > 0
+                              ? 'bg-rose-100 dark:bg-rose-900/60 text-rose-800 dark:text-rose-300'
+                              : 'bg-slate-100 dark:bg-slate-800 text-slate-400'
+                          }`}>
+                            {wrongCount > 0 ? `${wrongCount} câu sai` : '0 câu sai'}
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
+                          {wrongCount > 0
+                            ? `Chỉ làm lại những câu bạn đã từng trả lời sai trong bộ từ này.`
+                            : 'Hiện không có câu nào bị sai trong bộ từ này.'}
+                        </p>
+                      </div>
+                    </button>
+                  </>
+                );
+              })()}
+            </div>
+
+            <div className="flex justify-end pt-2 border-t border-slate-100 dark:border-slate-800">
+              <button
+                type="button"
+                onClick={() => setStudyOptionDeck(null)}
+                className="px-4 py-2 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg text-xs font-semibold cursor-pointer text-slate-700 dark:text-slate-300"
+              >
+                Hủy
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
