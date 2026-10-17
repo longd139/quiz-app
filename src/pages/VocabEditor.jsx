@@ -190,12 +190,7 @@ export default function VocabEditor() {
       }
       if (!term || !meaning || term === '[' || meaning === '[') return null;
 
-      // Extract [n], [v], [adj], etc. from term if not already set
-      const posMatch = term.match(/^(.*?)\s*\[([a-zA-Z/]+)\]$/);
-      if (posMatch) {
-        term = posMatch[1].trim();
-        if (!partOfSpeech) partOfSpeech = posMatch[2].trim();
-      }
+      // Keep term as-is (including tags like [v], [n])
 
       // Extract Ex: from meaning
       if (examples.length === 0 && /\n\s*(?:Ex|Ví dụ|Example)\s*:/i.test(meaning)) {
