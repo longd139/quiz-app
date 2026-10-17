@@ -113,6 +113,18 @@ export default function VocabQuiz() {
   const [dragLine, setDragLine] = useState(null); // { fromX, fromY, toX, toY, termId, status: 'dragging' | 'matched' | 'wrong' | 'fading' }
   const draggingTermIdRef = useRef(null);
   const isFlashcardAnimatingRef = useRef(false);
+  const autoNextTimerRef = useRef(null);
+  const handleNextRef = useRef(null);
+
+  // Clear auto-next timer on unmount
+  useEffect(() => {
+    return () => {
+      if (autoNextTimerRef.current) {
+        clearTimeout(autoNextTimerRef.current);
+        autoNextTimerRef.current = null;
+      }
+    };
+  }, []);
 
   // Common question state
   const [isAnswered, setIsAnswered] = useState(false);
@@ -151,6 +163,10 @@ export default function VocabQuiz() {
   };
 
   const resetSingleQuestionState = () => {
+    if (autoNextTimerRef.current) {
+      clearTimeout(autoNextTimerRef.current);
+      autoNextTimerRef.current = null;
+    }
     setSelectedOption(null);
     setTypedAnswer('');
     setIsCorrectWritten(null);
@@ -400,6 +416,12 @@ export default function VocabQuiz() {
     if (currentDeck && currentQ.card) {
       speakWordAuto(currentQ.card.term, currentDeck.targetLanguage || 'en-US');
     }
+
+    // Tự động chuyển câu sau 2 giây không cần ấn
+    if (autoNextTimerRef.current) clearTimeout(autoNextTimerRef.current);
+    autoNextTimerRef.current = setTimeout(() => {
+      handleNextRef.current?.();
+    }, 2000);
   };
 
   // Written answer submit
@@ -422,6 +444,12 @@ export default function VocabQuiz() {
         setMaxStreak(m => Math.max(m, next));
         return next;
       });
+
+      // Tự động chuyển câu sau 2 giây nếu trả lời đúng
+      if (autoNextTimerRef.current) clearTimeout(autoNextTimerRef.current);
+      autoNextTimerRef.current = setTimeout(() => {
+        handleNextRef.current?.();
+      }, 2000);
     } else {
       if (currentQ.card) {
         requeueWrongQuestion(currentQ.card);
@@ -466,6 +494,11 @@ export default function VocabQuiz() {
       setMaxStreak(m => Math.max(m, next));
       return next;
     });
+
+    if (autoNextTimerRef.current) clearTimeout(autoNextTimerRef.current);
+    autoNextTimerRef.current = setTimeout(() => {
+      handleNextRef.current?.();
+    }, 2000);
   };
 
   // Matching attempt (drop or click)
@@ -542,6 +575,12 @@ export default function VocabQuiz() {
       if (nextMatched.length === currentQ.totalPairs) {
         setIsAnswered(true);
         setScore(s => s + 1);
+
+        // Tự động chuyển câu sau 2 giây
+        if (autoNextTimerRef.current) clearTimeout(autoNextTimerRef.current);
+        autoNextTimerRef.current = setTimeout(() => {
+          handleNextRef.current?.();
+        }, 2000);
       }
     } else {
       // Wrong match
@@ -616,6 +655,11 @@ export default function VocabQuiz() {
   };
 
   const handleNext = () => {
+    if (autoNextTimerRef.current) {
+      clearTimeout(autoNextTimerRef.current);
+      autoNextTimerRef.current = null;
+    }
+
     // If user has mastered all words in the deck:
     if (totalWords > 0 && masteredCardIds.size >= totalWords) {
       setIsCompleted(true);
@@ -638,6 +682,8 @@ export default function VocabQuiz() {
       }
     }
   };
+
+  handleNextRef.current = handleNext;
 
   // Update ref for draggingTermId
   useEffect(() => {
@@ -1901,9 +1947,10 @@ export default function VocabQuiz() {
 
               <button
                 onClick={handleNext}
-                className="w-full py-2.5 bg-slate-900 dark:bg-white hover:bg-slate-800 dark:hover:bg-slate-100 text-white dark:text-slate-900 rounded-xl text-xs sm:text-sm font-semibold tracking-tight transition-all active:scale-98 flex items-center justify-center gap-1 cursor-pointer shadow-2xs"
+                className="w-full py-2.5 bg-slate-900 dark:bg-white hover:bg-slate-800 dark:hover:bg-slate-100 text-white dark:text-slate-900 rounded-xl text-xs sm:text-sm font-semibold tracking-tight transition-all active:scale-98 flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
               >
                 <span>{masteredCount >= totalWords ? 'Xem kết quả' : 'Câu tiếp theo'} &rarr;</span>
+                <span className="text-[11px] opacity-70 font-normal">(tự chuyển sau 2s)</span>
               </button>
             </div>
           )}
