@@ -100,7 +100,7 @@ export default function VocabFlashcard() {
       }
       setSlideStatus(null);
       isAnimatingRef.current = false;
-    }, 360);
+    }, 550);
   }, [currentCard, currentIndex, cardsList.length, data, update]);
 
   // Keyboard navigation shortcuts
@@ -342,7 +342,7 @@ export default function VocabFlashcard() {
 
       {/* 3D Tactile Flashcard with Slide Animation */}
       <div
-        className={`card-perspective w-full h-[370px] sm:h-[410px] select-none transition-all duration-360 ease-out ${
+        className={`card-perspective w-full h-[370px] sm:h-[410px] select-none transition-all duration-[550ms] ease-out ${
           slideStatus === 'remembered'
             ? 'translate-x-[110%] rotate-6 opacity-0 pointer-events-none'
             : slideStatus === 'review'

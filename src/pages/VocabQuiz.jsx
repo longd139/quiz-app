@@ -693,7 +693,7 @@ export default function VocabQuiz() {
       handleNext();
       setFlashcardSlide(null);
       isFlashcardAnimatingRef.current = false;
-    }, 360);
+    }, 550);
   };
 
   const handleNext = () => {
@@ -1485,7 +1485,7 @@ export default function VocabQuiz() {
             <div className="space-y-4">
               {/* 3D Tactile Flashcard with Slide Animation */}
               <div
-                className={`card-perspective w-full h-[370px] sm:h-[410px] select-none transition-all duration-360 ease-out ${
+                className={`card-perspective w-full h-[370px] sm:h-[410px] select-none transition-all duration-[550ms] ease-out ${
                   flashcardSlide === 'remembered'
                     ? 'translate-x-[110%] rotate-6 opacity-0 pointer-events-none'
                     : flashcardSlide === 'review'
