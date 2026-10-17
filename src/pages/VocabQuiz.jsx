@@ -173,8 +173,9 @@ export default function VocabQuiz() {
   const isFlashcardAnimatingRef = useRef(false);
   const autoNextTimerRef = useRef(null);
   const handleNextRef = useRef(null);
+  const activeQuizConfigRef = useRef('');
 
-  // Clear auto-next timer on unmount
+  // Clear auto-next timer on unmount or when currentIndex changes
   useEffect(() => {
     return () => {
       if (autoNextTimerRef.current) {
@@ -182,7 +183,7 @@ export default function VocabQuiz() {
         autoNextTimerRef.current = null;
       }
     };
-  }, []);
+  }, [currentIndex]);
 
   // Common question state
   const [isAnswered, setIsAnswered] = useState(false);
@@ -218,7 +219,7 @@ export default function VocabQuiz() {
   // Khi đổi deck hoặc studyMode, nạp lại tiến độ các từ đã thuộc của deck đó
   useEffect(() => {
     setMasteredCardIds(getInitialMastered());
-  }, [selectedDeckId, getInitialMastered, studyMode]);
+  }, [selectedDeckId, studyMode]);
 
   // Danh sách các từ đã từng làm sai trong bộ từ này
   const wrongCards = useMemo(() => {
@@ -532,8 +533,15 @@ export default function VocabQuiz() {
   };
 
   useEffect(() => {
+    if (!currentDeck || !currentDeck.cards || currentDeck.cards.length < 2) return;
+    const configKey = `${currentDeck.id}_${studyMode}_${direction}_${allowChoice}_${allowWritten}_${allowFlashcard}_${allowMatching}`;
+    // Nếu quiz đã sinh câu hỏi cho đúng cấu hình này rồi và đang làm dở, không tự sinh lại khi state/cloud sync
+    if (activeQuizConfigRef.current === configKey && questions.length > 0) {
+      return;
+    }
+    activeQuizConfigRef.current = configKey;
     generateQuiz();
-  }, [currentDeck, direction, allowChoice, allowWritten, allowFlashcard, allowMatching, studyMode]);
+  }, [currentDeck?.id, direction, allowChoice, allowWritten, allowFlashcard, allowMatching, studyMode]);
 
   const currentQ = questions[currentIndex] || null;
 
@@ -563,22 +571,29 @@ export default function VocabQuiz() {
         setMaxStreak(m => Math.max(m, next));
         return next;
       });
+
+      // Tự động chuyển câu sau 2 giây nếu trả lời ĐÚNG
+      if (autoNextTimerRef.current) clearTimeout(autoNextTimerRef.current);
+      autoNextTimerRef.current = setTimeout(() => {
+        handleNextRef.current?.();
+      }, 2000);
     } else {
       if (currentQ.card) {
         recordWrongCard(currentQ.card);
       }
       setStreak(0);
+
+      // Nếu trả lời SAI: KHÔNG tự động chuyển câu!
+      // Giữ nguyên câu hỏi để người dùng xem lại đáp án đúng, nghe phát âm và bấm "Câu tiếp theo" khi đã sẵn sàng
+      if (autoNextTimerRef.current) {
+        clearTimeout(autoNextTimerRef.current);
+        autoNextTimerRef.current = null;
+      }
     }
 
     if (currentDeck && currentQ.card) {
       speakWordAuto(currentQ.card.term, currentDeck.targetLanguage || 'en-US');
     }
-
-    // Tự động chuyển câu sau 2 giây không cần ấn
-    if (autoNextTimerRef.current) clearTimeout(autoNextTimerRef.current);
-    autoNextTimerRef.current = setTimeout(() => {
-      handleNextRef.current?.();
-    }, 2000);
   };
 
   // Written answer submit
@@ -2160,7 +2175,9 @@ export default function VocabQuiz() {
                 className="w-full py-2.5 bg-slate-900 dark:bg-white hover:bg-slate-800 dark:hover:bg-slate-100 text-white dark:text-slate-900 rounded-xl text-xs sm:text-sm font-semibold tracking-tight transition-all active:scale-98 flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
               >
                 <span>{masteredCount >= totalWords ? 'Xem kết quả' : 'Câu tiếp theo'} &rarr;</span>
-                <span className="text-[11px] opacity-70 font-normal">(tự chuyển sau 2s)</span>
+                {(selectedOption === currentQ.correctIdx || isCorrectWritten === true) && (
+                  <span className="text-[11px] opacity-70 font-normal">(tự chuyển sau 2s)</span>
+                )}
               </button>
             </div>
           )}
