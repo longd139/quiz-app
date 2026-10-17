@@ -6,7 +6,11 @@ import { speakWord, speakWordAuto } from '../lib/tts';
 import { IconSpeaker, IconCheck, IconCross, IconCards, IconRotate, IconArrowLeft, IconSettings, IconLink } from '../components/Icons';
 import { getBadgeColor } from '../data/badgeColors';
 
-// Smart answer matcher: ignores case, accents formatting (NFC), extra punctuation, spaces, alternatives & parentheses
+// Smart answer matcher:
+// - Cho phép hoán đổi thứ tự các từ nhưng BẮT BUỘC ĐỦ CHỮ (VD: "thu tiền" <-> "tiền thu")
+// - Bỏ qua hoa/thường, khoảng trắng thừa, dấu câu, hỗ trợ cả có dấu và không dấu
+// - Hỗ trợ các từ đồng nghĩa ngăn cách bởi dấu phẩy, chấm phẩy, gạch chéo, "hoặc", "or"
+// - Hỗ trợ text bên trong/ngoài dấu ngoặc đơn
 function checkAnswerMatch(userInput, targetAnswer) {
   if (!userInput || !targetAnswer) return false;
 
@@ -20,33 +24,71 @@ function checkAnswerMatch(userInput, targetAnswer) {
       .trim();
   };
 
+  const removeAccents = (str) => {
+    return str
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/đ/g, 'd')
+      .replace(/Đ/g, 'd');
+  };
+
   const normUser = normalizeStr(userInput);
-  const normTarget = normalizeStr(targetAnswer);
-
   if (!normUser) return false;
-  if (normUser === normTarget) return true;
 
-  // Check alternatives separated by comma, semicolon, slash, newline, "hoặc", "or" (case-insensitive)
+  const userWords = normUser.split(' ').filter(Boolean);
+  const userSorted = userWords.slice().sort().join(' ');
+  const userSortedNoAcc = removeAccents(normUser).split(' ').filter(Boolean).sort().join(' ');
+
+  // So sánh người dùng nhập với một chuỗi đáp án ứng viên
+  const matchesCandidate = (candidate) => {
+    const normCand = normalizeStr(candidate);
+    if (!normCand) return false;
+
+    // 1. Giống hệt 100%
+    if (normUser === normCand) return true;
+
+    // 2. Giống khi bỏ dấu tiếng Việt
+    if (removeAccents(normUser) === removeAccents(normCand)) return true;
+
+    const candWords = normCand.split(' ').filter(Boolean);
+
+    // BẮT BUỘC ĐỦ CHỮ: Số lượng chữ/từ phải bằng nhau (không chấp nhận thiếu từ)
+    if (userWords.length !== candWords.length) return false;
+
+    // Các từ giống hệt nhau (không quan trọng thứ tự, VD: "thu tiền" <-> "tiền thu")
+    const candSorted = candWords.slice().sort().join(' ');
+    if (userSorted === candSorted) return true;
+
+    // So sánh các từ khi bỏ dấu
+    const candSortedNoAcc = removeAccents(normCand).split(' ').filter(Boolean).sort().join(' ');
+    if (userSortedNoAcc === candSortedNoAcc) return true;
+
+    return false;
+  };
+
+  // 1. Kiểm tra trực tiếp toàn bộ đáp án
+  if (matchesCandidate(targetAnswer)) return true;
+
+  // 2. Kiểm tra khi bỏ phần trong ngoặc (VD: "Cột mốc (quan trọng)" -> "Cột mốc")
+  const withoutParens = targetAnswer.replace(/\(.*?\)|\[.*?\]/g, ' ');
+  if (matchesCandidate(withoutParens)) return true;
+
+  // 3. Kiểm tra từng nghĩa đồng nghĩa (ngăn cách bởi dấu phẩy, chấm phẩy, gạch chéo, xuống dòng, "hoặc", "or")
   const rawParts = targetAnswer
     .normalize('NFC')
     .split(/[\n,;/]|\bhoặc\b|\bor\b/i);
 
   for (const part of rawParts) {
-    const normPart = normalizeStr(part);
-    if (normPart && normPart === normUser) return true;
+    if (matchesCandidate(part)) return true;
+    const partWithoutParens = part.replace(/\(.*?\)|\[.*?\]/g, ' ');
+    if (matchesCandidate(partWithoutParens)) return true;
   }
 
-  // Check matching without text inside parentheses/brackets e.g. "Ma trận truy vết (RTM)" -> "Ma trận truy vết"
-  const withoutParens = targetAnswer.replace(/\(.*?\)|\[.*?\]/g, '');
-  const normWithoutParens = normalizeStr(withoutParens);
-  if (normWithoutParens && normWithoutParens === normUser) return true;
-
-  // Check matching text inside parentheses/brackets e.g. "(RTM)" -> "rtm"
+  // 4. Kiểm tra phần bên trong ngoặc đơn (VD: "(RTM)")
   const parensMatches = targetAnswer.match(/\((.*?)\)|\[(.*?)\]/g);
   if (parensMatches) {
     for (const match of parensMatches) {
-      const insideNorm = normalizeStr(match);
-      if (insideNorm && insideNorm === normUser) return true;
+      if (matchesCandidate(match)) return true;
     }
   }
 
