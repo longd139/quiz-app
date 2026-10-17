@@ -7,8 +7,17 @@ import { anonClient, hasSupabase } from '../lib/supabase';
 
 const ROOM_KEY = 'quiz_room_config';
 
+export const DEFAULT_ROOM_SECRET = 'main_quiz_app';
+
 export function getRoomConfig() {
-  try { const raw = localStorage.getItem(ROOM_KEY); if (!raw) return null; return JSON.parse(raw); } catch (_e) { return null; }
+  try {
+    const raw = localStorage.getItem(ROOM_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch (_e) {}
+  if (hasSupabase) {
+    return { secret: DEFAULT_ROOM_SECRET, room_id: 'default_main', isDefault: true };
+  }
+  return null;
 }
 
 export function setRoomConfig(cfg) { localStorage.setItem(ROOM_KEY, JSON.stringify(cfg)); }
@@ -17,7 +26,7 @@ export function clearRoomConfig() { localStorage.removeItem(ROOM_KEY); }
 
 export function isConfigured() {
   const cfg = getRoomConfig();
-  return hasSupabase && !!(cfg && cfg.secret && cfg.room_id);
+  return hasSupabase && !!(cfg && cfg.secret);
 }
 
 // ---- Tạo phòng -----------------------------------------------------------

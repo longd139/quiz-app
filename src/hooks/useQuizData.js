@@ -49,14 +49,25 @@ export function useQuizData() {
       try {
         // Làm mới nhanh từ cloud (nếu có dữ liệu mới hơn).
         const { data: cloudData } = await pullRoomData(cfg.secret);
-        if (active && cloudData && (cloudData.tests?.length || cloudData.history?.length)) {
+        const hasCloudContent = cloudData && (
+          (Array.isArray(cloudData.tests) && cloudData.tests.length > 0) ||
+          (Array.isArray(cloudData.vocabDecks) && cloudData.vocabDecks.some(d => d.cards?.length > 0)) ||
+          (Array.isArray(cloudData.history) && cloudData.history.length > 0)
+        );
+        const hasLocalContent = dataRef.current && (
+          (Array.isArray(dataRef.current.tests) && dataRef.current.tests.length > 0) ||
+          (Array.isArray(dataRef.current.vocabDecks) && dataRef.current.vocabDecks.some(d => d.cards?.length > 0)) ||
+          (Array.isArray(dataRef.current.history) && dataRef.current.history.length > 0)
+        );
+
+        if (active && hasCloudContent) {
           const { data: normalized } = ensureCollections(cloudData);
           dataRef.current = normalized;
           saveData(normalized);
           setData(normalized);
         }
-        // Nếu dữ liệu local chưa có trên cloud, đẩy lên.
-        else if (active && dataRef.current && (dataRef.current.tests?.length || dataRef.current.history?.length)) {
+        // Nếu dữ liệu local có mà trên cloud chưa có (lần đầu khởi tạo), đẩy dữ liệu local lên cloud.
+        else if (active && hasLocalContent) {
           await pushRoomData(cfg.secret, dataRef.current);
         }
       } catch (_e) {
@@ -106,8 +117,8 @@ export function useQuizData() {
       const result = await joinRoom(secret);
       // Nếu phòng đã có dữ liệu → lấy cloud; nếu rỗng → đẩy local lên.
       const cloud = result.data;
-      const hasCloud = cloud && (cloud.tests?.length || cloud.history?.length);
-      const hasLocal = dataRef.current && (dataRef.current.tests?.length || dataRef.current.history?.length);
+      const hasCloud = cloud && (cloud.tests?.length || cloud.history?.length || cloud.vocabDecks?.length);
+      const hasLocal = dataRef.current && (dataRef.current.tests?.length || dataRef.current.history?.length || dataRef.current.vocabDecks?.length);
       if (hasCloud) {
         const n = ensureCollections(cloud).data;
         dataRef.current = n; saveData(n); setData(n);

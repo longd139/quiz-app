@@ -132,8 +132,10 @@ export default function DataManagement() {
             </div>
             {cfg?.secret && (
               <div className="text-xs text-slate-500 dark:text-slate-400 my-2 flex items-center gap-2">
-                <span className="flex-1 break-all">Mã phòng: <code className="text-xs">{cfg.secret}</code></span>
-                <button onClick={() => handleCopy(cfg.secret, 'mã phòng')} className="text-primary-600 underline text-xs">Copy</button>
+                <span className="flex-1 break-all">
+                  Mã phòng: <code className="text-xs font-semibold">{cfg.secret}</code> {cfg.isDefault && <span className="text-primary-600 dark:text-primary-400 font-semibold">(Cơ sở dữ liệu đám mây chung)</span>}
+                </span>
+                <button onClick={() => handleCopy(cfg.secret, 'mã phòng')} className="text-primary-600 underline text-xs cursor-pointer">Copy</button>
               </div>
             )}
             <div className="flex flex-wrap gap-2">
