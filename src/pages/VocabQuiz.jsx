@@ -228,12 +228,25 @@ export default function VocabQuiz() {
     return currentDeck.cards.filter(c => (curStats[c.id]?.wrongCount || 0) > 0);
   }, [currentDeck, data.vocabStats]);
 
+  // Danh sách các từ đã từng được học (làm đúng hoặc làm sai) trong bộ từ này
+  const reviewedCards = useMemo(() => {
+    if (!currentDeck?.cards) return [];
+    const curStats = dataRef.current?.vocabStats || data.vocabStats || {};
+    return currentDeck.cards.filter(c => {
+      const st = curStats[c.id];
+      return Boolean(st && (st.mastered || (st.correctCount || 0) > 0 || (st.wrongCount || 0) > 0 || (st.reviewCount || 0) > 0 || st.lastReviewed));
+    });
+  }, [currentDeck, data.vocabStats]);
+
   const totalWords = useMemo(() => {
     if (studyMode === 'wrong_only') {
       return wrongCards.length > 0 ? wrongCards.length : (currentDeck?.cards?.length || 0);
     }
+    if (studyMode === 'restart') {
+      return reviewedCards.length > 0 ? reviewedCards.length : (currentDeck?.cards?.length || 0);
+    }
     return currentDeck?.cards?.length || 0;
-  }, [studyMode, wrongCards.length, currentDeck?.cards?.length]);
+  }, [studyMode, wrongCards.length, reviewedCards.length, currentDeck?.cards?.length]);
 
   const masteredCount = masteredCardIds.size;
 
@@ -411,6 +424,8 @@ export default function VocabQuiz() {
     let targetCards = [...currentDeck.cards];
     if (studyMode === 'wrong_only') {
       targetCards = wrongCards.length > 0 ? [...wrongCards] : [...currentDeck.cards];
+    } else if (studyMode === 'restart') {
+      targetCards = reviewedCards.length > 0 ? [...reviewedCards] : [...currentDeck.cards];
     } else if (studyMode === 'continue') {
       const curMastered = getInitialMastered();
       const unmastered = currentDeck.cards.filter(c => !curMastered.has(c.id));
@@ -869,7 +884,13 @@ export default function VocabQuiz() {
       resetSingleQuestionState();
     } else {
       // End of questions list, but some words are still not mastered:
-      const unmastered = (currentDeck?.cards || []).filter(c => !masteredCardIds.has(c.id));
+      let poolCards = currentDeck?.cards || [];
+      if (studyMode === 'wrong_only') {
+        poolCards = wrongCards.length > 0 ? wrongCards : poolCards;
+      } else if (studyMode === 'restart') {
+        poolCards = reviewedCards.length > 0 ? reviewedCards : poolCards;
+      }
+      const unmastered = poolCards.filter(c => !masteredCardIds.has(c.id));
       if (unmastered.length > 0) {
         const nextQuestions = shuffle(unmastered).map(c => makeQuestionForCard(c));
         setQuestions(prev => [...prev, ...nextQuestions]);

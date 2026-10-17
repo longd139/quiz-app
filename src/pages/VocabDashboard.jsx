@@ -428,6 +428,11 @@ export default function VocabDashboard() {
               {(() => {
                 const { mastered, total } = getDeckProgress(studyOptionDeck);
                 const wrongCount = studyOptionDeck.cards?.filter(c => (vocabStats[c.id]?.wrongCount || 0) > 0).length || 0;
+                const reviewedCards = (studyOptionDeck.cards || []).filter(c => {
+                  const st = vocabStats[c.id];
+                  return Boolean(st && (st.mastered || (st.correctCount || 0) > 0 || (st.wrongCount || 0) > 0 || (st.reviewCount || 0) > 0 || st.lastReviewed));
+                });
+                const reviewedCount = reviewedCards.length;
 
                 return (
                   <>
@@ -461,11 +466,17 @@ export default function VocabDashboard() {
                     {/* Option 2: Ôn lại */}
                     <button
                       type="button"
+                      disabled={reviewedCount === 0}
                       onClick={() => {
+                        if (reviewedCount === 0) return;
                         navigate('/vocab-quiz', { state: { deckId: studyOptionDeck.id, studyMode: 'restart' } });
                         setStudyOptionDeck(null);
                       }}
-                      className="w-full text-left p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-slate-400 dark:hover:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-all flex items-start gap-3 cursor-pointer group"
+                      className={`w-full text-left p-3.5 rounded-xl border transition-all flex items-start gap-3 ${
+                        reviewedCount > 0
+                          ? 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-slate-400 dark:hover:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800/60 cursor-pointer group'
+                          : 'border-slate-200 dark:border-slate-800/60 bg-slate-50/50 dark:bg-slate-900/30 opacity-50 cursor-not-allowed'
+                      }`}
                     >
                       <div className="w-9 h-9 rounded-lg bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 flex items-center justify-center shrink-0 mt-0.5 shadow-2xs group-hover:scale-105 transition-transform">
                         <IconRotate className="w-5 h-5" />
@@ -476,11 +487,11 @@ export default function VocabDashboard() {
                             Ôn lại
                           </span>
                           <span className="text-[11px] font-mono font-semibold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
-                            Toàn bộ {total} từ
+                            {reviewedCount} từ đã học & làm sai
                           </span>
                         </div>
                         <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
-                          Làm lại từ đầu cả những câu mình làm đúng và những câu mình làm sai.
+                          Làm lại những câu mình làm đúng và những câu mình làm sai (không bao gồm các câu chưa làm).
                         </p>
                       </div>
                     </button>
