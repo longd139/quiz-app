@@ -165,9 +165,11 @@ export default function VocabQuiz() {
   const [draggingTermId, setDraggingTermId] = useState(null);
   const [dragOverMeaningId, setDragOverMeaningId] = useState(null);
   const [selectedTermId, setSelectedTermId] = useState(null);
+  const [selectedMeaningId, setSelectedMeaningId] = useState(null);
   const [wrongFeedback, setWrongFeedback] = useState(null); // { meaningId, termId }
   const [dragLine, setDragLine] = useState(null); // { fromX, fromY, toX, toY, termId, status: 'dragging' | 'matched' | 'wrong' | 'fading' }
   const draggingTermIdRef = useRef(null);
+  const pointerDownPosRef = useRef({ x: 0, y: 0, termId: null, el: null });
   const isFlashcardAnimatingRef = useRef(false);
   const autoNextTimerRef = useRef(null);
   const handleNextRef = useRef(null);
@@ -320,8 +322,10 @@ export default function VocabQuiz() {
     setDraggingTermId(null);
     setDragOverMeaningId(null);
     setSelectedTermId(null);
+    setSelectedMeaningId(null);
     setWrongFeedback(null);
     setDragLine(null);
+    pointerDownPosRef.current = { x: 0, y: 0, termId: null, el: null };
   };
 
   const resetQuestionStates = () => {
@@ -701,6 +705,7 @@ export default function VocabQuiz() {
       const nextMatched = [...matchedPairIds, termId];
       setMatchedPairIds(nextMatched);
       setSelectedTermId(null);
+      setSelectedMeaningId(null);
       setDraggingTermId(null);
       setDragOverMeaningId(null);
       setWrongFeedback(null);
@@ -752,6 +757,8 @@ export default function VocabQuiz() {
 
       setStreak(0);
       setWrongFeedback({ meaningId, termId });
+      setSelectedTermId(null);
+      setSelectedMeaningId(null);
       setTimeout(() => {
         setWrongFeedback(null);
       }, 700);
@@ -761,6 +768,38 @@ export default function VocabQuiz() {
         recordWrongCard(wrongCard);
       }
     }
+  };
+
+  // Click on a term card (Left column)
+  const handleTermClick = (termId) => {
+    if (matchedPairIds.includes(termId) || isAnswered) return;
+
+    // Nếu đã chọn một nghĩa bên phải trước đó -> ghép cặp ngay!
+    if (selectedMeaningId) {
+      handleAttemptMatch(termId, selectedMeaningId);
+      return;
+    }
+
+    // Toggle chọn từ vựng này
+    setSelectedTermId(prev => (prev === termId ? null : termId));
+    setSelectedMeaningId(null);
+    setWrongFeedback(null);
+  };
+
+  // Click on a meaning card (Right column)
+  const handleMeaningClick = (meaningId) => {
+    if (matchedPairIds.includes(meaningId) || isAnswered) return;
+
+    // Nếu đã chọn một từ vựng bên trái trước đó -> ghép cặp ngay!
+    if (selectedTermId) {
+      handleAttemptMatch(selectedTermId, meaningId);
+      return;
+    }
+
+    // Toggle chọn định nghĩa này
+    setSelectedMeaningId(prev => (prev === meaningId ? null : meaningId));
+    setSelectedTermId(null);
+    setWrongFeedback(null);
   };
 
   // Flashcard answer ("Cần ôn lại" / "Đã nhớ")
@@ -864,6 +903,26 @@ export default function VocabQuiz() {
     };
 
     const handlePointerMove = (e) => {
+      if (pointerDownPosRef.current.termId && !draggingTermIdRef.current) {
+        const dx = e.clientX - pointerDownPosRef.current.x;
+        const dy = e.clientY - pointerDownPosRef.current.y;
+        if (Math.hypot(dx, dy) > 6) {
+          const termId = pointerDownPosRef.current.termId;
+          setDraggingTermId(termId);
+          const rect = pointerDownPosRef.current.el?.getBoundingClientRect();
+          if (rect) {
+            setDragLine({
+              fromX: rect.right,
+              fromY: rect.top + rect.height / 2,
+              toX: e.clientX,
+              toY: e.clientY,
+              termId,
+              status: 'dragging'
+            });
+          }
+        }
+      }
+
       updateCoord(e.clientX, e.clientY);
       if (draggingTermIdRef.current) {
         const targetEl = document.elementFromPoint(e.clientX, e.clientY);
@@ -874,6 +933,7 @@ export default function VocabQuiz() {
     };
 
     const handlePointerUp = (e) => {
+      pointerDownPosRef.current = { x: 0, y: 0, termId: null, el: null };
       if (!draggingTermIdRef.current) return;
       const targetEl = document.elementFromPoint(e.clientX, e.clientY);
       const meaningCard = targetEl?.closest('[data-meaning-id]');
@@ -1812,7 +1872,7 @@ export default function VocabQuiz() {
                         <span>Nối từ với nghĩa đúng</span>
                       </h3>
                       <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                        Giữ và kéo từ bên trái thả vào ô nghĩa đúng bên phải (hoặc chạm để chọn)
+                        Chạm vào từ và nghĩa tương ứng để nối (hoặc giữ và kéo)
                       </p>
                     </div>
                   </div>
@@ -1837,7 +1897,7 @@ export default function VocabQuiz() {
                       <span>Từ vựng ({currentQ.terms.filter(t => !matchedPairIds.includes(t.id)).length})</span>
                     </span>
                     <span className="text-[10px] text-slate-400 font-mono">
-                      Kéo hoặc chạm
+                      Bấm hoặc kéo để nối
                     </span>
                   </div>
 
@@ -1846,7 +1906,7 @@ export default function VocabQuiz() {
                       const isMatched = matchedPairIds.includes(item.id);
                       const isSelected = selectedTermId === item.id;
                       const isDragging = draggingTermId === item.id;
-
+                      const isWrong = wrongFeedback && wrongFeedback.termId === item.id;
 
                       if (isMatched) {
                         return (
@@ -1902,26 +1962,18 @@ export default function VocabQuiz() {
                           }}
                           onPointerDown={(e) => {
                             if (e.button !== undefined && e.button !== 0) return;
-                            const rect = e.currentTarget.getBoundingClientRect();
-                            setDraggingTermId(item.id);
-                            setSelectedTermId(item.id);
-                            setDragLine({
-                              fromX: rect.right,
-                              fromY: rect.top + rect.height / 2,
-                              toX: e.clientX,
-                              toY: e.clientY,
-                              termId: item.id,
-                              status: 'dragging'
-                            });
+                            pointerDownPosRef.current = { x: e.clientX, y: e.clientY, termId: item.id, el: e.currentTarget };
                           }}
-                          onClick={() => {
-                            setSelectedTermId(prev => (prev === item.id ? null : item.id));
-                          }}
-                          className={`p-3 rounded-xl border text-xs sm:text-sm transition-all flex items-center justify-between gap-2 cursor-grab active:cursor-grabbing select-none group relative ${
-                            isSelected
-                              ? 'border-purple-500 bg-purple-50/90 dark:bg-purple-950/70 text-purple-900 dark:text-purple-100 ring-2 ring-purple-500/30 shadow-md scale-[1.01]'
+                          onClick={() => handleTermClick(item.id)}
+                          className={`p-3 rounded-xl border text-xs sm:text-sm transition-all flex items-center justify-between gap-2 cursor-pointer select-none group relative ${
+                            isWrong
+                              ? 'border-rose-400 bg-rose-50 dark:bg-rose-950/50 text-rose-800 dark:text-rose-200 animate-shake ring-2 ring-rose-400/40'
+                              : isSelected
+                              ? 'border-purple-500 bg-purple-50/90 dark:bg-purple-950/70 text-purple-900 dark:text-purple-100 ring-2 ring-purple-500/40 shadow-md scale-[1.02]'
                               : isDragging
                               ? 'opacity-40 border-purple-400 bg-purple-50/50'
+                              : selectedMeaningId
+                              ? 'border-purple-300 dark:border-purple-700 bg-purple-50/20 hover:border-purple-500 hover:bg-purple-50/50 hover:scale-[1.01]'
                               : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-purple-300 dark:hover:border-purple-700 hover:shadow-xs text-slate-800 dark:text-slate-200'
                           }`}
                         >
@@ -1936,18 +1988,26 @@ export default function VocabQuiz() {
                             </span>
                           </div>
 
-                          {/* Quick speaker button */}
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              speakWord(item.card.term, currentDeck.targetLanguage || 'en-US');
-                            }}
-                            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors shrink-0 cursor-pointer"
-                            title="Nghe phát âm"
-                          >
-                            <IconSpeaker className="w-3.5 h-3.5" />
-                          </button>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            {isSelected && (
+                              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-purple-200 dark:bg-purple-900 text-purple-800 dark:text-purple-200 font-bold shrink-0">
+                                Đang chọn
+                              </span>
+                            )}
+
+                            {/* Quick speaker button */}
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                speakWord(item.card.term, currentDeck.targetLanguage || 'en-US');
+                              }}
+                              className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors shrink-0 cursor-pointer"
+                              title="Nghe phát âm"
+                            >
+                              <IconSpeaker className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
                         </div>
                       );
                     })}
@@ -1962,13 +2022,14 @@ export default function VocabQuiz() {
                       <span>Định nghĩa</span>
                     </span>
                     <span className="text-[10px] text-slate-400 font-mono">
-                      Thả từ vào đây
+                      Bấm hoặc thả vào đây
                     </span>
                   </div>
 
                   <div className="space-y-2">
                     {currentQ.meanings.map((item) => {
                       const isMatched = matchedPairIds.includes(item.id);
+                      const isSelected = selectedMeaningId === item.id;
                       const isOver = dragOverMeaningId === item.id;
                       const isWrong = wrongFeedback && wrongFeedback.meaningId === item.id;
 
@@ -2022,33 +2083,38 @@ export default function VocabQuiz() {
                               handleAttemptMatch(termId, item.id);
                             }
                           }}
-                          onClick={() => {
-                            if (selectedTermId) {
-                              handleAttemptMatch(selectedTermId, item.id);
-                            }
-                          }}
-                          className={`p-3 rounded-xl border-2 transition-colors duration-150 min-h-[58px] flex flex-col justify-center relative cursor-pointer ${
+                          onClick={() => handleMeaningClick(item.id)}
+                          className={`p-3 rounded-xl border-2 transition-all min-h-[58px] flex flex-col justify-center relative cursor-pointer select-none ${
                             isWrong
                               ? 'border-rose-400 bg-rose-50 dark:bg-rose-950/50 text-rose-800 dark:text-rose-200 animate-shake ring-2 ring-rose-400/40'
+                              : isSelected
+                              ? 'border-purple-500 bg-purple-50/90 dark:bg-purple-950/70 text-purple-900 dark:text-purple-100 ring-2 ring-purple-500/40 shadow-md scale-[1.02]'
                               : isOver
                               ? 'border-purple-500 bg-purple-50 dark:bg-purple-950/60 ring-2 ring-purple-400/50 shadow-md'
                               : selectedTermId
-                              ? 'border-dashed border-purple-300 dark:border-purple-800/80 bg-purple-50/20 dark:bg-purple-950/20 hover:border-purple-500 hover:bg-purple-50/50 dark:hover:bg-purple-950/50'
+                              ? 'border-dashed border-purple-300 dark:border-purple-800/80 bg-purple-50/20 dark:bg-purple-950/20 hover:border-purple-500 hover:bg-purple-50/50 dark:hover:bg-purple-950/50 hover:scale-[1.01]'
                               : 'border-dashed border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/60 hover:border-slate-300 dark:hover:border-slate-700'
                           }`}
                         >
-                          <p className="text-xs sm:text-sm font-semibold text-slate-900 dark:text-slate-100 leading-snug pointer-events-none select-none">
-                            {item.text}
-                          </p>
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="text-xs sm:text-sm font-semibold text-slate-900 dark:text-slate-100 leading-snug">
+                              {item.text}
+                            </p>
+                            {isSelected && (
+                              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-purple-200 dark:bg-purple-900 text-purple-800 dark:text-purple-200 font-bold shrink-0">
+                                Đang chọn
+                              </span>
+                            )}
+                          </div>
 
                           {isWrong && (
-                            <span className="text-[10px] font-bold text-rose-600 dark:text-rose-400 pt-0.5 pointer-events-none select-none">
+                            <span className="text-[10px] font-bold text-rose-600 dark:text-rose-400 pt-0.5">
                               ✕ Chưa chính xác, thử lại nhé!
                             </span>
                           )}
 
                           {isOver && !isWrong && (
-                            <span className="text-[10px] font-semibold text-purple-600 dark:text-purple-400 pt-0.5 flex items-center gap-1 pointer-events-none select-none">
+                            <span className="text-[10px] font-semibold text-purple-600 dark:text-purple-400 pt-0.5 flex items-center gap-1">
                               <span>Thả để nối</span> &darr;
                             </span>
                           )}
