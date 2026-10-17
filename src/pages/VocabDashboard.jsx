@@ -229,6 +229,15 @@ export default function VocabDashboard() {
                         style={{ width: `${percent}%` }}
                       />
                     </div>
+                    {(() => {
+                      const mistakeCount = deck.cards?.filter(c => (vocabStats[c.id]?.wrongCount || 0) >= 2).length || 0;
+                      if (mistakeCount === 0) return null;
+                      return (
+                        <div className="mt-2 text-[11px] font-medium text-rose-600 dark:text-rose-400 flex items-center gap-1 bg-rose-50 dark:bg-rose-950/40 px-2 py-0.5 rounded border border-rose-200/60 dark:border-rose-900/60 w-fit">
+                          <span>⚠️ {mistakeCount} từ hay làm sai</span>
+                        </div>
+                      );
+                    })()}
                   </div>
                 </div>
 

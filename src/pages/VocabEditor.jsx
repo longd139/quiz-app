@@ -489,6 +489,16 @@ export default function VocabEditor() {
                           </span>
                         );
                       })()}
+                      {data.vocabStats?.[card.id]?.wrongCount >= 2 && (
+                        <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md border bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 border-rose-200 dark:border-rose-900 shrink-0 flex items-center gap-1" title={`Đã làm sai ${data.vocabStats[card.id].wrongCount} lần`}>
+                          <span>⚠️ Sai {data.vocabStats[card.id].wrongCount} lần</span>
+                        </span>
+                      )}
+                      {data.vocabStats?.[card.id]?.mastered && (
+                        <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md border bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-900 shrink-0" title="Đã ghi nhớ">
+                          ✓ Đã nhớ
+                        </span>
+                      )}
                     </div>
 
                     <div className="flex items-center gap-1 shrink-0">

@@ -103,9 +103,14 @@ const EMPTY_DRAG_IMAGE = typeof window !== 'undefined' ? (() => {
 })() : null;
 
 export default function VocabQuiz() {
-  const { data } = useQuiz();
+  const { data, update } = useQuiz();
   const navigate = useNavigate();
   const location = useLocation();
+  const dataRef = useRef(data);
+
+  useEffect(() => {
+    dataRef.current = data;
+  }, [data]);
 
   const vocabDecks = data.vocabDecks || [];
   const initialDeckId = location.state?.deckId || (vocabDecks[0]?.id || '');
@@ -174,15 +179,82 @@ export default function VocabQuiz() {
   const [streak, setStreak] = useState(0);
   const [maxStreak, setMaxStreak] = useState(0);
   const [wrongItems, setWrongItems] = useState([]);
-  const [masteredCardIds, setMasteredCardIds] = useState(new Set());
   const [isCompleted, setIsCompleted] = useState(false);
 
   const currentDeck = useMemo(() => {
     return vocabDecks.find(d => d.id === selectedDeckId) || vocabDecks[0] || null;
   }, [vocabDecks, selectedDeckId]);
 
+  // Helper lấy danh sách ID các từ đã học thuộc của bộ từ này từ vocabStats
+  const getInitialMastered = useCallback(() => {
+    const set = new Set();
+    const curStats = dataRef.current?.vocabStats || data.vocabStats || {};
+    if (currentDeck?.cards) {
+      currentDeck.cards.forEach(c => {
+        if (curStats[c.id]?.mastered) {
+          set.add(c.id);
+        }
+      });
+    }
+    return set;
+  }, [currentDeck, data.vocabStats]);
+
+  const [masteredCardIds, setMasteredCardIds] = useState(() => getInitialMastered());
+
+  // Khi đổi deck, nạp lại tiến độ các từ đã thuộc của deck đó
+  useEffect(() => {
+    setMasteredCardIds(getInitialMastered());
+  }, [selectedDeckId, getInitialMastered]);
+
   const totalWords = currentDeck?.cards?.length || 0;
   const masteredCount = masteredCardIds.size;
+
+  // Ghi nhận ngay câu làm đúng vào vocabStats (Database) trong thời gian thực
+  const recordCorrectCard = (cardId) => {
+    if (!cardId) return;
+    setMasteredCardIds(prev => new Set(prev).add(cardId));
+    removeFutureDuplicatesOfCard(cardId);
+    setWrongItems(prev => prev.filter(c => c.id !== cardId));
+
+    const curData = dataRef.current || data;
+    const curStats = curData.vocabStats?.[cardId] || {};
+    const nextStats = {
+      ...(curData.vocabStats || {}),
+      [cardId]: {
+        ...curStats,
+        mastered: true,
+        correctCount: (curStats.correctCount || 0) + 1,
+        lastReviewed: new Date().toISOString()
+      }
+    };
+    const nextData = { ...curData, vocabStats: nextStats };
+    dataRef.current = nextData;
+    update(nextData);
+  };
+
+  // Ghi nhận ngay câu làm sai vào vocabStats (tăng wrongCount, đánh dấu cần ôn)
+  const recordWrongCard = (card) => {
+    if (!card) return;
+    requeueWrongQuestion(card);
+    setWrongItems(prev => prev.some(c => c.id === card.id) ? prev : [...prev, card]);
+
+    const curData = dataRef.current || data;
+    const curStats = curData.vocabStats?.[card.id] || {};
+    const nextWrongCount = (curStats.wrongCount || 0) + 1;
+    const nextStats = {
+      ...(curData.vocabStats || {}),
+      [card.id]: {
+        ...curStats,
+        mastered: false,
+        wrongCount: nextWrongCount,
+        reviewCount: (curStats.reviewCount || 0) + 1,
+        lastReviewed: new Date().toISOString()
+      }
+    };
+    const nextData = { ...curData, vocabStats: nextStats };
+    dataRef.current = nextData;
+    update(nextData);
+  };
 
   const handleToggleChoice = () => {
     if (allowChoice && !allowWritten && !allowFlashcard && !allowMatching) return; // Keep at least 1 selected
@@ -233,7 +305,7 @@ export default function VocabQuiz() {
     setStreak(0);
     setMaxStreak(0);
     setWrongItems([]);
-    setMasteredCardIds(new Set());
+    setMasteredCardIds(getInitialMastered());
     setIsCompleted(false);
   };
 
@@ -439,8 +511,7 @@ export default function VocabQuiz() {
     if (isCorrect) {
       setScore(s => s + 1);
       if (currentQ.card) {
-        setMasteredCardIds(prev => new Set(prev).add(currentQ.card.id));
-        removeFutureDuplicatesOfCard(currentQ.card.id);
+        recordCorrectCard(currentQ.card.id);
       }
       setStreak(s => {
         const next = s + 1;
@@ -449,8 +520,7 @@ export default function VocabQuiz() {
       });
     } else {
       if (currentQ.card) {
-        requeueWrongQuestion(currentQ.card);
-        setWrongItems(prev => prev.some(c => c.id === currentQ.card.id) ? prev : [...prev, currentQ.card]);
+        recordWrongCard(currentQ.card);
       }
       setStreak(0);
     }
@@ -478,8 +548,7 @@ export default function VocabQuiz() {
     if (isCorrect) {
       setScore(s => s + 1);
       if (currentQ.card) {
-        setMasteredCardIds(prev => new Set(prev).add(currentQ.card.id));
-        removeFutureDuplicatesOfCard(currentQ.card.id);
+        recordCorrectCard(currentQ.card.id);
       }
       setStreak(s => {
         const next = s + 1;
@@ -494,8 +563,7 @@ export default function VocabQuiz() {
       }, 2000);
     } else {
       if (currentQ.card) {
-        requeueWrongQuestion(currentQ.card);
-        setWrongItems(prev => prev.some(c => c.id === currentQ.card.id) ? prev : [...prev, currentQ.card]);
+        recordWrongCard(currentQ.card);
       }
       setStreak(0);
     }
@@ -512,8 +580,7 @@ export default function VocabQuiz() {
     setIsCorrectWritten(false);
     setStreak(0);
     if (currentQ.card) {
-      requeueWrongQuestion(currentQ.card);
-      setWrongItems(prev => prev.some(c => c.id === currentQ.card.id) ? prev : [...prev, currentQ.card]);
+      recordWrongCard(currentQ.card);
     }
     if (currentDeck && currentQ.card) {
       speakWordAuto(currentQ.card.term, currentDeck.targetLanguage || 'en-US');
@@ -527,9 +594,7 @@ export default function VocabQuiz() {
     setIsCorrectWritten(true);
     setScore(s => s + 1);
     if (currentQ.card) {
-      setMasteredCardIds(prev => new Set(prev).add(currentQ.card.id));
-      removeFutureDuplicatesOfCard(currentQ.card.id);
-      setWrongItems(prev => prev.filter(c => c.id !== currentQ.card.id));
+      recordCorrectCard(currentQ.card.id);
     }
     setStreak(s => {
       const next = s + 1;
@@ -569,8 +634,7 @@ export default function VocabQuiz() {
 
     if (termId === meaningId) {
       // Correct match!
-      setMasteredCardIds(prev => new Set(prev).add(termId));
-      removeFutureDuplicatesOfCard(termId);
+      recordCorrectCard(termId);
 
       if (fromX && toX) {
         setDragLine({
@@ -653,8 +717,7 @@ export default function VocabQuiz() {
 
       const wrongCard = currentQ.cards?.find(c => c.id === termId);
       if (wrongCard) {
-        requeueWrongQuestion(wrongCard);
-        setWrongItems(prev => prev.some(c => c.id === wrongCard.id) ? prev : [...prev, wrongCard]);
+        recordWrongCard(wrongCard);
       }
     }
   };
@@ -669,8 +732,7 @@ export default function VocabQuiz() {
     if (isKnown) {
       setScore(s => s + 1);
       if (currentQ.card) {
-        setMasteredCardIds(prev => new Set(prev).add(currentQ.card.id));
-        removeFutureDuplicatesOfCard(currentQ.card.id);
+        recordCorrectCard(currentQ.card.id);
       }
       setStreak(s => {
         const next = s + 1;
@@ -679,8 +741,7 @@ export default function VocabQuiz() {
       });
     } else {
       if (currentQ.card) {
-        requeueWrongQuestion(currentQ.card);
-        setWrongItems(prev => prev.some(c => c.id === currentQ.card.id) ? prev : [...prev, currentQ.card]);
+        recordWrongCard(currentQ.card);
       }
       setStreak(0);
     }
