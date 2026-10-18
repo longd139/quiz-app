@@ -354,7 +354,8 @@ export const STREAK_TIERS = [
     topGlow: 'from-slate-400/40 via-slate-500/40 to-slate-600/40',
     glowColor: 'rgba(148, 163, 184, 0.25)',
     accentColor: '#94a3b8',
-    cardBorder: 'border-slate-200/80 dark:border-slate-800'
+    cardBorder: 'border-slate-200/80 dark:border-slate-800',
+    flameSize: 'w-5 h-5 sm:w-6 sm:h-6'
   },
   {
     level: 1,
@@ -370,7 +371,8 @@ export const STREAK_TIERS = [
     topGlow: 'from-amber-500 via-orange-500 to-yellow-400',
     glowColor: 'rgba(245, 158, 11, 0.5)',
     accentColor: '#f59e0b',
-    cardBorder: 'border-amber-500/30 dark:border-amber-500/20'
+    cardBorder: 'border-amber-500/30 dark:border-amber-500/20',
+    flameSize: 'w-7 h-7 sm:w-8 sm:h-8'
   },
   {
     level: 2,
@@ -386,7 +388,8 @@ export const STREAK_TIERS = [
     topGlow: 'from-red-600 via-rose-500 to-amber-500',
     glowColor: 'rgba(239, 68, 68, 0.55)',
     accentColor: '#f43f5e',
-    cardBorder: 'border-rose-500/30 dark:border-rose-500/20'
+    cardBorder: 'border-rose-500/30 dark:border-rose-500/20',
+    flameSize: 'w-8 h-8 sm:w-9 sm:h-9'
   },
   {
     level: 3,
@@ -402,7 +405,8 @@ export const STREAK_TIERS = [
     topGlow: 'from-blue-600 via-cyan-500 to-teal-300',
     glowColor: 'rgba(6, 182, 212, 0.6)',
     accentColor: '#06b6d4',
-    cardBorder: 'border-cyan-500/30 dark:border-cyan-500/20'
+    cardBorder: 'border-cyan-500/30 dark:border-cyan-500/20',
+    flameSize: 'w-9 h-9 sm:w-10 sm:h-10'
   },
   {
     level: 4,
@@ -418,7 +422,8 @@ export const STREAK_TIERS = [
     topGlow: 'from-violet-600 via-purple-500 to-pink-400',
     glowColor: 'rgba(168, 85, 247, 0.65)',
     accentColor: '#a855f7',
-    cardBorder: 'border-purple-500/30 dark:border-purple-500/20'
+    cardBorder: 'border-purple-500/30 dark:border-purple-500/20',
+    flameSize: 'w-10 h-10 sm:w-11 sm:h-11'
   },
   {
     level: 5,
@@ -432,9 +437,10 @@ export const STREAK_TIERS = [
     badgeBg: 'bg-emerald-50 dark:bg-emerald-950/60 border-emerald-300 dark:border-emerald-800',
     flameGradient: 'from-emerald-600 via-teal-500 to-lime-400',
     topGlow: 'from-emerald-600 via-teal-500 to-lime-400',
-    glowColor: 'rgba(16, 185, 129, 0.7)',
+    glowColor: 'rgba(168, 85, 247, 0.7)',
     accentColor: '#10b981',
-    cardBorder: 'border-emerald-500/30 dark:border-emerald-500/20'
+    cardBorder: 'border-emerald-500/30 dark:border-emerald-500/20',
+    flameSize: 'w-11 h-11 sm:w-12 sm:h-12'
   },
   {
     level: 6,
@@ -450,7 +456,8 @@ export const STREAK_TIERS = [
     topGlow: 'from-amber-500 via-yellow-400 to-amber-200',
     glowColor: 'rgba(234, 179, 8, 0.8)',
     accentColor: '#eab308',
-    cardBorder: 'border-yellow-500/40 dark:border-yellow-500/30'
+    cardBorder: 'border-yellow-500/40 dark:border-yellow-500/30',
+    flameSize: 'w-12 h-12 sm:w-14 sm:h-14'
   },
   {
     level: 7,
@@ -466,7 +473,8 @@ export const STREAK_TIERS = [
     topGlow: 'from-purple-500 via-pink-500 to-cyan-400',
     glowColor: 'rgba(236, 72, 153, 0.85)',
     accentColor: '#ec4899',
-    cardBorder: 'border-pink-500/40 dark:border-pink-500/30'
+    cardBorder: 'border-pink-500/40 dark:border-pink-500/30',
+    flameSize: 'w-14 h-14 sm:w-16 sm:h-16'
   }
 ];
 
@@ -478,4 +486,18 @@ export function getStreakTier(streakCount) {
     }
   }
   return STREAK_TIERS[0];
+}
+
+// Progressive flame size that expands smoothly based on streak count & color evolution tier
+export function getFlameSizeClass(streakCount) {
+  const s = Math.max(0, Number(streakCount) || 0);
+  if (s === 0) return 'w-5 h-5 sm:w-6 sm:h-6';
+  if (s === 1) return 'w-6 h-6 sm:w-7 sm:h-7';
+  if (s === 2) return 'w-7 h-7 sm:w-8 sm:h-8';
+  if (s <= 6) return 'w-8 h-8 sm:w-9 sm:h-9';
+  if (s <= 13) return 'w-9 h-9 sm:w-10 sm:h-10';
+  if (s <= 29) return 'w-10 h-10 sm:w-11 sm:h-11';
+  if (s <= 59) return 'w-11 h-11 sm:w-12 sm:h-12';
+  if (s <= 99) return 'w-12 h-12 sm:w-14 sm:h-14';
+  return 'w-14 h-14 sm:w-16 sm:h-16';
 }

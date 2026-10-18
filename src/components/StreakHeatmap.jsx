@@ -375,10 +375,11 @@ export default function StreakHeatmap({ onQuickStudy, className = '' }) {
                 {stats.currentStreak}
               </span>
               <AnimatedFlame
-                className="w-5 h-5 sm:w-6 sm:h-6 shrink-0"
                 active={stats.currentStreak > 0 || stats.hasStudiedToday}
                 showSparks={stats.currentStreak >= 3}
                 colorScheme={activeTier.id}
+                streak={stats.currentStreak}
+                className="shrink-0 transition-all duration-300"
               />
             </div>
 

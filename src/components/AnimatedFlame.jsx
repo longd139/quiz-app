@@ -1,14 +1,14 @@
 import { memo } from 'react';
-import { getStreakTier } from '../data/streak';
+import { getStreakTier, getFlameSizeClass } from '../data/streak';
 
 /**
  * AnimatedFlame Component
  * Multi-layer living fire with dancing outer flame, fluid inner core,
  * floating glowing ember sparks, and pulsing heat aura.
- * Supports evolving color tiers based on streak count!
+ * Supports evolving color tiers and progressive size scaling based on streak count!
  */
 function AnimatedFlame({
-  className = "w-7 h-7",
+  className = "",
   active = true,
   showSparks = true,
   streak = undefined,
@@ -25,6 +25,10 @@ function AnimatedFlame({
   }
 
   const idSuffix = scheme;
+
+  // Progressive flame size that expands smoothly based on streak count & color evolution tier
+  const hasExplicitSize = /\b[wh]-\d/.test(className);
+  const sizeClass = hasExplicitSize ? '' : getFlameSizeClass(streak ?? (scheme === 'dormant' ? 0 : 2));
 
   // Configuration for each evolution tier
   const TIER_COLORS = {
@@ -97,7 +101,7 @@ function AnimatedFlame({
   const currentTheme = TIER_COLORS[scheme] || TIER_COLORS.warm;
 
   return (
-    <div className={`relative inline-flex items-center justify-center select-none ${className}`}>
+    <div className={`relative inline-flex items-center justify-center select-none transition-all duration-300 ${sizeClass} ${className}`}>
       {/* Background ambient heat aura */}
       {active && (
         <div
@@ -157,6 +161,27 @@ function AnimatedFlame({
               fill={currentTheme.sparks[2]}
               className="animate-spark-3"
             />
+            {/* Extra sparks for higher tiers (cyan, violet, emerald, solar, cosmic) */}
+            {(scheme === 'cyan' || scheme === 'violet' || scheme === 'emerald' || scheme === 'solar' || scheme === 'cosmic' || (streak && streak >= 7)) && (
+              <>
+                <circle
+                  cx="22"
+                  cy="7"
+                  r="1.1"
+                  fill={currentTheme.sparks[0]}
+                  className="animate-spark-1"
+                  style={{ animationDelay: '0.4s' }}
+                />
+                <circle
+                  cx="13"
+                  cy="9"
+                  r="0.9"
+                  fill={currentTheme.sparks[1]}
+                  className="animate-spark-3"
+                  style={{ animationDelay: '0.6s' }}
+                />
+              </>
+            )}
           </g>
         )}
 
