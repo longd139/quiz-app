@@ -7,7 +7,8 @@ import {
   IconChevronDown,
   IconChevronUp,
   IconCross,
-  IconCheck
+  IconCheck,
+  IconLock
 } from './Icons';
 import AnimatedFlame from './AnimatedFlame';
 
@@ -859,7 +860,8 @@ export default function StreakHeatmap({ onQuickStudy, className = '' }) {
                         </span>
                       ) : (
                         <span className="inline-flex items-center gap-1 text-[10px] font-medium text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-2 py-0.5 rounded-full">
-                          <span>🔒 {tier.minDays} ngày</span>
+                          <IconLock className="w-2.5 h-2.5 shrink-0" />
+                          <span>{tier.minDays} ngày</span>
                         </span>
                       )}
                     </div>
