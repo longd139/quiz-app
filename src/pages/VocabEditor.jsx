@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQuiz } from '../App';
 import { createVocabDeck, createVocabCard, createVocabCollection, escHtml } from '../data/storage';
 import { speakWord } from '../lib/tts';
-import { IconSpeaker, IconTrash, IconPlus, IconFolder, IconArrowLeft, IconEdit } from '../components/Icons';
+import { IconSpeaker, IconTrash, IconPlus, IconFolder, IconArrowLeft, IconEdit, IconSearch } from '../components/Icons';
 import CreateFlashcardModal from '../components/CreateFlashcardModal';
 import { getBadgeColor } from '../data/badgeColors';
 
@@ -25,6 +25,65 @@ export default function VocabEditor() {
   const [showStudy4Modal, setShowStudy4Modal] = useState(false);
   const [showBatchModal, setShowBatchModal] = useState(false);
   const [batchText, setBatchText] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sortOrder, setSortOrder] = useState('az'); // 'az' | 'za' | 'default'
+
+  const handleApplySortPermanently = () => {
+    if (cards.length <= 1) return;
+    const sorted = [...cards].sort((a, b) => {
+      const termA = (a.term || '').trim().toLowerCase();
+      const termB = (b.term || '').trim().toLowerCase();
+      return sortOrder === 'za'
+        ? termB.localeCompare(termA, 'vi', { sensitivity: 'base' })
+        : termA.localeCompare(termB, 'vi', { sensitivity: 'base' });
+    });
+    setCards(sorted);
+    setSortOrder('default');
+    showToast(`Đã áp dụng thứ tự ${sortOrder === 'za' ? 'Z → A' : 'A → Z'} vào bộ từ`, 'success');
+  };
+
+  const filteredAndSortedCards = useMemo(() => {
+    let list = cards.map((card, originalIndex) => ({ card, originalIndex }));
+
+    if (searchQuery.trim()) {
+      const q = searchQuery.trim().toLowerCase();
+      list = list.filter(({ card }) => {
+        const term = (card.term || '').toLowerCase();
+        const meaning = (card.meaning || '').toLowerCase();
+        const phonetic = (card.phonetic || '').toLowerCase();
+        const partOfSpeech = (card.partOfSpeech || '').toLowerCase();
+        const example = (card.example || '').toLowerCase();
+        const examples = Array.isArray(card.examples) ? card.examples.join(' ').toLowerCase() : '';
+        const note = (card.note || '').toLowerCase();
+
+        return (
+          term.includes(q) ||
+          meaning.includes(q) ||
+          phonetic.includes(q) ||
+          partOfSpeech.includes(q) ||
+          example.includes(q) ||
+          examples.includes(q) ||
+          note.includes(q)
+        );
+      });
+    }
+
+    if (sortOrder === 'az') {
+      list.sort((a, b) => {
+        const termA = (a.card.term || '').trim().toLowerCase();
+        const termB = (b.card.term || '').trim().toLowerCase();
+        return termA.localeCompare(termB, 'vi', { sensitivity: 'base' });
+      });
+    } else if (sortOrder === 'za') {
+      list.sort((a, b) => {
+        const termA = (a.card.term || '').trim().toLowerCase();
+        const termB = (b.card.term || '').trim().toLowerCase();
+        return termB.localeCompare(termA, 'vi', { sensitivity: 'base' });
+      });
+    }
+
+    return list;
+  }, [cards, searchQuery, sortOrder]);
 
   // Modal create collection
   const [showCreateColModal, setShowCreateColModal] = useState(false);
@@ -435,9 +494,9 @@ export default function VocabEditor() {
 
       {/* Cards List Section - Clean preview of created cards */}
       <div className="space-y-3">
-        <div className="flex items-center justify-between pb-1">
+        <div className="flex items-center justify-between pb-1 flex-wrap gap-2">
           <h3 className="text-xs font-mono uppercase tracking-wider text-slate-500">
-            Danh sách từ vựng ({cards.length})
+            Danh sách từ vựng ({filteredAndSortedCards.length}{searchQuery ? `/${cards.length}` : ''})
           </h3>
           <button
             type="button"
@@ -448,6 +507,63 @@ export default function VocabEditor() {
             <span>Tạo từ vựng</span>
           </button>
         </div>
+
+        {/* Search & Sort Toolbar */}
+        {cards.length > 0 && (
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 bg-slate-50/70 dark:bg-slate-950/40 p-2.5 rounded-xl border border-slate-200/60 dark:border-slate-800">
+            {/* Search Input */}
+            <div className="relative flex-1 min-w-[200px]">
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                placeholder="Tìm kiếm từ vựng, định nghĩa, ví dụ..."
+                className="w-full pl-8 pr-7 py-2 border border-slate-200 dark:border-slate-800 rounded-lg text-xs bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 outline-none focus:border-slate-400 dark:focus:border-slate-600 transition-colors"
+              />
+              <span className="absolute left-2.5 top-2.5 text-slate-400 pointer-events-none">
+                <IconSearch className="w-3.5 h-3.5" />
+              </span>
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-2.5 top-2 text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer p-0.5"
+                  title="Xóa tìm kiếm"
+                >
+                  &times;
+                </button>
+              )}
+            </div>
+
+            {/* Sort Selector & Actions */}
+            <div className="flex items-center gap-2 shrink-0">
+              <div className="relative">
+                <select
+                  value={sortOrder}
+                  onChange={e => setSortOrder(e.target.value)}
+                  className="pl-3 pr-7 py-2 border border-slate-200 dark:border-slate-800 rounded-lg text-xs font-medium bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 outline-none focus:border-slate-400 appearance-none cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors"
+                  title="Sắp xếp danh sách hiển thị"
+                >
+                  <option value="az">Sắp xếp: A → Z</option>
+                  <option value="za">Sắp xếp: Z → A</option>
+                  <option value="default">Thứ tự thêm vào (Gốc)</option>
+                </select>
+                <span className="absolute right-2.5 top-2.5 pointer-events-none text-slate-400 text-[10px]">▼</span>
+              </div>
+
+              {sortOrder !== 'default' && (
+                <button
+                  type="button"
+                  onClick={handleApplySortPermanently}
+                  className="px-2.5 py-2 border border-dashed border-slate-300 dark:border-slate-700 hover:border-slate-400 rounded-lg text-xs text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/80 transition-colors cursor-pointer whitespace-nowrap"
+                  title="Lưu thứ tự này làm thứ tự gốc vĩnh viễn cho bộ từ"
+                >
+                  Áp dụng thứ tự
+                </button>
+              )}
+            </div>
+          </div>
+        )}
 
         {cards.length === 0 ? (
           <div className="bg-white/60 dark:bg-slate-900/40 rounded-xl p-8 border border-dashed border-slate-200 dark:border-slate-800 text-center space-y-3">
@@ -463,11 +579,24 @@ export default function VocabEditor() {
               <span>Tạo từ vựng</span>
             </button>
           </div>
+        ) : filteredAndSortedCards.length === 0 ? (
+          <div className="bg-white/60 dark:bg-slate-900/40 rounded-xl p-8 border border-dashed border-slate-200 dark:border-slate-800 text-center space-y-3">
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Không tìm thấy từ vựng nào khớp với từ khóa "{searchQuery}".
+            </p>
+            <button
+              type="button"
+              onClick={() => setSearchQuery('')}
+              className="text-xs font-semibold text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 px-3.5 py-1.5 rounded-lg transition-colors cursor-pointer"
+            >
+              Xóa tìm kiếm
+            </button>
+          </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {cards.map((card, idx) => (
+            {filteredAndSortedCards.map(({ card, originalIndex }, displayIdx) => (
               <div
-                key={card.id || idx}
+                key={card.id || originalIndex}
                 className="bg-white dark:bg-slate-900 rounded-xl p-4 border border-slate-200/90 dark:border-slate-800 flex flex-col justify-between gap-3 shadow-2xs hover:border-slate-300 dark:hover:border-slate-700 hover:shadow-xs transition-all h-full"
               >
                 {/* Top Header & Main Info */}
@@ -475,8 +604,8 @@ export default function VocabEditor() {
                   {/* Top Bar: #Index + Term + Actions */}
                   <div className="flex items-start justify-between gap-2 border-b border-slate-100 dark:border-slate-800/80 pb-2">
                     <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
-                      <span className="text-[11px] font-mono font-bold text-slate-400 shrink-0">
-                        #{idx + 1}
+                      <span className="text-[11px] font-mono font-bold text-slate-400 shrink-0" title={`Vị trí gốc: #${originalIndex + 1}`}>
+                        #{displayIdx + 1}
                       </span>
                       <span className="text-sm font-bold text-slate-900 dark:text-slate-100 tracking-tight truncate max-w-[170px]" title={card.term}>
                         {card.term}
@@ -512,7 +641,7 @@ export default function VocabEditor() {
                       </button>
                       <button
                         type="button"
-                        onClick={() => handleOpenEditModal(idx)}
+                        onClick={() => handleOpenEditModal(originalIndex)}
                         className="p-1 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs cursor-pointer transition-colors"
                         title="Chỉnh sửa từ này"
                       >
@@ -520,7 +649,7 @@ export default function VocabEditor() {
                       </button>
                       <button
                         type="button"
-                        onClick={() => handleDeleteCard(idx)}
+                        onClick={() => handleDeleteCard(originalIndex)}
                         className="p-1 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-slate-400 hover:text-rose-600 text-xs cursor-pointer transition-colors"
                         title="Xóa thẻ"
                       >
