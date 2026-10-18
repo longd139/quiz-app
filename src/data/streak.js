@@ -355,7 +355,8 @@ export const STREAK_TIERS = [
     glowColor: 'rgba(148, 163, 184, 0.25)',
     accentColor: '#94a3b8',
     cardBorder: 'border-slate-200/80 dark:border-slate-800',
-    flameSize: 'w-5 h-5 sm:w-6 sm:h-6'
+    flameSize: 'w-5 h-5 sm:w-6 sm:h-6',
+    sizePx: '20px - 24px'
   },
   {
     level: 1,
@@ -372,7 +373,8 @@ export const STREAK_TIERS = [
     glowColor: 'rgba(245, 158, 11, 0.5)',
     accentColor: '#f59e0b',
     cardBorder: 'border-amber-500/30 dark:border-amber-500/20',
-    flameSize: 'w-7 h-7 sm:w-8 sm:h-8'
+    flameSize: 'w-7 h-7 sm:w-8 sm:h-8',
+    sizePx: '28px - 32px'
   },
   {
     level: 2,
@@ -389,7 +391,8 @@ export const STREAK_TIERS = [
     glowColor: 'rgba(239, 68, 68, 0.55)',
     accentColor: '#f43f5e',
     cardBorder: 'border-rose-500/30 dark:border-rose-500/20',
-    flameSize: 'w-8 h-8 sm:w-9 sm:h-9'
+    flameSize: 'w-8 h-8 sm:w-9 sm:h-9',
+    sizePx: '32px - 36px'
   },
   {
     level: 3,
@@ -406,7 +409,8 @@ export const STREAK_TIERS = [
     glowColor: 'rgba(6, 182, 212, 0.6)',
     accentColor: '#06b6d4',
     cardBorder: 'border-cyan-500/30 dark:border-cyan-500/20',
-    flameSize: 'w-9 h-9 sm:w-10 sm:h-10'
+    flameSize: 'w-9 h-9 sm:w-10 sm:h-10',
+    sizePx: '36px - 40px'
   },
   {
     level: 4,
@@ -423,7 +427,8 @@ export const STREAK_TIERS = [
     glowColor: 'rgba(168, 85, 247, 0.65)',
     accentColor: '#a855f7',
     cardBorder: 'border-purple-500/30 dark:border-purple-500/20',
-    flameSize: 'w-10 h-10 sm:w-11 sm:h-11'
+    flameSize: 'w-10 h-10 sm:w-11 sm:h-11',
+    sizePx: '40px - 44px'
   },
   {
     level: 5,
@@ -437,10 +442,11 @@ export const STREAK_TIERS = [
     badgeBg: 'bg-emerald-50 dark:bg-emerald-950/60 border-emerald-300 dark:border-emerald-800',
     flameGradient: 'from-emerald-600 via-teal-500 to-lime-400',
     topGlow: 'from-emerald-600 via-teal-500 to-lime-400',
-    glowColor: 'rgba(168, 85, 247, 0.7)',
+    glowColor: 'rgba(16, 185, 129, 0.7)',
     accentColor: '#10b981',
     cardBorder: 'border-emerald-500/30 dark:border-emerald-500/20',
-    flameSize: 'w-11 h-11 sm:w-12 sm:h-12'
+    flameSize: 'w-11 h-11 sm:w-12 sm:h-12',
+    sizePx: '44px - 48px'
   },
   {
     level: 6,
@@ -457,7 +463,8 @@ export const STREAK_TIERS = [
     glowColor: 'rgba(234, 179, 8, 0.8)',
     accentColor: '#eab308',
     cardBorder: 'border-yellow-500/40 dark:border-yellow-500/30',
-    flameSize: 'w-12 h-12 sm:w-14 sm:h-14'
+    flameSize: 'w-12 h-12 sm:w-14 sm:h-14',
+    sizePx: '48px - 56px'
   },
   {
     level: 7,
@@ -474,7 +481,8 @@ export const STREAK_TIERS = [
     glowColor: 'rgba(236, 72, 153, 0.85)',
     accentColor: '#ec4899',
     cardBorder: 'border-pink-500/40 dark:border-pink-500/30',
-    flameSize: 'w-14 h-14 sm:w-16 sm:h-16'
+    flameSize: 'w-14 h-14 sm:w-16 sm:h-16',
+    sizePx: '56px - 64px'
   }
 ];
 

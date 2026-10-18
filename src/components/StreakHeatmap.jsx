@@ -2,10 +2,12 @@ import { useState, useMemo, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { useQuiz } from '../App';
-import { calculateStreakStats } from '../data/streak';
+import { calculateStreakStats, STREAK_TIERS } from '../data/streak';
 import {
   IconChevronDown,
-  IconChevronUp
+  IconChevronUp,
+  IconCross,
+  IconCheck
 } from './Icons';
 import AnimatedFlame from './AnimatedFlame';
 
@@ -92,7 +94,19 @@ export default function StreakHeatmap({ onQuickStudy, className = '' }) {
   };
 
   const [hoveredCell, setHoveredCell] = useState(null);
+  const [showFlameModal, setShowFlameModal] = useState(false);
   const scrollContainerRef = useRef(null);
+
+  useEffect(() => {
+    if (!showFlameModal) return;
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        setShowFlameModal(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showFlameModal]);
 
   const theme = THEMES.emerald;
 
@@ -362,11 +376,18 @@ export default function StreakHeatmap({ onQuickStudy, className = '' }) {
             </span>
           </div>
 
-          {/* Column 2: Current Streak */}
-          <div className="flex flex-col items-center justify-center text-center px-1 sm:px-3">
+          {/* Column 2: Current Streak (Click to view flame evolution tiers) */}
+          <div
+            onClick={() => setShowFlameModal(true)}
+            className="flex flex-col items-center justify-center text-center px-1 sm:px-3 cursor-pointer group select-none transition-transform hover:scale-[1.03] active:scale-[0.98]"
+            title="Nhấn vào ngọn lửa để xem các cấp bậc tiến hóa & màu sắc ngọn lửa"
+            role="button"
+            tabIndex={0}
+            onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setShowFlameModal(true); } }}
+          >
             <div className="flex items-center justify-center gap-1.5 leading-none">
               <span
-                className="text-2xl sm:text-3xl md:text-4xl font-black tracking-tight leading-none drop-shadow-xs"
+                className="text-2xl sm:text-3xl md:text-4xl font-black tracking-tight leading-none drop-shadow-xs transition-colors"
                 style={{
                   color: stats.currentStreak === 0 ? '#94a3b8' : (activeTier.accentColor || '#d97706'),
                   textShadow: stats.currentStreak > 0 ? `0 0 16px ${activeTier.glowColor}` : 'none'
@@ -379,15 +400,16 @@ export default function StreakHeatmap({ onQuickStudy, className = '' }) {
                 showSparks={stats.currentStreak >= 3}
                 colorScheme={activeTier.id}
                 streak={stats.currentStreak}
-                className="shrink-0 transition-all duration-300"
+                className="shrink-0 transition-all duration-300 group-hover:scale-110"
               />
             </div>
 
             <span
-              className="text-xs sm:text-sm font-semibold mt-2 sm:mt-2.5 leading-tight"
+              className="text-xs sm:text-sm font-semibold mt-2 sm:mt-2.5 leading-tight flex items-center justify-center gap-1 transition-colors group-hover:underline"
               style={{ color: stats.currentStreak === 0 ? '#64748b' : (activeTier.accentColor || '#d97706') }}
             >
-              Current Streak
+              <span>Current Streak</span>
+              <span className="text-[10px] opacity-70 group-hover:opacity-100 transition-opacity">ⓘ</span>
             </span>
 
             <span className="text-[10px] sm:text-xs font-semibold text-emerald-600 dark:text-[#7ee787] mt-1 line-clamp-1">
@@ -673,6 +695,220 @@ export default function StreakHeatmap({ onQuickStudy, className = '' }) {
             </div>
           </div>
         </div>
+      )}
+      {/* Flame Evolution Tiers Popup Modal */}
+      {showFlameModal && typeof document !== 'undefined' && createPortal(
+        <div
+          className="fixed inset-0 z-[99999] bg-slate-900/60 dark:bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-5 overflow-y-auto animate-in fade-in duration-200 select-none"
+          onClick={() => setShowFlameModal(false)}
+        >
+          <div
+            className="relative w-full max-w-xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 rounded-3xl shadow-2xl p-5 sm:p-6 space-y-4 animate-in zoom-in-95 duration-200 text-slate-900 dark:text-slate-100 max-h-[90vh] flex flex-col my-auto"
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="flex items-start justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-3 shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-2xl bg-amber-50 dark:bg-amber-950/60 border border-amber-200/80 dark:border-amber-800/80 flex items-center justify-center shrink-0">
+                  <AnimatedFlame
+                    streak={stats.currentStreak}
+                    colorScheme={activeTier.id}
+                    className="w-6 h-6 shrink-0"
+                    active={true}
+                    showSparks={true}
+                  />
+                </div>
+                <div>
+                  <h3 className="text-base sm:text-lg font-bold tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
+                    <span>Tiến Hóa Ngọn Lửa Streak</span>
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Màu sắc & kích thước ngọn lửa tăng dần theo số ngày học liên tục
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowFlameModal(false)}
+                className="w-8 h-8 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 flex items-center justify-center transition-colors cursor-pointer shrink-0"
+                title="Đóng (Esc)"
+                aria-label="Đóng"
+              >
+                <IconCross className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Current Streak Summary Box */}
+            <div
+              className="rounded-2xl p-4 border shrink-0 transition-colors"
+              style={{
+                backgroundColor: activeTier.level === 0 ? 'rgba(241, 245, 249, 0.6)' : `${activeTier.accentColor}12`,
+                borderColor: activeTier.level === 0 ? 'rgba(203, 213, 225, 0.8)' : `${activeTier.accentColor}40`
+              }}
+            >
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="shrink-0 flex items-center justify-center w-12 h-12">
+                    <AnimatedFlame
+                      streak={stats.currentStreak}
+                      colorScheme={activeTier.id}
+                      className="shrink-0"
+                      active={true}
+                      showSparks={true}
+                    />
+                  </div>
+                  <div>
+                    <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                      Ngọn lửa hiện tại của bạn
+                    </div>
+                    <div className="text-base font-black tracking-tight" style={{ color: activeTier.accentColor }}>
+                      {activeTier.name} • {stats.currentStreak} ngày
+                    </div>
+                  </div>
+                </div>
+
+                <div className="text-right">
+                  <span
+                    className="inline-block text-[11px] font-bold px-2.5 py-1 rounded-full border shadow-2xs"
+                    style={{
+                      backgroundColor: `${activeTier.accentColor}18`,
+                      color: activeTier.accentColor,
+                      borderColor: `${activeTier.accentColor}40`
+                    }}
+                  >
+                    Kích cỡ: {activeTier.sizePx}
+                  </span>
+                </div>
+              </div>
+
+              {/* Progress to next tier */}
+              {stats.nextTier ? (
+                <div className="mt-3 pt-3 border-t border-slate-200/50 dark:border-slate-700/50 text-xs">
+                  <div className="flex items-center justify-between text-[11px] font-medium text-slate-600 dark:text-slate-300 mb-1.5">
+                    <span>
+                      Tiến trình lên <strong style={{ color: stats.nextTier.accentColor }}>{stats.nextTier.name}</strong>
+                    </span>
+                    <span className="font-bold">
+                      Còn {stats.nextTier.minDays - stats.currentStreak} ngày
+                    </span>
+                  </div>
+                  <div className="w-full h-2 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
+                    <div
+                      className="h-full rounded-full transition-all duration-500"
+                      style={{
+                        width: `${Math.min(100, Math.round((stats.currentStreak / stats.nextTier.minDays) * 100))}%`,
+                        backgroundColor: stats.nextTier.accentColor
+                      }}
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div className="mt-2 text-xs font-semibold text-pink-600 dark:text-pink-400">
+                  ✨ Bạn đã đạt cấp bậc ngọn lửa huyền thoại tối thượng!
+                </div>
+              )}
+            </div>
+
+            {/* List of all 8 Tiers */}
+            <div className="flex-1 overflow-y-auto space-y-2.5 pr-1 max-h-[46vh] [scrollbar-width:thin]">
+              <div className="text-xs font-semibold text-slate-500 dark:text-slate-400 px-1 uppercase tracking-wider">
+                Bảng 8 Cấp Bậc Tiến Hóa ({STREAK_TIERS.length} Tầng)
+              </div>
+              {STREAK_TIERS.map((tier) => {
+                const isCurrent = tier.id === activeTier.id;
+                const isUnlocked = stats.currentStreak >= tier.minDays;
+
+                return (
+                  <div
+                    key={tier.id}
+                    className={`flex items-center gap-3.5 p-3 sm:p-3.5 rounded-2xl border transition-all ${
+                      isCurrent
+                        ? 'border-2 shadow-md ring-2 ring-offset-1 dark:ring-offset-slate-900'
+                        : isUnlocked
+                          ? 'border-slate-200/90 dark:border-slate-800 bg-white/70 dark:bg-slate-800/40'
+                          : 'border-dashed border-slate-200 dark:border-slate-800/70 bg-slate-50/50 dark:bg-slate-900/30 opacity-75'
+                    }`}
+                    style={{
+                      borderColor: isCurrent ? tier.accentColor : undefined,
+                      ringColor: isCurrent ? `${tier.accentColor}50` : undefined,
+                      backgroundColor: isCurrent ? `${tier.accentColor}0a` : undefined
+                    }}
+                  >
+                    {/* Flame Preview rendered in actual tier size */}
+                    <div className="w-14 h-14 sm:w-16 sm:h-16 shrink-0 flex items-center justify-center rounded-2xl bg-slate-100/80 dark:bg-slate-800/80 border border-slate-200/60 dark:border-slate-700/60">
+                      <AnimatedFlame
+                        colorScheme={tier.id}
+                        streak={tier.minDays}
+                        active={true}
+                        showSparks={tier.level >= 2}
+                        className="shrink-0"
+                      />
+                    </div>
+
+                    {/* Tier Info */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-bold text-xs sm:text-sm tracking-tight text-slate-900 dark:text-white">
+                          Cấp {tier.level}: {tier.name}
+                        </span>
+                        <span
+                          className="text-[10px] font-bold px-1.5 py-0.2 rounded-full border"
+                          style={{
+                            color: tier.accentColor,
+                            borderColor: `${tier.accentColor}40`,
+                            backgroundColor: `${tier.accentColor}15`
+                          }}
+                        >
+                          {tier.tag}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 line-clamp-2">
+                        {tier.description}
+                      </p>
+                      <div className="mt-1 flex items-center gap-2 text-[10px] text-slate-400 dark:text-slate-500 font-medium">
+                        <span>Kích cỡ: <strong className="text-slate-700 dark:text-slate-300">{tier.sizePx}</strong></span>
+                      </div>
+                    </div>
+
+                    {/* Badge Status */}
+                    <div className="shrink-0 text-right">
+                      {isCurrent ? (
+                        <span
+                          className="inline-flex items-center gap-1 text-[11px] font-black px-2.5 py-1 rounded-full text-white shadow-sm"
+                          style={{ backgroundColor: tier.accentColor }}
+                        >
+                          ★ Hiện tại
+                        </span>
+                      ) : isUnlocked ? (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 px-2 py-0.5 rounded-full">
+                          <IconCheck className="w-3 h-3" />
+                          <span>Mở khóa</span>
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-medium text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-2 py-0.5 rounded-full">
+                          <span>🔒 {tier.minDays} ngày</span>
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex justify-end shrink-0">
+              <button
+                type="button"
+                onClick={() => setShowFlameModal(false)}
+                className="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-slate-100 transition-colors cursor-pointer"
+              >
+                Đóng
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
       )}
     </div>
   );
