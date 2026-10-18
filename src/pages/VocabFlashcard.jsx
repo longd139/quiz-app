@@ -2,12 +2,13 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useQuiz } from '../App';
 import { shuffle } from '../data/storage';
+import { recordStudyActivity } from '../data/streak';
 import { speakWord, speakWordAuto } from '../lib/tts';
 import { IconSpeaker, IconRotate, IconShuffle, IconCheck, IconCross, IconArrowLeft, IconTarget } from '../components/Icons';
 import { getBadgeColor } from '../data/badgeColors';
 
 export default function VocabFlashcard() {
-  const { data, update, showAlert } = useQuiz();
+  const { data, update, showAlert, showToast } = useQuiz();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -21,6 +22,7 @@ export default function VocabFlashcard() {
   const [autoSpeak, setAutoSpeak] = useState(true);
   const [slideStatus, setSlideStatus] = useState(null); // 'remembered' | 'review' | null
   const isAnimatingRef = useRef(false);
+  const hasAwardedMooskRef = useRef(false);
   const hidePhonetic = localStorage.getItem('vocab_quiz_hide_phonetic') === 'true';
 
   const currentDeck = useMemo(() => {
@@ -32,6 +34,28 @@ export default function VocabFlashcard() {
   const [reviewIds, setReviewIds] = useState(new Set());
   const [isFinished, setIsFinished] = useState(false);
 
+  // Award +1 Moosk when the flashcard deck is completed
+  useEffect(() => {
+    if (isFinished && !hasAwardedMooskRef.current) {
+      hasAwardedMooskRef.current = true;
+      const currentMoosk = typeof data.mooskCount === 'number' ? data.mooskCount : 0;
+      const nextMoosk = currentMoosk + 1;
+      const nextData = {
+        ...data,
+        mooskCount: nextMoosk
+      };
+      update(nextData);
+
+      if (showToast) {
+        showToast({
+          title: '🎉 +1 Moosk!',
+          message: `Bạn đã hoàn thành bộ thẻ "${currentDeck?.name || ''}"! Tổng: ${nextMoosk} Moosk.`,
+          type: 'success'
+        });
+      }
+    }
+  }, [isFinished, currentDeck, data, update, showToast]);
+
   // Initialize cards
   useEffect(() => {
     if (currentDeck && currentDeck.cards) {
@@ -41,6 +65,7 @@ export default function VocabFlashcard() {
       setCurrentIndex(0);
       setIsFlipped(false);
       setIsFinished(false);
+      hasAwardedMooskRef.current = false;
       setRememberedIds(new Set());
       setReviewIds(new Set());
     }
@@ -77,7 +102,8 @@ export default function VocabFlashcard() {
           lastReviewed: new Date().toISOString()
         }
       };
-      update({ ...data, vocabStats: nextStats });
+      const withActivity = recordStudyActivity(data, 1);
+      update({ ...withActivity, vocabStats: nextStats });
     } else {
       setReviewIds(prev => new Set([...prev, currentCard.id]));
       const nextStats = {
@@ -88,7 +114,8 @@ export default function VocabFlashcard() {
           lastReviewed: new Date().toISOString()
         }
       };
-      update({ ...data, vocabStats: nextStats });
+      const withActivity = recordStudyActivity(data, 1);
+      update({ ...withActivity, vocabStats: nextStats });
     }
 
     setTimeout(() => {
@@ -191,6 +218,12 @@ export default function VocabFlashcard() {
             <div className="text-2xl font-mono font-bold text-[#865903] dark:text-amber-300">{reviewCount}</div>
             <div className="text-[11px] font-medium text-[#865903] dark:text-amber-400 mt-0.5">Cần ôn lại</div>
           </div>
+        </div>
+
+        {/* Moosk Reward Banner */}
+        <div className="bg-slate-50 dark:bg-slate-950/60 rounded-xl p-2.5 max-w-xs mx-auto border border-slate-200/80 dark:border-slate-800 flex items-center justify-center gap-1.5 text-xs font-bold text-blue-600 dark:text-blue-400">
+          <span>✨ +1 Moosk!</span>
+          <span className="text-slate-400 dark:text-slate-500 font-normal">| Tổng: {(data?.mooskCount ?? 1)} Moosk</span>
         </div>
 
         {/* Action Buttons */}

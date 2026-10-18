@@ -5,6 +5,7 @@ import { escHtml, getVocabCollectionName, createVocabCollection } from '../data/
 import { IconCards, IconTarget, IconEdit, IconTrash, IconPlus, IconFolder, IconSearch, IconRotate, IconCross, IconSpeaker } from '../components/Icons';
 import { speakWord } from '../lib/tts';
 import CreateFlashcardModal from '../components/CreateFlashcardModal';
+import StreakHeatmap from '../components/StreakHeatmap';
 
 export default function VocabDashboard() {
   const { data, update, showConfirm, showToast } = useQuiz();
@@ -137,6 +138,9 @@ export default function VocabDashboard() {
           </div>
         </div>
       </div>
+
+      {/* Daily Streak & Activity Heatmap */}
+      <StreakHeatmap />
 
       {/* Filter and Search Bar */}
       <div className="flex flex-wrap items-center gap-2">

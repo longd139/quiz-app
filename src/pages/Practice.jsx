@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useQuiz } from '../App';
 import { uid, arraysEqual, renderMd } from '../data/storage';
+import { recordStudyActivity } from '../data/streak';
 
 export default function Practice() {
   const { data, update, showConfirm } = useQuiz();
@@ -126,7 +127,8 @@ export default function Practice() {
     };
 
     d.history = [session, ...d.history].slice(0, 100);
-    update(d);
+    const updatedData = recordStudyActivity(d, total);
+    update(updatedData);
 
     navigate('/results', { state: { session, score, correctCount, total } });
   }, [data, update, navigate, sessionNames, questions, answers, isTimed, timeLimit, isExam, timeLimitMs]);
