@@ -756,19 +756,6 @@ export default function StreakHeatmap({ onQuickStudy, className = '' }) {
                     </div>
                   </div>
                 </div>
-
-                <div className="text-right">
-                  <span
-                    className="inline-block text-[11px] font-bold px-2.5 py-1 rounded-full border shadow-2xs"
-                    style={{
-                      backgroundColor: `${activeTier.accentColor}18`,
-                      color: activeTier.accentColor,
-                      borderColor: `${activeTier.accentColor}40`
-                    }}
-                  >
-                    Kích cỡ: {activeTier.sizePx}
-                  </span>
-                </div>
               </div>
 
               {/* Progress to next tier */}
@@ -811,17 +798,16 @@ export default function StreakHeatmap({ onQuickStudy, className = '' }) {
                 return (
                   <div
                     key={tier.id}
-                    className={`flex items-center gap-3.5 p-3 sm:p-3.5 rounded-2xl border transition-all ${
+                    className={`flex items-center gap-3.5 p-3 sm:p-3.5 rounded-2xl transition-all ${
                       isCurrent
-                        ? 'border-2 shadow-md ring-2 ring-offset-1 dark:ring-offset-slate-900'
+                        ? 'border-2 shadow-sm'
                         : isUnlocked
-                          ? 'border-slate-200/90 dark:border-slate-800 bg-white/70 dark:bg-slate-800/40'
-                          : 'border-dashed border-slate-200 dark:border-slate-800/70 bg-slate-50/50 dark:bg-slate-900/30 opacity-75'
+                          ? 'border border-slate-200/90 dark:border-slate-800 bg-white/70 dark:bg-slate-800/40'
+                          : 'border border-dashed border-slate-200 dark:border-slate-800/70 bg-slate-50/50 dark:bg-slate-900/30 opacity-75'
                     }`}
                     style={{
                       borderColor: isCurrent ? tier.accentColor : undefined,
-                      ringColor: isCurrent ? `${tier.accentColor}50` : undefined,
-                      backgroundColor: isCurrent ? `${tier.accentColor}0a` : undefined
+                      backgroundColor: isCurrent ? `${tier.accentColor}0e` : undefined
                     }}
                   >
                     {/* Flame Preview rendered in actual tier size */}
@@ -855,9 +841,6 @@ export default function StreakHeatmap({ onQuickStudy, className = '' }) {
                       <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 line-clamp-2">
                         {tier.description}
                       </p>
-                      <div className="mt-1 flex items-center gap-2 text-[10px] text-slate-400 dark:text-slate-500 font-medium">
-                        <span>Kích cỡ: <strong className="text-slate-700 dark:text-slate-300">{tier.sizePx}</strong></span>
-                      </div>
                     </div>
 
                     {/* Badge Status */}
