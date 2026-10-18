@@ -96,12 +96,6 @@ function checkAnswerMatch(userInput, targetAnswer) {
   return false;
 }
 
-// 1x1 transparent image to hide the browser's default drag ghost preview
-const EMPTY_DRAG_IMAGE = typeof window !== 'undefined' ? (() => {
-  const img = new Image();
-  img.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
-  return img;
-})() : null;
 
 export default function VocabQuiz() {
   const { data, update, showToast } = useQuiz();
@@ -164,14 +158,9 @@ export default function VocabQuiz() {
 
   // Matching State (Nối từ)
   const [matchedPairIds, setMatchedPairIds] = useState([]);
-  const [draggingTermId, setDraggingTermId] = useState(null);
-  const [dragOverMeaningId, setDragOverMeaningId] = useState(null);
   const [selectedTermId, setSelectedTermId] = useState(null);
   const [selectedMeaningId, setSelectedMeaningId] = useState(null);
   const [wrongFeedback, setWrongFeedback] = useState(null); // { meaningId, termId }
-  const [dragLine, setDragLine] = useState(null); // { fromX, fromY, toX, toY, termId, status: 'dragging' | 'matched' | 'wrong' | 'fading' }
-  const draggingTermIdRef = useRef(null);
-  const pointerDownPosRef = useRef({ x: 0, y: 0, termId: null, el: null });
   const isFlashcardAnimatingRef = useRef(false);
   const autoNextTimerRef = useRef(null);
   const handleNextRef = useRef(null);
@@ -337,13 +326,9 @@ export default function VocabQuiz() {
     isFlashcardAnimatingRef.current = false;
     setIsAnswered(false);
     setMatchedPairIds([]);
-    setDraggingTermId(null);
-    setDragOverMeaningId(null);
     setSelectedTermId(null);
     setSelectedMeaningId(null);
     setWrongFeedback(null);
-    setDragLine(null);
-    pointerDownPosRef.current = { x: 0, y: 0, termId: null, el: null };
   };
 
   const resetQuestionStates = () => {
@@ -712,61 +697,19 @@ export default function VocabQuiz() {
     }, 2000);
   };
 
-  // Matching attempt (drop or click)
+  // Matching attempt (click to match)
   const handleAttemptMatch = (termId, meaningId) => {
     if (!currentQ || currentQ.type !== 'matching' || isAnswered) return;
     if (matchedPairIds.includes(termId) || matchedPairIds.includes(meaningId)) return;
-
-    const termEl = document.getElementById(`term-card-${termId}`);
-    const defEl = document.getElementById(`meaning-card-${meaningId}`);
-
-    let fromX = dragLine?.fromX;
-    let fromY = dragLine?.fromY;
-    if (termEl && (!fromX || !fromY)) {
-      const termRect = termEl.getBoundingClientRect();
-      fromX = termRect.right;
-      fromY = termRect.top + termRect.height / 2;
-    }
-
-    let toX = dragLine?.toX;
-    let toY = dragLine?.toY;
-    if (defEl) {
-      const defRect = defEl.getBoundingClientRect();
-      toX = defRect.left;
-      toY = defRect.top + defRect.height / 2;
-    }
 
     if (termId === meaningId) {
       // Correct match!
       recordCorrectCard(termId);
 
-      if (fromX && toX) {
-        setDragLine({
-          fromX,
-          fromY,
-          toX,
-          toY,
-          termId,
-          status: 'matched'
-        });
-
-        // Smoothly fade out wire
-        setTimeout(() => {
-          setDragLine(prev => (prev ? { ...prev, status: 'fading' } : null));
-          setTimeout(() => {
-            setDragLine(null);
-          }, 350);
-        }, 220);
-      } else {
-        setDragLine(null);
-      }
-
       const nextMatched = [...matchedPairIds, termId];
       setMatchedPairIds(nextMatched);
       setSelectedTermId(null);
       setSelectedMeaningId(null);
-      setDraggingTermId(null);
-      setDragOverMeaningId(null);
       setWrongFeedback(null);
 
       // Speak word automatically on correct match
@@ -795,25 +738,6 @@ export default function VocabQuiz() {
       }
     } else {
       // Wrong match
-      if (fromX && toX) {
-        setDragLine({
-          fromX,
-          fromY,
-          toX,
-          toY,
-          termId,
-          status: 'wrong'
-        });
-        setTimeout(() => {
-          setDragLine(prev => (prev ? { ...prev, status: 'fading' } : null));
-          setTimeout(() => {
-            setDragLine(null);
-          }, 250);
-        }, 300);
-      } else {
-        setDragLine(null);
-      }
-
       setStreak(0);
       setWrongFeedback({ meaningId, termId });
       setSelectedTermId(null);
@@ -933,102 +857,7 @@ export default function VocabQuiz() {
 
   handleNextRef.current = handleNext;
 
-  // Update ref for draggingTermId
-  useEffect(() => {
-    draggingTermIdRef.current = draggingTermId;
-  }, [draggingTermId]);
 
-  // Global dragover & pointermove listeners to follow mouse/touch coordinates
-  useEffect(() => {
-    let animId = null;
-
-    const updateCoord = (clientX, clientY) => {
-      if (!draggingTermIdRef.current) return;
-      if (animId) cancelAnimationFrame(animId);
-      animId = requestAnimationFrame(() => {
-        setDragLine(prev => {
-          if (!prev || prev.status === 'matched' || prev.status === 'fading') return prev;
-          return {
-            ...prev,
-            toX: clientX,
-            toY: clientY
-          };
-        });
-      });
-    };
-
-    const handleGlobalDragOver = (e) => {
-      updateCoord(e.clientX, e.clientY);
-      if (draggingTermIdRef.current) {
-        const targetEl = document.elementFromPoint(e.clientX, e.clientY);
-        const meaningCard = targetEl?.closest('[data-meaning-id]');
-        const meaningId = meaningCard ? meaningCard.getAttribute('data-meaning-id') : null;
-        setDragOverMeaningId(prev => (prev === meaningId ? prev : meaningId));
-      }
-    };
-
-    const handlePointerMove = (e) => {
-      if (pointerDownPosRef.current.termId && !draggingTermIdRef.current) {
-        const dx = e.clientX - pointerDownPosRef.current.x;
-        const dy = e.clientY - pointerDownPosRef.current.y;
-        if (Math.hypot(dx, dy) > 6) {
-          const termId = pointerDownPosRef.current.termId;
-          setDraggingTermId(termId);
-          const rect = pointerDownPosRef.current.el?.getBoundingClientRect();
-          if (rect) {
-            setDragLine({
-              fromX: rect.right,
-              fromY: rect.top + rect.height / 2,
-              toX: e.clientX,
-              toY: e.clientY,
-              termId,
-              status: 'dragging'
-            });
-          }
-        }
-      }
-
-      updateCoord(e.clientX, e.clientY);
-      if (draggingTermIdRef.current) {
-        const targetEl = document.elementFromPoint(e.clientX, e.clientY);
-        const meaningCard = targetEl?.closest('[data-meaning-id]');
-        const meaningId = meaningCard ? meaningCard.getAttribute('data-meaning-id') : null;
-        setDragOverMeaningId(prev => (prev === meaningId ? prev : meaningId));
-      }
-    };
-
-    const handlePointerUp = (e) => {
-      pointerDownPosRef.current = { x: 0, y: 0, termId: null, el: null };
-      if (!draggingTermIdRef.current) return;
-      const targetEl = document.elementFromPoint(e.clientX, e.clientY);
-      const meaningCard = targetEl?.closest('[data-meaning-id]');
-      setDragOverMeaningId(null);
-      if (meaningCard) {
-        const meaningId = meaningCard.getAttribute('data-meaning-id');
-        if (meaningId) {
-          handleAttemptMatch(draggingTermIdRef.current, meaningId);
-          return;
-        }
-      }
-
-      setDraggingTermId(null);
-      setDragLine(prev => {
-        if (!prev) return null;
-        if (prev.status === 'matched' || prev.status === 'fading') return prev;
-        return null;
-      });
-    };
-
-    window.addEventListener('dragover', handleGlobalDragOver);
-    window.addEventListener('pointermove', handlePointerMove);
-    window.addEventListener('pointerup', handlePointerUp);
-    return () => {
-      window.removeEventListener('dragover', handleGlobalDragOver);
-      window.removeEventListener('pointermove', handlePointerMove);
-      window.removeEventListener('pointerup', handlePointerUp);
-      if (animId) cancelAnimationFrame(animId);
-    };
-  }, []);
 
   // Keyboard navigation shortcuts in flashcard mode
   useEffect(() => {
@@ -1926,7 +1755,7 @@ export default function VocabQuiz() {
                         <span>Nối từ với nghĩa đúng</span>
                       </h3>
                       <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                        Chạm vào từ và nghĩa tương ứng để nối (hoặc giữ và kéo)
+                        Chạm vào từ và định nghĩa tương ứng để nối cặp
                       </p>
                     </div>
                   </div>
@@ -1951,7 +1780,7 @@ export default function VocabQuiz() {
                       <span>Từ vựng ({currentQ.terms.filter(t => !matchedPairIds.includes(t.id)).length})</span>
                     </span>
                     <span className="text-[10px] text-slate-400 font-mono">
-                      Bấm hoặc kéo để nối
+                      Bấm để chọn
                     </span>
                   </div>
 
@@ -1959,7 +1788,6 @@ export default function VocabQuiz() {
                     {currentQ.terms.map((item) => {
                       const isMatched = matchedPairIds.includes(item.id);
                       const isSelected = selectedTermId === item.id;
-                      const isDragging = draggingTermId === item.id;
                       const isWrong = wrongFeedback && wrongFeedback.termId === item.id;
 
                       if (isMatched) {
@@ -1987,56 +1815,18 @@ export default function VocabQuiz() {
                         <div
                           key={item.id}
                           id={`term-card-${item.id}`}
-                          data-term-id={item.id}
-                          draggable
-                          onDragStart={(e) => {
-                            e.dataTransfer.setData('text/plain', item.id);
-                            e.dataTransfer.effectAllowed = 'move';
-                            if (EMPTY_DRAG_IMAGE && e.dataTransfer.setDragImage) {
-                              e.dataTransfer.setDragImage(EMPTY_DRAG_IMAGE, 0, 0);
-                            }
-                            setDraggingTermId(item.id);
-                            setSelectedTermId(item.id);
-                            const rect = e.currentTarget.getBoundingClientRect();
-                            setDragLine({
-                              fromX: rect.right,
-                              fromY: rect.top + rect.height / 2,
-                              toX: e.clientX,
-                              toY: e.clientY,
-                              termId: item.id,
-                              status: 'dragging'
-                            });
-                          }}
-                          onDragEnd={() => {
-                            setDraggingTermId(null);
-                            setDragOverMeaningId(null);
-                            if (dragLine && dragLine.status === 'dragging') {
-                              setDragLine(null);
-                            }
-                          }}
-                          onPointerDown={(e) => {
-                            if (e.button !== undefined && e.button !== 0) return;
-                            pointerDownPosRef.current = { x: e.clientX, y: e.clientY, termId: item.id, el: e.currentTarget };
-                          }}
                           onClick={() => handleTermClick(item.id)}
                           className={`p-3 rounded-xl border text-xs sm:text-sm transition-all flex items-center justify-between gap-2 cursor-pointer select-none group relative ${
                             isWrong
                               ? 'border-rose-400 bg-rose-50 dark:bg-rose-950/50 text-rose-800 dark:text-rose-200 animate-shake ring-2 ring-rose-400/40'
                               : isSelected
                               ? 'border-purple-500 bg-purple-50/90 dark:bg-purple-950/70 text-purple-900 dark:text-purple-100 ring-2 ring-purple-500/40 shadow-md scale-[1.02]'
-                              : isDragging
-                              ? 'opacity-40 border-purple-400 bg-purple-50/50'
                               : selectedMeaningId
                               ? 'border-purple-300 dark:border-purple-700 bg-purple-50/20 hover:border-purple-500 hover:bg-purple-50/50 hover:scale-[1.01]'
                               : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-purple-300 dark:hover:border-purple-700 hover:shadow-xs text-slate-800 dark:text-slate-200'
                           }`}
                         >
                           <div className="flex items-center gap-2.5 truncate flex-1 min-w-0">
-                            {/* Grip handle dots */}
-                            <span className="text-slate-300 dark:text-slate-600 group-hover:text-purple-500 transition-colors shrink-0 text-sm leading-none select-none">
-                              ⋮⋮
-                            </span>
-
                             <span className="font-bold text-slate-900 dark:text-slate-100 truncate text-xs sm:text-sm">
                               {item.text}
                             </span>
@@ -2068,7 +1858,7 @@ export default function VocabQuiz() {
                   </div>
                 </div>
 
-                {/* Cột Định nghĩa (Bên phải - Drop Target) */}
+                {/* Cột Định nghĩa (Bên phải - Click để nối) */}
                 <div className="space-y-2">
                   <div className="flex items-center justify-between px-1">
                     <span className="text-[11px] font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
@@ -2076,7 +1866,7 @@ export default function VocabQuiz() {
                       <span>Định nghĩa</span>
                     </span>
                     <span className="text-[10px] text-slate-400 font-mono">
-                      Bấm hoặc thả vào đây
+                      Bấm để nối
                     </span>
                   </div>
 
@@ -2084,7 +1874,6 @@ export default function VocabQuiz() {
                     {currentQ.meanings.map((item) => {
                       const isMatched = matchedPairIds.includes(item.id);
                       const isSelected = selectedMeaningId === item.id;
-                      const isOver = dragOverMeaningId === item.id;
                       const isWrong = wrongFeedback && wrongFeedback.meaningId === item.id;
 
                       if (isMatched) {
@@ -2115,39 +1904,15 @@ export default function VocabQuiz() {
                         <div
                           key={item.id}
                           id={`meaning-card-${item.id}`}
-                          data-meaning-id={item.id}
-                          onDragOver={(e) => {
-                            e.preventDefault();
-                            e.dataTransfer.dropEffect = 'move';
-                            if (dragOverMeaningId !== item.id) {
-                              setDragOverMeaningId(item.id);
-                            }
-                          }}
-                          onDragLeave={(e) => {
-                            if (e.currentTarget.contains(e.relatedTarget)) return;
-                            if (dragOverMeaningId === item.id) {
-                              setDragOverMeaningId(null);
-                            }
-                          }}
-                          onDrop={(e) => {
-                            e.preventDefault();
-                            const termId = e.dataTransfer.getData('text/plain') || draggingTermId || selectedTermId;
-                            setDragOverMeaningId(null);
-                            if (termId) {
-                              handleAttemptMatch(termId, item.id);
-                            }
-                          }}
                           onClick={() => handleMeaningClick(item.id)}
-                          className={`p-3 rounded-xl border-2 transition-all min-h-[58px] flex flex-col justify-center relative cursor-pointer select-none ${
+                          className={`p-3 rounded-xl border text-xs sm:text-sm transition-all min-h-[58px] flex flex-col justify-center relative cursor-pointer select-none ${
                             isWrong
                               ? 'border-rose-400 bg-rose-50 dark:bg-rose-950/50 text-rose-800 dark:text-rose-200 animate-shake ring-2 ring-rose-400/40'
                               : isSelected
                               ? 'border-purple-500 bg-purple-50/90 dark:bg-purple-950/70 text-purple-900 dark:text-purple-100 ring-2 ring-purple-500/40 shadow-md scale-[1.02]'
-                              : isOver
-                              ? 'border-purple-500 bg-purple-50 dark:bg-purple-950/60 ring-2 ring-purple-400/50 shadow-md'
                               : selectedTermId
-                              ? 'border-dashed border-purple-300 dark:border-purple-800/80 bg-purple-50/20 dark:bg-purple-950/20 hover:border-purple-500 hover:bg-purple-50/50 dark:hover:bg-purple-950/50 hover:scale-[1.01]'
-                              : 'border-dashed border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/60 hover:border-slate-300 dark:hover:border-slate-700'
+                              ? 'border-purple-300 dark:border-purple-700 bg-purple-50/20 dark:bg-purple-950/20 hover:border-purple-500 hover:bg-purple-50/50 dark:hover:bg-purple-950/50 hover:scale-[1.01]'
+                              : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-purple-300 dark:hover:border-purple-700 hover:shadow-xs'
                           }`}
                         >
                           <div className="flex items-center justify-between gap-2">
@@ -2164,12 +1929,6 @@ export default function VocabQuiz() {
                           {isWrong && (
                             <span className="text-[10px] font-bold text-rose-600 dark:text-rose-400 pt-0.5">
                               ✕ Chưa chính xác, thử lại nhé!
-                            </span>
-                          )}
-
-                          {isOver && !isWrong && (
-                            <span className="text-[10px] font-semibold text-purple-600 dark:text-purple-400 pt-0.5 flex items-center gap-1">
-                              <span>Thả để nối</span> &darr;
                             </span>
                           )}
                         </div>
@@ -2238,81 +1997,7 @@ export default function VocabQuiz() {
         </div>
       )}
 
-      {/* SVG Elastic Connecting Wire Overlay (Sợi dây nối từ vựng kéo đến trỏ chuột) */}
-      {dragLine && (
-        <svg
-          className={`pointer-events-none fixed inset-0 z-50 w-full h-full transition-opacity duration-300 ${
-            dragLine.status === 'fading' ? 'opacity-0' : 'opacity-100'
-          }`}
-          style={{ willChange: 'opacity' }}
-        >
-          <defs>
-            <linearGradient id="wireGradientStroke" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop
-                offset="0%"
-                stopColor={dragLine.status === 'matched' ? '#10b981' : dragLine.status === 'wrong' ? '#ef4444' : '#9333ea'}
-              />
-              <stop
-                offset="100%"
-                stopColor={dragLine.status === 'matched' ? '#34d399' : dragLine.status === 'wrong' ? '#f87171' : '#c084fc'}
-              />
-            </linearGradient>
-            <filter id="wireGlowFilter" x="-40%" y="-40%" width="180%" height="180%">
-              <feGaussianBlur stdDeviation="3" result="blur" />
-              <feMerge>
-                <feMergeNode in="blur" />
-                <feMergeNode in="SourceGraphic" />
-              </feMerge>
-            </filter>
-          </defs>
 
-          {(() => {
-            const { fromX, fromY, toX, toY, status } = dragLine;
-            const dist = Math.sqrt(Math.pow(toX - fromX, 2) + Math.pow(toY - fromY, 2));
-            const curveOffset = Math.min(130, Math.max(40, dist * 0.4));
-            const pathD = `M ${fromX} ${fromY} C ${fromX + curveOffset} ${fromY}, ${toX - curveOffset} ${toY}, ${toX} ${toY}`;
-            const color = status === 'matched' ? '#10b981' : status === 'wrong' ? '#ef4444' : '#a855f7';
-
-            return (
-              <g>
-                {/* Wider ambient aura */}
-                <path
-                  d={pathD}
-                  fill="none"
-                  stroke={color}
-                  strokeWidth="8"
-                  strokeOpacity="0.2"
-                  strokeLinecap="round"
-                />
-
-                {/* Primary glowing wire */}
-                <path
-                  d={pathD}
-                  fill="none"
-                  stroke="url(#wireGradientStroke)"
-                  strokeWidth={status === 'matched' ? '4.5' : '3.5'}
-                  strokeLinecap="round"
-                  filter="url(#wireGlowFilter)"
-                />
-
-                {/* Origin Terminal Socket */}
-                <circle cx={fromX} cy={fromY} r="5" fill={color} stroke="#ffffff" strokeWidth="2" />
-
-                {/* Mouse Cursor Terminal Tip */}
-                <circle
-                  cx={toX}
-                  cy={toY}
-                  r={status === 'matched' ? '8' : '6'}
-                  fill={color}
-                  stroke="#ffffff"
-                  strokeWidth="2.5"
-                  className={status === 'dragging' ? 'animate-pulse' : ''}
-                />
-              </g>
-            );
-          })()}
-        </svg>
-      )}
     </div>
   );
 }
