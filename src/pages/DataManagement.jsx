@@ -51,7 +51,8 @@ export default function DataManagement() {
           questionStats: imported.questionStats || {},
           vocabCollections: imported.vocabCollections || data.vocabCollections || [],
           vocabDecks: imported.vocabDecks || data.vocabDecks || [],
-          vocabStats: imported.vocabStats || data.vocabStats || {}
+          vocabStats: imported.vocabStats || data.vocabStats || {},
+          activityLog: imported.activityLog || data.activityLog || {}
         });
         setImportFeedback('✅ Đã nhập thành công!');
         setImportText('');

@@ -21,7 +21,9 @@ export function loadData() {
       questionStats: data.questionStats || {},
       vocabCollections: Array.isArray(data.vocabCollections) && data.vocabCollections.length > 0 ? data.vocabCollections : getDefaultVocabCollections(),
       vocabDecks: Array.isArray(data.vocabDecks) && data.vocabDecks.length > 0 ? data.vocabDecks : getDefaultVocabDecks(),
-      vocabStats: data.vocabStats || {}
+      vocabStats: data.vocabStats || {},
+      activityLog: data.activityLog || {},
+      mooskCount: typeof data.mooskCount === 'number' ? data.mooskCount : undefined
     };
   } catch (_e) { return defaultData(); }
 }
@@ -35,7 +37,9 @@ function defaultData() {
     questionStats: {},
     vocabCollections: getDefaultVocabCollections(),
     vocabDecks: getDefaultVocabDecks(),
-    vocabStats: {}
+    vocabStats: {},
+    activityLog: {},
+    mooskCount: 0
   };
 }
 
@@ -150,6 +154,19 @@ export function ensureCollections(data) {
 
   if (!data.vocabStats) {
     data.vocabStats = {};
+    changed = true;
+  }
+
+  if (!data.activityLog || typeof data.activityLog !== 'object') {
+    data.activityLog = {};
+    changed = true;
+  }
+
+  if (typeof data.mooskCount !== 'number') {
+    const masteredDecksCount = (data.vocabDecks || []).filter(
+      d => d.cards && d.cards.length > 0 && d.cards.every(c => data.vocabStats?.[c.id]?.mastered)
+    ).length;
+    data.mooskCount = masteredDecksCount;
     changed = true;
   }
 
@@ -304,4 +321,14 @@ export function arraysEqual(a, b) {
 export function getFilteredTests(data, collectionId) {
   if (!collectionId) return data.tests;
   return data.tests.filter(t => t.collectionId === collectionId);
+}
+
+// Moosk point system: +1 Moosk when a vocabulary deck is completed
+export function recordMooskEarned(data, count = 1) {
+  if (!data) return data;
+  const current = typeof data.mooskCount === 'number' ? data.mooskCount : 0;
+  return {
+    ...data,
+    mooskCount: Math.max(0, current + count)
+  };
 }

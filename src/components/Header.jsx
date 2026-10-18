@@ -1,8 +1,10 @@
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useQuiz } from '../App';
 import { IconBook, IconCards, IconSpeaker, IconSpeakerMute } from './Icons';
 import { APP_VERSION } from '../version';
 
 export default function Header({ syncStatus, dark, toggleDark, appMode, setAppMode, ttsMuted, toggleTts }) {
+  const { data } = useQuiz();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -113,7 +115,7 @@ export default function Header({ syncStatus, dark, toggleDark, appMode, setAppMo
         </div>
 
         {/* Right: Sound toggle & Dark mode switch for desktop */}
-        <div className="hidden sm:flex items-center justify-end gap-1.5 sm:min-w-[180px]">
+        <div className="hidden sm:flex items-center justify-end gap-1.5 sm:min-w-[120px]">
           <button
             type="button"
             onClick={toggleTts}

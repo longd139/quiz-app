@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuiz } from '../App';
 import { getFilteredTests, getCollectionName, escHtml, truncate, fmtDate } from '../data/storage';
+import StreakHeatmap from '../components/StreakHeatmap';
 
 export default function Dashboard() {
   const { data, update, showConfirm, showAlert } = useQuiz();
@@ -48,7 +49,9 @@ export default function Dashboard() {
   };
 
   return (
-    <div>
+    <div className="space-y-5">
+      <StreakHeatmap />
+
       <div className="flex flex-wrap gap-2 mb-5 items-center">
         <select value={filterId} onChange={e => setFilterId(e.target.value)} className="px-3 py-2.5 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-semibold bg-white dark:bg-slate-800 dark:text-slate-200 outline-none focus:border-primary-500">
           <option value="">Tất cả collection</option>

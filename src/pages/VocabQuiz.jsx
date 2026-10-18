@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useQuiz } from '../App';
 import { shuffle } from '../data/storage';
+import { recordStudyActivity } from '../data/streak';
 import { speakWord, speakWordAuto } from '../lib/tts';
 import { IconSpeaker, IconCheck, IconCross, IconCards, IconRotate, IconArrowLeft, IconSettings, IconLink } from '../components/Icons';
 import { getBadgeColor } from '../data/badgeColors';
@@ -103,10 +104,11 @@ const EMPTY_DRAG_IMAGE = typeof window !== 'undefined' ? (() => {
 })() : null;
 
 export default function VocabQuiz() {
-  const { data, update } = useQuiz();
+  const { data, update, showToast } = useQuiz();
   const navigate = useNavigate();
   const location = useLocation();
   const dataRef = useRef(data);
+  const hasAwardedMooskRef = useRef(false);
 
   useEffect(() => {
     dataRef.current = data;
@@ -269,7 +271,8 @@ export default function VocabQuiz() {
         lastReviewed: new Date().toISOString()
       }
     };
-    const nextData = { ...curData, vocabStats: nextStats };
+    const withActivity = recordStudyActivity(curData, 1);
+    const nextData = { ...withActivity, vocabStats: nextStats };
     dataRef.current = nextData;
     update(nextData);
   };
@@ -293,7 +296,8 @@ export default function VocabQuiz() {
         lastReviewed: new Date().toISOString()
       }
     };
-    const nextData = { ...curData, vocabStats: nextStats };
+    const withActivity = recordStudyActivity(curData, 1);
+    const nextData = { ...withActivity, vocabStats: nextStats };
     dataRef.current = nextData;
     update(nextData);
   };
@@ -351,7 +355,32 @@ export default function VocabQuiz() {
     setWrongItems([]);
     setMasteredCardIds(getInitialMastered());
     setIsCompleted(false);
+    hasAwardedMooskRef.current = false;
   };
+
+  // Award +1 Moosk whenever a vocabulary deck is completed
+  useEffect(() => {
+    if (isCompleted && !hasAwardedMooskRef.current) {
+      hasAwardedMooskRef.current = true;
+      const curData = dataRef.current || data;
+      const currentMoosk = typeof curData.mooskCount === 'number' ? curData.mooskCount : 0;
+      const nextMoosk = currentMoosk + 1;
+      const nextData = {
+        ...curData,
+        mooskCount: nextMoosk
+      };
+      dataRef.current = nextData;
+      update(nextData);
+
+      if (showToast) {
+        showToast({
+          title: '🎉 +1 Moosk!',
+          message: `Bạn vừa hoàn thành bộ từ "${currentDeck?.name || ''}"! Tổng: ${nextMoosk} Moosk.`,
+          type: 'success'
+        });
+      }
+    }
+  }, [isCompleted, currentDeck, data, update, showToast]);
 
   // Helper to generate a single question for a specific card
   const makeQuestionForCard = (card, forcedType = null) => {
@@ -1117,15 +1146,19 @@ export default function VocabQuiz() {
           </p>
         </div>
 
-        <div className="bg-slate-50 dark:bg-slate-950/60 rounded-xl p-4 max-w-xs mx-auto border border-slate-200/80 dark:border-slate-800 space-y-1">
+        <div className="bg-slate-50 dark:bg-slate-950/60 rounded-xl p-4 max-w-xs mx-auto border border-slate-200/80 dark:border-slate-800 space-y-1.5">
           <div className="text-3xl font-mono font-bold text-slate-900 dark:text-slate-100 mb-1">
             {totalWords} / {totalWords}
           </div>
           <div className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">
             ✓ Đã thuộc toàn bộ {totalWords} từ vựng
           </div>
+          <div className="pt-2 border-t border-slate-200/60 dark:border-slate-800 flex items-center justify-center gap-1.5 text-xs font-bold text-blue-600 dark:text-blue-400">
+            <span>✨ +1 Moosk!</span>
+            <span className="text-slate-400 dark:text-slate-500 font-normal">| Tổng: {(dataRef.current?.mooskCount ?? data?.mooskCount ?? 1)} Moosk</span>
+          </div>
           {maxStreak >= 3 && (
-            <div className="pt-2 border-t border-slate-200/60 dark:border-slate-800 flex items-center justify-center gap-1.5 text-xs font-bold text-orange-600 dark:text-orange-400">
+            <div className="pt-1 flex items-center justify-center gap-1.5 text-xs font-bold text-orange-600 dark:text-orange-400">
               <span className="streak-flame-icon">🔥</span>
               <span>Chuỗi đúng dài nhất: {maxStreak} câu</span>
             </div>
