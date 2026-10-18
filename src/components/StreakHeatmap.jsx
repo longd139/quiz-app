@@ -708,24 +708,13 @@ export default function StreakHeatmap({ onQuickStudy, className = '' }) {
           >
             {/* Modal Header */}
             <div className="flex items-start justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-3 shrink-0">
-              <div className="flex items-center gap-2.5">
-                <div className="w-10 h-10 rounded-2xl bg-amber-50 dark:bg-amber-950/60 border border-amber-200/80 dark:border-amber-800/80 flex items-center justify-center shrink-0">
-                  <AnimatedFlame
-                    streak={stats.currentStreak}
-                    colorScheme={activeTier.id}
-                    className="w-6 h-6 shrink-0"
-                    active={true}
-                    showSparks={true}
-                  />
-                </div>
-                <div>
-                  <h3 className="text-base sm:text-lg font-bold tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
-                    <span>Tiến Hóa Ngọn Lửa Streak</span>
-                  </h3>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">
-                    Màu sắc & kích thước ngọn lửa tăng dần theo số ngày học liên tục
-                  </p>
-                </div>
+              <div>
+                <h3 className="text-base sm:text-lg font-bold tracking-tight text-slate-900 dark:text-white">
+                  Tiến Hóa Ngọn Lửa Streak
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                  Màu sắc & kích thước ngọn lửa tăng dần theo số ngày học liên tục
+                </p>
               </div>
 
               <button
