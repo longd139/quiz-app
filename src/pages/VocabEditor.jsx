@@ -28,19 +28,6 @@ export default function VocabEditor() {
   const [searchQuery, setSearchQuery] = useState('');
   const [sortOrder, setSortOrder] = useState('az'); // 'az' | 'za' | 'default'
 
-  const handleApplySortPermanently = () => {
-    if (cards.length <= 1) return;
-    const sorted = [...cards].sort((a, b) => {
-      const termA = (a.term || '').trim().toLowerCase();
-      const termB = (b.term || '').trim().toLowerCase();
-      return sortOrder === 'za'
-        ? termB.localeCompare(termA, 'vi', { sensitivity: 'base' })
-        : termA.localeCompare(termB, 'vi', { sensitivity: 'base' });
-    });
-    setCards(sorted);
-    setSortOrder('default');
-    showToast(`Đã áp dụng thứ tự ${sortOrder === 'za' ? 'Z → A' : 'A → Z'} vào bộ từ`, 'success');
-  };
 
   const filteredAndSortedCards = useMemo(() => {
     let list = cards.map((card, originalIndex) => ({ card, originalIndex }));
@@ -535,32 +522,19 @@ export default function VocabEditor() {
               )}
             </div>
 
-            {/* Sort Selector & Actions */}
-            <div className="flex items-center gap-2 shrink-0">
-              <div className="relative">
-                <select
-                  value={sortOrder}
-                  onChange={e => setSortOrder(e.target.value)}
-                  className="pl-3 pr-7 py-2 border border-slate-200 dark:border-slate-800 rounded-lg text-xs font-medium bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 outline-none focus:border-slate-400 appearance-none cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors"
-                  title="Sắp xếp danh sách hiển thị"
-                >
-                  <option value="az">Sắp xếp: A → Z</option>
-                  <option value="za">Sắp xếp: Z → A</option>
-                  <option value="default">Thứ tự thêm vào (Gốc)</option>
-                </select>
-                <span className="absolute right-2.5 top-2.5 pointer-events-none text-slate-400 text-[10px]">▼</span>
-              </div>
-
-              {sortOrder !== 'default' && (
-                <button
-                  type="button"
-                  onClick={handleApplySortPermanently}
-                  className="px-2.5 py-2 border border-dashed border-slate-300 dark:border-slate-700 hover:border-slate-400 rounded-lg text-xs text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/80 transition-colors cursor-pointer whitespace-nowrap"
-                  title="Lưu thứ tự này làm thứ tự gốc vĩnh viễn cho bộ từ"
-                >
-                  Áp dụng thứ tự
-                </button>
-              )}
+            {/* Sort Selector */}
+            <div className="relative shrink-0">
+              <select
+                value={sortOrder}
+                onChange={e => setSortOrder(e.target.value)}
+                className="pl-3 pr-7 py-2 border border-slate-200 dark:border-slate-800 rounded-lg text-xs font-medium bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 outline-none focus:border-slate-400 appearance-none cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors"
+                title="Sắp xếp danh sách hiển thị"
+              >
+                <option value="az">Sắp xếp: A → Z</option>
+                <option value="za">Sắp xếp: Z → A</option>
+                <option value="default">Thứ tự thêm vào (Gốc)</option>
+              </select>
+              <span className="absolute right-2.5 top-2.5 pointer-events-none text-slate-400 text-[10px]">▼</span>
             </div>
           </div>
         )}
