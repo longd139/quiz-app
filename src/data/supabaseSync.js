@@ -7,7 +7,7 @@ import { anonClient, hasSupabase } from '../lib/supabase';
 
 const ROOM_KEY = 'quiz_room_config';
 
-export const DEFAULT_ROOM_SECRET = 'main_quiz_app';
+export const DEFAULT_ROOM_SECRET = import.meta.env.VITE_DEFAULT_ROOM_SECRET || (import.meta.env.DEV ? 'dev_local_quiz_app' : 'main_quiz_app');
 
 export function getRoomConfig() {
   try {

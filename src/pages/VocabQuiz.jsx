@@ -1605,7 +1605,7 @@ export default function VocabQuiz() {
                           />
                         </div>
                       )}
-                      <h2 className={`text-2xl sm:text-3xl font-extrabold tracking-tight ${flashcardSlide ? 'text-white' : 'text-slate-950 dark:text-white'}`}>
+                      <h2 className={`text-2xl sm:text-3xl font-extrabold tracking-tight whitespace-pre-line ${flashcardSlide ? 'text-white' : 'text-slate-950 dark:text-white'}`}>
                         {direction === 'term-to-meaning' ? currentQ.card.term : currentQ.card.meaning}
                       </h2>
                       {direction === 'term-to-meaning' && currentQ.card.phonetic && !hidePhonetic && (
@@ -1665,7 +1665,7 @@ export default function VocabQuiz() {
                     </div>
 
                     <div className="text-center my-auto space-y-2.5 px-2 py-2">
-                      <h3 className={`text-xl sm:text-2xl font-bold ${flashcardSlide ? 'text-white' : 'text-slate-900 dark:text-slate-100'}`}>
+                      <h3 className={`text-xl sm:text-2xl font-bold whitespace-pre-line ${flashcardSlide ? 'text-white' : 'text-slate-900 dark:text-slate-100'}`}>
                         {direction === 'term-to-meaning' ? currentQ.card.meaning : currentQ.card.term}
                       </h3>
                       {direction === 'meaning-to-term' && currentQ.card.phonetic && !hidePhonetic && (

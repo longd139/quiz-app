@@ -2,6 +2,7 @@ import { useState, useRef } from 'react';
 import { useQuiz } from '../App';
 import { getRoomConfig, isConfigured } from '../data/supabaseSync';
 import { getCloudinaryConfig, setCloudinaryCloudName } from '../lib/cloudinary';
+import { loadLocalBackups, saveLocalBackups, checkAndCreateDailyBackup, restoreFromBackup, getTodayDateString } from '../data/backupManager';
 
 export default function DataManagement() {
   const { data, update, syncStatus, doPush, doPull, doCreateRoom, doJoinRoom, doDisconnectSync, showConfirm, showAlert, showToast } = useQuiz();
@@ -91,6 +92,53 @@ export default function DataManagement() {
 
   const handleReconfig = () => { setShowConfig(true); };
 
+  const todayDate = getTodayDateString();
+  const backupsList = (data.dailyBackups && data.dailyBackups.length > 0)
+    ? data.dailyBackups
+    : loadLocalBackups();
+
+  const handleCreateBackupNow = () => {
+    const nextBackups = checkAndCreateDailyBackup(data);
+    saveLocalBackups(nextBackups);
+    update({ ...data, dailyBackups: nextBackups });
+    showToast('✅ Đã tạo bản sao lưu thành công cho ngày hôm nay!', 'success');
+  };
+
+  const handleRestoreBackup = (backup) => {
+    showConfirm(
+      `⚠️ Khôi phục dữ liệu từ bản sao lưu ngày ${backup.date}? Toàn bộ bài test, bộ từ vựng và lịch sử hiện tại sẽ được quay về trạng thái của ngày này. Tiếp tục?`,
+      () => {
+        try {
+          restoreFromBackup(backup, data, update);
+          showToast(`✅ Đã khôi phục thành công từ bản sao lưu ngày ${backup.date}!`, 'success');
+        } catch (err) {
+          showAlert('Lỗi khôi phục', err.message, 'error');
+        }
+      }
+    );
+  };
+
+  const handleDownloadBackup = (backup) => {
+    const jsonStr = JSON.stringify(backup.data || backup, null, 2);
+    const blob = new Blob([jsonStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `quiz-backup-${backup.date}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast(`✅ Đã tải file sao lưu ngày ${backup.date}`, 'success');
+  };
+
+  const handleDeleteBackup = (backup) => {
+    showConfirm(`Bạn có chắc chắn muốn xóa bản sao lưu ngày ${backup.date}?`, () => {
+      const filtered = backupsList.filter(b => b.date !== backup.date);
+      saveLocalBackups(filtered);
+      update({ ...data, dailyBackups: filtered });
+      showToast(`Đã xóa bản sao lưu ngày ${backup.date}`, 'info');
+    });
+  };
+
   const statusLabels = { synced: 'Đã đồng bộ', syncing: 'Đang đồng bộ...', error: 'Lỗi đồng bộ', unconfigured: 'Chưa cấu hình' };
   const statusColors = { synced: 'bg-success-50 dark:bg-success-700/20 text-success-700 dark:text-success-300', syncing: 'bg-warning-50 dark:bg-warning-700/20 text-warning-700 dark:text-warning-300', error: 'bg-danger-50 dark:bg-danger-700/20 text-danger-700 dark:text-danger-300', unconfigured: 'bg-slate-50 dark:bg-slate-800 text-slate-500' };
 
@@ -145,6 +193,105 @@ export default function DataManagement() {
               <button onClick={handleReconfig} className="border border-slate-200 dark:border-slate-700 px-3 py-2 rounded-lg text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-800 text-slate-600">Đổi phòng</button>
               <button onClick={handleDisconnect} className="border border-slate-200 dark:border-slate-700 px-3 py-2 rounded-lg text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-800 text-slate-600">Ngắt kết nối</button>
             </div>
+          </div>
+        )}
+      </div>
+
+      {/* Daily Backups & Auto-Retention */}
+      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm dark:shadow-none border border-slate-200 dark:border-slate-700 p-4 mb-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
+          <div>
+            <div className="flex items-center gap-2">
+              <h3 className="text-base font-semibold">Bản sao lưu hàng ngày (Daily Backup)</h3>
+              <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800/40">
+                Lưu 2 ngày gần nhất
+              </span>
+            </div>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+              Tự động sao lưu dữ liệu mỗi ngày. Cơ chế xoay vòng giữ lại đúng 2 bản sao lưu của 2 ngày gần nhất (sang ngày thứ 3 sẽ tự động xóa ngày thứ 1).
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleCreateBackupNow}
+            className="self-start sm:self-auto bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-3.5 py-1.5 rounded-lg text-xs font-semibold hover:bg-slate-800 dark:hover:bg-slate-100 transition-colors cursor-pointer shrink-0 shadow-2xs"
+          >
+            + Sao lưu hôm nay
+          </button>
+        </div>
+
+        {/* Backups list */}
+        {backupsList.length === 0 ? (
+          <div className="text-center py-6 border border-dashed border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50/50 dark:bg-slate-900/30">
+            <p className="text-xs text-slate-500 dark:text-slate-400">Chưa có bản sao lưu nào. Hệ thống sẽ tự động tạo khi có dữ liệu mới.</p>
+          </div>
+        ) : (
+          <div className="space-y-2 mt-3">
+            {backupsList.map((backup, idx) => {
+              const isToday = backup.date === todayDate;
+              return (
+                <div
+                  key={backup.id || backup.date}
+                  className="p-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-900/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:border-slate-300 dark:hover:border-slate-600 transition-colors"
+                >
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-xs font-bold text-slate-900 dark:text-slate-100 font-mono">
+                        {backup.date}
+                      </span>
+                      {isToday ? (
+                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-200/60 dark:border-blue-900/40">
+                          Hôm nay (Bản mới nhất)
+                        </span>
+                      ) : (
+                        <span className="text-[10px] font-medium px-2 py-0.5 rounded bg-slate-200/70 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+                          {idx === 1 ? 'Hôm trước' : `Bản sao lưu #${idx + 1}`}
+                        </span>
+                      )}
+                      <span className="text-[11px] text-slate-400">
+                        • Cập nhật lúc {new Date(backup.updatedAt || backup.createdAt).toLocaleTimeString('vi-VN')}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-400 flex-wrap">
+                      <span>📚 <strong>{backup.summary?.testCount || 0}</strong> bài test ({backup.summary?.questionCount || 0} câu)</span>
+                      <span>•</span>
+                      <span>🗂️ <strong>{backup.summary?.deckCount || 0}</strong> bộ từ ({backup.summary?.cardCount || 0} từ)</span>
+                      <span>•</span>
+                      <span>⏱️ <strong>{backup.summary?.historyCount || 0}</strong> lượt thi</span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-1.5 shrink-0 self-end sm:self-auto">
+                    <button
+                      type="button"
+                      onClick={() => handleRestoreBackup(backup)}
+                      className="px-2.5 py-1.5 rounded-lg border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 hover:bg-amber-100 dark:hover:bg-amber-900/50 text-amber-700 dark:text-amber-300 text-xs font-semibold cursor-pointer transition-colors"
+                      title="Khôi phục dữ liệu từ bản sao lưu này"
+                    >
+                      Khôi phục
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDownloadBackup(backup)}
+                      className="px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-medium cursor-pointer transition-colors"
+                      title="Tải bản sao lưu này về máy"
+                    >
+                      Tải .json
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteBackup(backup)}
+                      className="px-2 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-slate-400 hover:text-rose-600 text-xs cursor-pointer transition-colors"
+                      title="Xóa bản sao lưu này"
+                    >
+                      Xóa
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>

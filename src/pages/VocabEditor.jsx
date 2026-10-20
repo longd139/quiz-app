@@ -1,16 +1,19 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQuiz } from '../App';
-import { createVocabDeck, createVocabCard, createVocabCollection, escHtml } from '../data/storage';
+import { createVocabDeck, createVocabCard, createVocabCollection, escHtml, uid } from '../data/storage';
 import { speakWord } from '../lib/tts';
 import { IconSpeaker, IconTrash, IconPlus, IconFolder, IconArrowLeft, IconEdit, IconSearch } from '../components/Icons';
 import CreateFlashcardModal from '../components/CreateFlashcardModal';
 import { getBadgeColor } from '../data/badgeColors';
 
 export default function VocabEditor() {
-  const { data, update, showToast } = useQuiz();
+  const { data, update, syncStatus, showToast, showConfirm } = useQuiz();
   const navigate = useNavigate();
   const { deckId } = useParams();
+
+  // Đảm bảo luôn có ID ổn định cho bộ từ (kể cả khi tạo mới)
+  const [activeDeckId] = useState(() => deckId || uid());
 
   const vocabCollections = data.vocabCollections || [];
 
@@ -21,6 +24,9 @@ export default function VocabEditor() {
   const [description, setDescription] = useState('');
   const [targetLanguage, setTargetLanguage] = useState('en-US');
   const [cards, setCards] = useState([]);
+  const cardsRef = useRef(cards);
+  cardsRef.current = cards;
+  const [isSavingCard, setIsSavingCard] = useState(false);
   const [editingCardIndex, setEditingCardIndex] = useState(null);
   const [showStudy4Modal, setShowStudy4Modal] = useState(false);
   const [showBatchModal, setShowBatchModal] = useState(false);
@@ -72,28 +78,156 @@ export default function VocabEditor() {
     return list;
   }, [cards, searchQuery, sortOrder]);
 
-  // Modal create collection
+  // Modal create/edit collection
   const [showCreateColModal, setShowCreateColModal] = useState(false);
   const [newColName, setNewColName] = useState('');
+  const [showEditColModal, setShowEditColModal] = useState(false);
+  const [editColName, setEditColName] = useState('');
 
-  // Load existing deck if editing
+  const [hasRestoredDraft, setHasRestoredDraft] = useState(false);
+  const initializedDeckIdRef = useRef(null);
+
+  // Đảm bảo URL luôn có ID để khách reload F5 không mất trạng thái
   useEffect(() => {
-    if (deckId && data.vocabDecks) {
-      const existing = data.vocabDecks.find(d => d.id === deckId);
+    if (!deckId && activeDeckId) {
+      navigate(`/vocab-editor/${activeDeckId}`, { replace: true });
+    }
+  }, [deckId, activeDeckId, navigate]);
+
+  // Load existing deck if editing, hoặc tự động khôi phục bản nháp chưa lưu nếu có
+  useEffect(() => {
+    const currentId = deckId || activeDeckId;
+    if (initializedDeckIdRef.current === currentId) return;
+
+    if (currentId && data.vocabDecks) {
+      const existing = data.vocabDecks.find(d => d.id === currentId);
       if (existing) {
+        initializedDeckIdRef.current = currentId;
         setName(existing.name || '');
         setCollectionId(existing.collectionId || (vocabCollections[0]?.id || ''));
         setDescription(existing.description || '');
         setTargetLanguage(existing.targetLanguage || 'en-US');
         setCards(existing.cards ? JSON.parse(JSON.stringify(existing.cards)) : []);
+        return;
       }
-    } else if (!deckId) {
+    }
+
+    if (!initializedDeckIdRef.current) {
+      initializedDeckIdRef.current = currentId;
+      // Khôi phục bản nháp nếu khách hàng từng F5 hoặc bị tắt tab
+      try {
+        const rawDraft = localStorage.getItem('vocab_draft_new');
+        if (rawDraft) {
+          const draft = JSON.parse(rawDraft);
+          if (draft && ((Array.isArray(draft.cards) && draft.cards.length > 0) || (draft.name && draft.name.trim()))) {
+            setName(draft.name || '');
+            if (draft.collectionId) setCollectionId(draft.collectionId);
+            setDescription(draft.description || '');
+            if (draft.targetLanguage) setTargetLanguage(draft.targetLanguage);
+            if (Array.isArray(draft.cards) && draft.cards.length > 0) setCards(draft.cards);
+            setHasRestoredDraft(true);
+            return;
+          }
+        }
+      } catch (_e) {}
+
       setCards([]);
       if (vocabCollections.length > 0 && !collectionId) {
         setCollectionId(vocabCollections[0].id);
       }
     }
-  }, [deckId, data.vocabDecks, vocabCollections]);
+  }, [deckId, activeDeckId, data.vocabDecks, vocabCollections, collectionId]);
+
+  // Đồng bộ tức thì bộ từ vựng và từng từ mới vào Database (Supabase) + LocalStorage
+  const syncDeckToDatabase = useCallback(async (
+    updatedCards,
+    customName = null,
+    customColId = null,
+    customDesc = null,
+    customLang = null
+  ) => {
+    setIsSavingCard(true);
+    const currentId = deckId || activeDeckId;
+    const currentDecks = data.vocabDecks || [];
+    const existingIndex = currentDecks.findIndex(d => d.id === currentId);
+    const now = new Date().toISOString();
+
+    const finalCards = updatedCards !== undefined ? updatedCards : cards;
+    const finalName = (customName !== null ? customName : name).trim() || 'Bộ từ vựng mới';
+    const finalColId = customColId !== null 
+      ? customColId 
+      : (collectionId || vocabCollections[0]?.id || null);
+    const finalDesc = (customDesc !== null ? customDesc : description).trim();
+    const finalLang = customLang !== null ? customLang : targetLanguage;
+
+    let nextDecks;
+    if (existingIndex >= 0) {
+      const existing = currentDecks[existingIndex];
+      const updatedDeck = {
+        ...existing,
+        name: finalName,
+        collectionId: finalColId,
+        description: finalDesc,
+        targetLanguage: finalLang,
+        cards: finalCards,
+        updatedAt: now
+      };
+      nextDecks = [...currentDecks];
+      nextDecks[existingIndex] = updatedDeck;
+    } else {
+      const newDeck = {
+        id: currentId,
+        name: finalName,
+        collectionId: finalColId,
+        description: finalDesc,
+        targetLanguage: finalLang,
+        cards: finalCards,
+        createdAt: now,
+        updatedAt: now
+      };
+      nextDecks = [newDeck, ...currentDecks];
+    }
+
+    try {
+      // update() sẽ lập tức lưu vào localStorage và đẩy lên Supabase DB qua RPC
+      await update({ ...data, vocabDecks: nextDecks });
+      try { localStorage.removeItem('vocab_draft_new'); } catch (_e) {}
+    } finally {
+      setIsSavingCard(false);
+    }
+  }, [deckId, activeDeckId, data, cards, name, collectionId, description, targetLanguage, vocabCollections, update]);
+
+  // Tự động lưu nháp liên tục vào localStorage để dự phòng tối đa
+  useEffect(() => {
+    if (!name.trim() && cards.length === 0 && !description.trim()) {
+      localStorage.removeItem('vocab_draft_new');
+      return;
+    }
+    const draftData = {
+      id: deckId || activeDeckId,
+      name,
+      collectionId,
+      description,
+      targetLanguage,
+      cards,
+      savedAt: new Date().toISOString()
+    };
+    try {
+      localStorage.setItem('vocab_draft_new', JSON.stringify(draftData));
+    } catch (_e) {}
+  }, [name, collectionId, description, targetLanguage, cards, deckId, activeDeckId]);
+
+  // Cảnh báo người dùng khi bấm F5 hoặc đóng tab nếu đang có từ vựng chưa lưu
+  useEffect(() => {
+    const handleBeforeUnload = (e) => {
+      if (cards.length > 0 || name.trim()) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [cards.length, name]);
 
   // If there are no collections yet, open create collection modal automatically
   useEffect(() => {
@@ -114,17 +248,20 @@ export default function VocabEditor() {
 
   const handleSaveFromStudy4Modal = (savedCard, shouldClose) => {
     if (editingCardIndex !== null) {
-      setCards(prev => {
-        const next = [...prev];
-        next[editingCardIndex] = savedCard;
-        return next;
-      });
-      showToast(`Đã cập nhật từ "${savedCard.term}"`, 'success');
+      const nextCards = [...cardsRef.current];
+      nextCards[editingCardIndex] = savedCard;
+      cardsRef.current = nextCards;
+      setCards(nextCards);
+      syncDeckToDatabase(nextCards);
+      showToast(`Đã lưu thay đổi từ "${savedCard.term}" vào Database`, 'success');
       setEditingCardIndex(null);
       setShowStudy4Modal(false);
     } else {
-      setCards(prev => [...prev, savedCard]);
-      showToast(`Đã thêm từ "${savedCard.term}"`, 'success');
+      const nextCards = [...cardsRef.current, savedCard];
+      cardsRef.current = nextCards;
+      setCards(nextCards);
+      syncDeckToDatabase(nextCards);
+      showToast(`Đã thêm từ "${savedCard.term}" và lưu vào Database`, 'success');
       if (shouldClose) {
         setShowStudy4Modal(false);
       }
@@ -132,7 +269,10 @@ export default function VocabEditor() {
   };
 
   const handleDeleteCard = (idx) => {
-    setCards(prev => prev.filter((_, i) => i !== idx));
+    const nextCards = cards.filter((_, i) => i !== idx);
+    setCards(nextCards);
+    syncDeckToDatabase(nextCards);
+    showToast('Đã xóa từ vựng khỏi Database', 'info');
   };
 
   const handleCreateCollection = () => {
@@ -149,6 +289,55 @@ export default function VocabEditor() {
     showToast(`Đã tạo bộ sưu tập "${newCol.name}"`, 'success');
   };
 
+  const handleOpenEditCollection = () => {
+    const current = vocabCollections.find(c => c.id === collectionId);
+    if (!current) {
+      showToast('Vui lòng chọn bộ sưu tập cần sửa', 'error');
+      return;
+    }
+    setEditColName(current.name);
+    setShowEditColModal(true);
+  };
+
+  const handleUpdateCollection = () => {
+    if (!editColName.trim()) {
+      showToast('Tên bộ sưu tập không được để trống', 'error');
+      return;
+    }
+    const current = vocabCollections.find(c => c.id === collectionId);
+    if (!current) return;
+    const updatedName = editColName.trim();
+    const nextCollections = vocabCollections.map(c =>
+      c.id === current.id ? { ...c, name: updatedName } : c
+    );
+    update({ ...data, vocabCollections: nextCollections });
+    setShowEditColModal(false);
+    showToast(`Đã đổi tên bộ sưu tập thành "${updatedName}"`, 'success');
+  };
+
+  const handleDeleteCollection = () => {
+    const current = vocabCollections.find(c => c.id === collectionId);
+    if (!current) {
+      showToast('Vui lòng chọn bộ sưu tập cần xóa', 'error');
+      return;
+    }
+    const deckCount = (data.vocabDecks || []).filter(d => d.collectionId === current.id).length;
+    const confirmMessage = deckCount > 0
+      ? `Bộ sưu tập "${current.name}" đang có ${deckCount} bộ từ. Xóa bộ sưu tập này, các bộ từ sẽ chuyển sang "Chưa phân loại". Tiếp tục?`
+      : `Bạn có chắc chắn muốn xóa bộ sưu tập "${current.name}"?`;
+
+    showConfirm(confirmMessage, () => {
+      const nextCols = vocabCollections.filter(c => c.id !== current.id);
+      const nextDecks = (data.vocabDecks || []).map(d =>
+        d.collectionId === current.id ? { ...d, collectionId: null } : d
+      );
+      update({ ...data, vocabCollections: nextCols, vocabDecks: nextDecks });
+      const nextId = nextCols[0]?.id || '';
+      setCollectionId(nextId);
+      showToast(`Đã xóa bộ sưu tập "${current.name}"`, 'success');
+    });
+  };
+
   const handleSave = () => {
     if (!name.trim()) {
       showToast('Vui lòng nhập tên bộ từ vựng', 'error');
@@ -160,41 +349,14 @@ export default function VocabEditor() {
       return;
     }
 
-    const validCards = cards.filter(c => c.term.trim() || c.meaning.trim());
+    const validCards = cards.filter(c => (c.term && c.term.trim()) || (c.meaning && c.meaning.trim()));
     if (validCards.length === 0) {
       showToast('Vui lòng thêm ít nhất 1 từ vựng hợp lệ', 'error');
       return;
     }
 
-    const now = new Date().toISOString();
-    let nextDecks = [...(data.vocabDecks || [])];
-
-    if (deckId) {
-      nextDecks = nextDecks.map(d => {
-        if (d.id === deckId) {
-          return {
-            ...d,
-            name: name.trim(),
-            collectionId,
-            description: description.trim(),
-            targetLanguage,
-            cards: validCards,
-            updatedAt: now
-          };
-        }
-        return d;
-      });
-      showToast('Đã lưu thay đổi bộ từ vựng', 'success');
-    } else {
-      const newDeck = {
-        ...createVocabDeck(name, collectionId, description, targetLanguage),
-        cards: validCards
-      };
-      nextDecks.unshift(newDeck);
-      showToast('Đã tạo bộ từ vựng mới thành công', 'success');
-    }
-
-    update({ ...data, vocabDecks: nextDecks });
+    syncDeckToDatabase(validCards, name.trim(), collectionId, description.trim(), targetLanguage);
+    showToast('Đã lưu toàn bộ bộ từ vựng thành công', 'success');
     navigate('/vocab');
   };
 
@@ -348,8 +510,10 @@ export default function VocabEditor() {
     }
 
     if (newCards.length > 0) {
-      setCards(prev => [...prev, ...newCards]);
-      showToast(`Đã thêm ${newCards.length} từ vào danh sách`, 'success');
+      const nextCards = [...cards, ...newCards];
+      setCards(nextCards);
+      syncDeckToDatabase(nextCards);
+      showToast(`Đã thêm ${newCards.length} từ và lưu ngay vào Database`, 'success');
       setBatchText('');
       setShowBatchModal(false);
     } else {
@@ -369,6 +533,22 @@ export default function VocabEditor() {
           <span>Quay lại Thư viện</span>
         </button>
         <div className="flex items-center gap-2">
+          {isSavingCard ? (
+            <div className="hidden sm:flex items-center gap-1.5 text-[11px] text-amber-700 dark:text-amber-300 font-semibold bg-amber-50 dark:bg-amber-950/50 border border-amber-300 dark:border-amber-800 px-2.5 py-1 rounded-lg">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-ping"></span>
+              <span>Đang đẩy lên Supabase DB...</span>
+            </div>
+          ) : syncStatus === 'error' ? (
+            <div className="hidden sm:flex items-center gap-1.5 text-[11px] text-rose-700 dark:text-rose-300 font-semibold bg-rose-50 dark:bg-rose-950/50 border border-rose-300 dark:border-rose-800 px-2.5 py-1 rounded-lg" title="Không thể kết nối Supabase, dữ liệu đang lưu trên máy">
+              <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
+              <span>Lỗi kết nối DB (Đã lưu local)</span>
+            </div>
+          ) : (
+            <div className="hidden sm:flex items-center gap-1.5 text-[11px] text-emerald-700 dark:text-emerald-300 font-semibold bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800 px-2.5 py-1 rounded-lg" title="Dữ liệu hiện tại đã được lưu an toàn trên Supabase Database">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+              <span>Đã lưu vào Supabase DB ✓</span>
+            </div>
+          )}
           <button
             onClick={() => setShowBatchModal(true)}
             className="border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-slate-50 dark:hover:bg-slate-800/60 text-slate-700 dark:text-slate-300 transition-colors cursor-pointer"
@@ -386,6 +566,28 @@ export default function VocabEditor() {
 
       {/* Deck Metadata Form */}
       <div className="bg-white dark:bg-slate-900 rounded-xl p-5 border border-slate-200/90 dark:border-slate-800 space-y-4">
+        {hasRestoredDraft && (
+          <div className="flex items-center justify-between p-3 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/60 text-amber-800 dark:text-amber-200 text-xs">
+            <div className="flex items-center gap-2">
+              <span className="text-base">💾</span>
+              <span>Đã tự động khôi phục bản nháp đang soạn dở ({cards.length} từ vựng).</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                try { localStorage.removeItem('vocab_draft_new'); } catch (_e) {}
+                setCards([]);
+                setName('');
+                setDescription('');
+                setHasRestoredDraft(false);
+              }}
+              className="text-amber-700 dark:text-amber-300 underline font-semibold hover:text-amber-900 dark:hover:text-amber-100 cursor-pointer"
+            >
+              Hủy bản nháp này
+            </button>
+          </div>
+        )}
+
         <div>
           <span className="text-[10px] font-mono uppercase tracking-wider text-slate-400 block mb-1">
             Deck Configuration
@@ -405,11 +607,17 @@ export default function VocabEditor() {
             </label>
           </div>
 
-          <div className="flex gap-2">
+          <div className="flex flex-col sm:flex-row gap-2">
             <div className="relative flex-1">
               <select
                 value={collectionId}
-                onChange={e => setCollectionId(e.target.value)}
+                onChange={e => {
+                  const val = e.target.value;
+                  setCollectionId(val);
+                  if (cards.length > 0 || name.trim()) {
+                    syncDeckToDatabase(cards, null, val);
+                  }
+                }}
                 className="w-full pl-3 pr-7 py-2 border border-slate-200 dark:border-slate-800 rounded-lg text-xs font-medium bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 outline-none focus:border-slate-400 appearance-none cursor-pointer"
               >
                 <option value="" disabled>-- Chọn một bộ sưu tập --</option>
@@ -419,13 +627,40 @@ export default function VocabEditor() {
               </select>
               <span className="absolute right-2.5 top-2.5 pointer-events-none text-slate-400 text-[10px]">▼</span>
             </div>
-            <button
-              type="button"
-              onClick={() => setShowCreateColModal(true)}
-              className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 px-3 py-2 rounded-lg text-xs font-medium text-slate-700 dark:text-slate-200 whitespace-nowrap cursor-pointer"
-            >
-              Tạo bộ sưu tập
-            </button>
+
+            <div className="flex items-center gap-1.5 shrink-0">
+              <button
+                type="button"
+                onClick={handleOpenEditCollection}
+                disabled={!collectionId || vocabCollections.length === 0}
+                className="flex items-center gap-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 px-3 py-2 rounded-lg text-xs font-medium text-slate-700 dark:text-slate-200 disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap cursor-pointer transition-colors shadow-2xs"
+                title="Sửa tên bộ sưu tập đang chọn"
+              >
+                <IconEdit className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
+                <span>Sửa</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleDeleteCollection}
+                disabled={!collectionId || vocabCollections.length === 0}
+                className="flex items-center gap-1.5 bg-rose-50/60 dark:bg-rose-950/40 border border-rose-200/80 dark:border-rose-900/60 hover:bg-rose-100/70 dark:hover:bg-rose-900/50 px-3 py-2 rounded-lg text-xs font-medium text-rose-600 dark:text-rose-400 disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap cursor-pointer transition-colors shadow-2xs"
+                title="Xóa bộ sưu tập đang chọn"
+              >
+                <IconTrash className="w-3.5 h-3.5" />
+                <span>Xóa</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => { setNewColName(''); setShowCreateColModal(true); }}
+                className="flex items-center gap-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 px-3 py-2 rounded-lg text-xs font-medium text-slate-700 dark:text-slate-200 whitespace-nowrap cursor-pointer transition-colors shadow-2xs"
+                title="Tạo bộ sưu tập mới"
+              >
+                <IconPlus className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
+                <span>Tạo bộ sưu tập</span>
+              </button>
+            </div>
           </div>
         </div>
 
@@ -438,6 +673,11 @@ export default function VocabEditor() {
             type="text"
             value={name}
             onChange={e => setName(e.target.value)}
+            onBlur={e => {
+              if (cards.length > 0 || e.target.value.trim()) {
+                syncDeckToDatabase(cards, e.target.value.trim());
+              }
+            }}
             placeholder="50 Từ Vựng Tiếng Anh Giao Tiếp Hằng Ngày"
             className="w-full px-3 py-2 border border-slate-200 dark:border-slate-800 rounded-lg text-xs font-semibold bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 outline-none focus:border-slate-400"
           />
@@ -452,6 +692,11 @@ export default function VocabEditor() {
               type="text"
               value={description}
               onChange={e => setDescription(e.target.value)}
+              onBlur={e => {
+                if (cards.length > 0 || name.trim()) {
+                  syncDeckToDatabase(cards, null, null, e.target.value.trim());
+                }
+              }}
               placeholder="Chủ đề công sở, phỏng vấn, thi chứng chỉ"
               className="w-full px-3 py-2 border border-slate-200 dark:border-slate-800 rounded-lg text-xs bg-white dark:bg-slate-950 text-slate-800 dark:text-slate-200 outline-none focus:border-slate-400"
             />
@@ -463,7 +708,13 @@ export default function VocabEditor() {
             <div className="relative">
               <select
                 value={targetLanguage}
-                onChange={e => setTargetLanguage(e.target.value)}
+                onChange={e => {
+                  const lang = e.target.value;
+                  setTargetLanguage(lang);
+                  if (cards.length > 0 || name.trim()) {
+                    syncDeckToDatabase(cards, null, null, null, lang);
+                  }
+                }}
                 className="w-full pl-3 pr-7 py-2 border border-slate-200 dark:border-slate-800 rounded-lg text-xs bg-white dark:bg-slate-950 text-slate-800 dark:text-slate-200 outline-none focus:border-slate-400 appearance-none cursor-pointer"
               >
                 <option value="en-US">Tiếng Anh (Mỹ - en-US)</option>
@@ -697,7 +948,7 @@ export default function VocabEditor() {
               {vocabCollections.length > 0 && (
                 <button
                   onClick={() => setShowCreateColModal(false)}
-                  className="text-slate-400 hover:text-slate-600 p-1 cursor-pointer"
+                  className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 cursor-pointer"
                 >
                   &times;
                 </button>
@@ -723,7 +974,7 @@ export default function VocabEditor() {
                 <button
                   type="button"
                   onClick={() => setShowCreateColModal(false)}
-                  className="px-3 py-1.5 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-medium cursor-pointer"
+                  className="px-3 py-1.5 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-medium cursor-pointer text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
                 >
                   Hủy
                 </button>
@@ -731,9 +982,59 @@ export default function VocabEditor() {
               <button
                 type="button"
                 onClick={handleCreateCollection}
-                className="px-3.5 py-1.5 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-lg text-xs font-semibold cursor-pointer"
+                className="px-3.5 py-1.5 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-lg text-xs font-semibold cursor-pointer hover:bg-slate-800 dark:hover:bg-slate-100"
               >
                 Tạo & Chọn
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Edit Collection */}
+      {showEditColModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-2xs">
+          <div className="bg-white dark:bg-slate-900 rounded-xl max-w-sm w-full p-5 shadow-xl border border-slate-200 dark:border-slate-800 space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+              <h3 className="text-sm font-bold tracking-tight text-slate-900 dark:text-slate-100">
+                Sửa tên Bộ sưu tập
+              </h3>
+              <button
+                onClick={() => setShowEditColModal(false)}
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 cursor-pointer"
+              >
+                &times;
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Nhập tên mới cho bộ sưu tập này:
+            </p>
+
+            <input
+              type="text"
+              autoFocus
+              value={editColName}
+              onChange={e => setEditColName(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') handleUpdateCollection(); }}
+              placeholder="Tên bộ sưu tập..."
+              className="w-full px-3 py-2 border border-slate-200 dark:border-slate-800 rounded-lg text-xs bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 outline-none focus:border-slate-400"
+            />
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+              <button
+                type="button"
+                onClick={() => setShowEditColModal(false)}
+                className="px-3 py-1.5 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-medium cursor-pointer text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                onClick={handleUpdateCollection}
+                className="px-3.5 py-1.5 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-lg text-xs font-semibold cursor-pointer hover:bg-slate-800 dark:hover:bg-slate-100"
+              >
+                Lưu thay đổi
               </button>
             </div>
           </div>

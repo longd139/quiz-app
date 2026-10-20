@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { loadData, saveData, ensureCollections } from '../data/storage';
+import { checkAndCreateDailyBackup } from '../data/backupManager';
 import {
   getRoomConfig, isConfigured, createRoom, finalizeRoom, joinRoom,
   pullRoomData, pushRoomData, schedulePush, startPolling, stopPolling,
@@ -10,7 +11,9 @@ export function useQuizData() {
   const [data, setData] = useState(() => {
     const d = loadData();
     const { data: migrated, changed } = ensureCollections(d);
-    if (changed) saveData(migrated);
+    const backups = checkAndCreateDailyBackup(migrated);
+    migrated.dailyBackups = backups;
+    if (changed || (backups && backups.length > 0)) saveData(migrated);
     return migrated;
   });
   const [syncStatus, setSyncStatus] = useState(() => {
@@ -20,12 +23,25 @@ export function useQuizData() {
   const dataRef = useRef(data);
   const mountedRef = useRef(false);
 
-  const update = useCallback((newData) => {
-    dataRef.current = newData;
-    saveData(newData);
-    setData(newData);
+  const update = useCallback(async (newData) => {
+    // Tự động sao lưu hàng ngày & xoay vòng retention (giữ tối đa 2 ngày gần nhất)
+    const backups = checkAndCreateDailyBackup(newData);
+    const dataWithBackups = { ...newData, dailyBackups: backups };
+
+    dataRef.current = dataWithBackups;
+    saveData(dataWithBackups);
+    setData(dataWithBackups);
     const cfg = getRoomConfig();
-    if (cfg && cfg.secret) schedulePush(cfg.secret, newData);
+    if (cfg && cfg.secret) {
+      setSyncStatus('syncing');
+      try {
+        await pushRoomData(cfg.secret, dataWithBackups);
+        setSyncStatus('synced');
+      } catch (e) {
+        console.error('Supabase push failed:', e);
+        setSyncStatus('error');
+      }
+    }
   }, []);
 
   const refresh = useCallback(() => {
@@ -37,18 +53,17 @@ export function useQuizData() {
 
   // Kết nối cloud + subscribe realtime khi mở app.
   useEffect(() => {
-    if (mountedRef.current) return;
     const cfg = getRoomConfig();
     if (!isConfigured() || !cfg) return;
-    mountedRef.current = true;
 
     let active = true;
-    setSyncStatus('syncing');
 
     (async () => {
       try {
         // Làm mới nhanh từ cloud (nếu có dữ liệu mới hơn).
         const { data: cloudData } = await pullRoomData(cfg.secret);
+        if (!active) return;
+
         const hasCloudContent = cloudData && (
           (Array.isArray(cloudData.tests) && cloudData.tests.length > 0) ||
           (Array.isArray(cloudData.vocabDecks) && cloudData.vocabDecks.some(d => d.cards?.length > 0)) ||
@@ -60,34 +75,43 @@ export function useQuizData() {
           (Array.isArray(dataRef.current.history) && dataRef.current.history.length > 0)
         );
 
-        if (active && hasCloudContent) {
+        if (hasCloudContent) {
           const { data: normalized } = ensureCollections(cloudData);
+          const backups = checkAndCreateDailyBackup(normalized);
+          normalized.dailyBackups = backups;
           dataRef.current = normalized;
           saveData(normalized);
           setData(normalized);
         }
         // Nếu dữ liệu local có mà trên cloud chưa có (lần đầu khởi tạo), đẩy dữ liệu local lên cloud.
-        else if (active && hasLocalContent) {
+        else if (hasLocalContent) {
           await pushRoomData(cfg.secret, dataRef.current);
         }
-      } catch (_e) {
-        setSyncStatus('error');
-      }
 
-      if (!active) return;
-      startPolling(cfg.secret, (update0) => {
-        if (update0.data) {
-          const { data: normalized } = ensureCollections(update0.data);
-          dataRef.current = normalized;
-          saveData(normalized);
-          setData(normalized);
-        }
+        if (!active) return;
         setSyncStatus('synced');
-      });
-      setSyncStatus('synced');
+
+        startPolling(cfg.secret, (update0) => {
+          if (!active) return;
+          if (update0.data) {
+            const { data: normalized } = ensureCollections(update0.data);
+            const backups = checkAndCreateDailyBackup(normalized);
+            normalized.dailyBackups = backups;
+            dataRef.current = normalized;
+            saveData(normalized);
+            setData(normalized);
+          }
+          setSyncStatus('synced');
+        });
+      } catch (_e) {
+        if (active) setSyncStatus('error');
+      }
     })();
 
-    return () => { active = false; };
+    return () => {
+      active = false;
+      stopPolling();
+    };
   }, []);
 
   // ---- Actions ----

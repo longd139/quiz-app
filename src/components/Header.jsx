@@ -1,12 +1,15 @@
+import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useQuiz } from '../App';
-import { IconBook, IconCards, IconSpeaker, IconSpeakerMute } from './Icons';
+import { IconBook, IconCards, IconSettings } from './Icons';
+import SettingsModal from './SettingsModal';
 import { APP_VERSION } from '../version';
 
-export default function Header({ syncStatus, dark, toggleDark, appMode, setAppMode, ttsMuted, toggleTts }) {
+export default function Header({ syncStatus, dark, toggleDark, appMode, setAppMode, ttsMuted, toggleTts, fontSizeState }) {
   const { data } = useQuiz();
   const navigate = useNavigate();
   const location = useLocation();
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   const colors = {
     synced: 'bg-emerald-500',
@@ -35,8 +38,10 @@ export default function Header({ syncStatus, dark, toggleDark, appMode, setAppMo
     }
   };
 
+  const hasCustomSettings = dark || ttsMuted || (fontSizeState && fontSizeState.fontSize !== 100);
+
   return (
-    <header className="sticky top-0 z-20 bg-[#fbfbfa]/90 dark:bg-[#0c0f17]/90 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800/80 py-3.5 mb-6 transition-colors">
+    <header className="relative sticky top-0 z-20 bg-[#fbfbfa] dark:bg-[#0c0f17] border-b border-slate-200/80 dark:border-slate-800/80 py-3.5 mb-6 transition-colors">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         {/* Left: Logo / App title */}
         <div className="flex items-center justify-between sm:justify-start gap-2 sm:min-w-[180px]">
@@ -55,27 +60,23 @@ export default function Header({ syncStatus, dark, toggleDark, appMode, setAppMo
             </span>
           </div>
 
-          {/* Sound & Dark mode switch for mobile */}
-          <div className="sm:hidden flex items-center gap-1.5">
+          {/* Settings button for mobile */}
+          <div className="sm:hidden flex items-center">
             <button
               type="button"
-              onClick={toggleTts}
-              className={`w-7 h-7 flex items-center justify-center rounded-lg border transition-all cursor-pointer ${
-                ttsMuted
-                  ? 'border-rose-200 dark:border-rose-900/60 bg-rose-50/70 dark:bg-rose-950/40 text-rose-500 dark:text-rose-400 hover:bg-rose-100/70 dark:hover:bg-rose-900/50'
+              onClick={() => setIsSettingsOpen(prev => !prev)}
+              className={`relative w-8 h-8 flex items-center justify-center rounded-lg border transition-all cursor-pointer ${
+                isSettingsOpen
+                  ? 'border-indigo-400 dark:border-indigo-600 bg-indigo-50/90 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 shadow-2xs'
                   : 'border-slate-200/80 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800/60 text-slate-600 dark:text-slate-300'
               }`}
-              title={ttsMuted ? 'Bật tự động đọc khi chuyển câu' : 'Tắt tự động đọc khi chuyển câu'}
-              aria-label={ttsMuted ? 'Bật tự động đọc khi chuyển câu' : 'Tắt tự động đọc khi chuyển câu'}
+              title="Cài đặt hệ thống (Giao diện, âm thanh, cỡ chữ)"
+              aria-label="Cài đặt hệ thống"
             >
-              {ttsMuted ? <IconSpeakerMute className="w-3.5 h-3.5" /> : <IconSpeaker className="w-3.5 h-3.5" />}
-            </button>
-            <button
-              onClick={toggleDark}
-              className="w-7 h-7 flex items-center justify-center rounded-lg border border-slate-200/80 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800/60 transition-all text-xs text-slate-600 dark:text-slate-300 cursor-pointer"
-              title={dark ? 'Chuyển sang giao diện sáng' : 'Chuyển sang giao diện tối'}
-            >
-              {dark ? '☼' : '☾'}
+              <IconSettings className={`w-4 h-4 transition-transform duration-300 ${isSettingsOpen ? 'rotate-90' : ''}`} />
+              {hasCustomSettings && (
+                <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-indigo-500 ring-1 ring-white dark:ring-slate-900" />
+              )}
             </button>
           </div>
         </div>
@@ -114,31 +115,38 @@ export default function Header({ syncStatus, dark, toggleDark, appMode, setAppMo
           </div>
         </div>
 
-        {/* Right: Sound toggle & Dark mode switch for desktop */}
-        <div className="hidden sm:flex items-center justify-end gap-1.5 sm:min-w-[120px]">
+        {/* Right: Settings button for desktop */}
+        <div className="hidden sm:flex items-center justify-end sm:min-w-[120px]">
           <button
             type="button"
-            onClick={toggleTts}
-            className={`w-7 h-7 flex items-center justify-center rounded-lg border transition-all cursor-pointer ${
-              ttsMuted
-                ? 'border-rose-200 dark:border-rose-900/60 bg-rose-50/70 dark:bg-rose-950/40 text-rose-500 dark:text-rose-400 hover:bg-rose-100/70 dark:hover:bg-rose-900/50'
-                : 'border-slate-200/80 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800/60 text-slate-600 dark:text-slate-300'
+            onClick={() => setIsSettingsOpen(prev => !prev)}
+            className={`group flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold tracking-tight transition-all cursor-pointer ${
+              isSettingsOpen
+                ? 'border-indigo-400 dark:border-indigo-600 bg-indigo-50/90 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 shadow-2xs'
+                : 'border-slate-200/80 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800/60 text-slate-700 dark:text-slate-200'
             }`}
-            title={ttsMuted ? 'Bật tự động đọc khi chuyển câu' : 'Tắt tự động đọc khi chuyển câu'}
-            aria-label={ttsMuted ? 'Bật tự động đọc khi chuyển câu' : 'Tắt tự động đọc khi chuyển câu'}
+            title="Cài đặt hệ thống (Giao diện, âm thanh, cỡ chữ)"
+            aria-label="Cài đặt hệ thống"
           >
-            {ttsMuted ? <IconSpeakerMute className="w-3.5 h-3.5" /> : <IconSpeaker className="w-3.5 h-3.5" />}
-          </button>
-
-          <button
-            onClick={toggleDark}
-            className="w-7 h-7 flex items-center justify-center rounded-lg border border-slate-200/80 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800/60 transition-all text-xs text-slate-600 dark:text-slate-300 cursor-pointer"
-            title={dark ? 'Chuyển sang giao diện sáng' : 'Chuyển sang giao diện tối'}
-          >
-            {dark ? '☼' : '☾'}
+            <IconSettings className={`w-3.5 h-3.5 transition-transform duration-300 ${isSettingsOpen ? 'rotate-90 text-indigo-600 dark:text-indigo-400' : 'group-hover:rotate-45'}`} />
+            <span>Cài đặt</span>
+            {hasCustomSettings && (
+              <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 ring-1 ring-white dark:ring-slate-900" />
+            )}
           </button>
         </div>
       </div>
+
+      {/* Settings Modal / Popover */}
+      <SettingsModal
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+        dark={dark}
+        toggleDark={toggleDark}
+        ttsMuted={ttsMuted}
+        toggleTts={toggleTts}
+        fontSizeState={fontSizeState}
+      />
     </header>
   );
 }

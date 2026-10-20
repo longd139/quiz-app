@@ -437,7 +437,7 @@ export default function VocabFlashcard() {
                   />
                 </div>
               )}
-              <h2 className={`text-2xl sm:text-3xl font-bold tracking-tight ${slideStatus ? 'text-white' : 'text-slate-900 dark:text-slate-50'}`}>
+              <h2 className={`text-2xl sm:text-3xl font-bold tracking-tight whitespace-pre-line ${slideStatus ? 'text-white' : 'text-slate-900 dark:text-slate-50'}`}>
                 {currentCard.term}
               </h2>
               {currentCard.phonetic && !hidePhonetic && (

@@ -2,6 +2,8 @@ node_modules/
 dist/
 .DS_Store
 *.local
+.env
+.env.*
 
 # Supabase CLI cache (riêng từng máy)
 supabase/.temp/

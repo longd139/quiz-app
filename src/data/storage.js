@@ -23,7 +23,8 @@ export function loadData() {
       vocabDecks: Array.isArray(data.vocabDecks) && data.vocabDecks.length > 0 ? data.vocabDecks : getDefaultVocabDecks(),
       vocabStats: data.vocabStats || {},
       activityLog: data.activityLog || {},
-      mooskCount: typeof data.mooskCount === 'number' ? data.mooskCount : undefined
+      mooskCount: typeof data.mooskCount === 'number' ? data.mooskCount : undefined,
+      dailyBackups: Array.isArray(data.dailyBackups) ? data.dailyBackups : []
     };
   } catch (_e) { return defaultData(); }
 }
@@ -39,7 +40,8 @@ function defaultData() {
     vocabDecks: getDefaultVocabDecks(),
     vocabStats: {},
     activityLog: {},
-    mooskCount: 0
+    mooskCount: 0,
+    dailyBackups: []
   };
 }
 
@@ -167,6 +169,11 @@ export function ensureCollections(data) {
       d => d.cards && d.cards.length > 0 && d.cards.every(c => data.vocabStats?.[c.id]?.mastered)
     ).length;
     data.mooskCount = masteredDecksCount;
+    changed = true;
+  }
+
+  if (!Array.isArray(data.dailyBackups)) {
+    data.dailyBackups = [];
     changed = true;
   }
 

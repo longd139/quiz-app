@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { useQuizData } from './hooks/useQuizData';
 import { useDarkMode } from './hooks/useDarkMode';
+import { useFontSize } from './hooks/useFontSize';
 import Header from './components/Header';
 import TabNav from './components/TabNav';
 import ConfirmDialog from './components/ConfirmDialog';
@@ -75,7 +76,7 @@ class ErrorBoundary extends Component {
   }
 }
 
-function MainLayout({ quiz, dark, toggleDark }) {
+function MainLayout({ quiz, dark, toggleDark, fontSizeState }) {
   const location = useLocation();
 
   const [appMode, setAppModeState] = useState(() => {
@@ -172,6 +173,7 @@ function MainLayout({ quiz, dark, toggleDark }) {
     setAppMode,
     ttsMuted,
     toggleTts,
+    fontSizeState,
     showConfirm,
     showToast,
     showAlert
@@ -188,6 +190,7 @@ function MainLayout({ quiz, dark, toggleDark }) {
           setAppMode={setAppMode}
           ttsMuted={ttsMuted}
           toggleTts={toggleTts}
+          fontSizeState={fontSizeState}
         />
         <TabNav />
         <div className="page-enter">
@@ -242,11 +245,12 @@ function MainLayout({ quiz, dark, toggleDark }) {
 export default function App() {
   const quiz = useQuizData();
   const { dark, toggle: toggleDark } = useDarkMode();
+  const fontSizeState = useFontSize();
 
   return (
     <BrowserRouter>
       <ErrorBoundary>
-        <MainLayout quiz={quiz} dark={dark} toggleDark={toggleDark} />
+        <MainLayout quiz={quiz} dark={dark} toggleDark={toggleDark} fontSizeState={fontSizeState} />
       </ErrorBoundary>
     </BrowserRouter>
   );
