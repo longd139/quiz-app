@@ -447,13 +447,8 @@ export default function CreateFlashcardModal({ deck, isOpen, onClose, onSaveCard
             {/* Duplicate Word Matching List */}
             {duplicateMatches.length > 0 && (
               <div className="mt-2 p-2.5 rounded-xl border border-amber-200/90 dark:border-amber-900/50 bg-amber-50/70 dark:bg-amber-950/20 space-y-2 animate-fadeIn">
-                <div className="flex items-center gap-1.5 text-xs font-semibold text-amber-800 dark:text-amber-300">
-                  <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-                  <span>
-                    {duplicateMatches.some(m => (m.term || '').toLowerCase().trim() === term.toLowerCase().trim())
-                      ? 'Từ vựng này đã có trong danh sách:'
-                      : `Từ vựng trùng / tương tự đã có (${duplicateMatches.length}):`}
-                  </span>
+                <div className="text-xs font-semibold text-amber-800 dark:text-amber-300">
+                  <span>Từ vựng trùng</span>
                 </div>
 
                 <div className="space-y-1.5 max-h-48 overflow-y-auto pr-0.5">
