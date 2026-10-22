@@ -64,6 +64,21 @@ body {
 @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
 .page-enter { animation: fadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1); }
 
+/* Slide down animation for alert and duplicate banners */
+@keyframes slideDownSmooth {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-slide-down {
+  animation: slideDownSmooth 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
 /* Slide animations for question navigation */
 @keyframes slideFromRight { from { transform: translateX(20px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
 @keyframes slideFromLeft  { from { transform: translateX(-20px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }

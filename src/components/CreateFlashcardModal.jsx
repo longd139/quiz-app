@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { createVocabCard } from '../data/storage';
 import { uploadToCloudinary, getCloudinaryConfig } from '../lib/cloudinary';
-import { IconImage, IconPlus, IconEdit, IconTrash } from './Icons';
+import { IconImage, IconPlus, IconEdit, IconTrash, IconChevronDown } from './Icons';
 import { BADGE_COLORS, getAllPosList, saveCustomPos, deletePos, updateCustomPos, getBadgeColor, getColorForPos, savePosColor } from '../data/badgeColors';
 import FormattedText, { parseExampleHtmlLines, convertMarkdownToHtml, HIGHLIGHT_COLORS, TEXT_COLORS } from './FormattedText';
 import TextFormatMenu from './TextFormatMenu';
@@ -16,6 +16,7 @@ export default function CreateFlashcardModal({ deck, isOpen, onClose, onSaveCard
   const [meaning, setMeaning] = useState('');
   const [isExpanded, setIsExpanded] = useState(false);
   const [previewCardTarget, setPreviewCardTarget] = useState(null); // card to inspect in popup
+  const [isDuplicatesOpen, setIsDuplicatesOpen] = useState(false); // toggle accordion for matching cards
 
   // Expanded fields
   const [image, setImage] = useState('');
@@ -70,6 +71,7 @@ export default function CreateFlashcardModal({ deck, isOpen, onClose, onSaveCard
     setErrorMsg('');
     setIsOpenPosDropdown(false);
     setFormatMenu(null);
+    setIsDuplicatesOpen(false);
     if (fileInputRef.current) fileInputRef.current.value = '';
   }, []);
 
@@ -219,6 +221,13 @@ export default function CreateFlashcardModal({ deck, isOpen, onClose, onSaveCard
       return aTerm.localeCompare(bTerm);
     }).slice(0, 5);
   }, [isOpen, deck, term, allCardsList, editingCard]);
+
+  // Auto-reset duplicate expanded state when no duplicates
+  useEffect(() => {
+    if (duplicateMatches.length === 0) {
+      setIsDuplicatesOpen(false);
+    }
+  }, [duplicateMatches.length]);
 
   // Apply existing card's data into current creation form
   const handleApplyExistingCard = (targetCard) => {
@@ -444,32 +453,66 @@ export default function CreateFlashcardModal({ deck, isOpen, onClose, onSaveCard
               className="w-full px-3.5 py-2.5 border border-slate-300 dark:border-slate-700 rounded-xl text-sm font-semibold bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 dark:focus:border-purple-400 dark:focus:ring-purple-400 transition-all resize-y min-h-[46px]"
             />
 
-            {/* Duplicate Word Matching List */}
+            {/* Duplicate Word Matching Accordion */}
             {duplicateMatches.length > 0 && (
-              <div className="mt-2 p-2.5 rounded-xl border border-amber-200/90 dark:border-amber-900/50 bg-amber-50/70 dark:bg-amber-950/20 space-y-2 animate-fadeIn">
-                <div className="text-xs font-semibold text-amber-800 dark:text-amber-300">
-                  <span>Từ vựng trùng</span>
-                </div>
+              <div className="mt-2 rounded-xl border border-amber-200/90 dark:border-amber-900/50 bg-amber-50/70 dark:bg-amber-950/20 overflow-hidden shadow-xs animate-slide-down">
+                <button
+                  type="button"
+                  onClick={() => setIsDuplicatesOpen(prev => !prev)}
+                  className="w-full flex items-center justify-between px-3 py-2 text-left hover:bg-amber-100/50 dark:hover:bg-amber-900/30 transition-colors select-none cursor-pointer group"
+                  aria-expanded={isDuplicatesOpen}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-semibold text-amber-800 dark:text-amber-300">
+                      Từ vựng trùng
+                    </span>
+                    <span className="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 text-[11px] font-bold rounded-full bg-amber-200/80 dark:bg-amber-900/70 text-amber-900 dark:text-amber-200">
+                      {duplicateMatches.length}
+                    </span>
+                  </div>
 
-                <div className="space-y-1.5 max-h-48 overflow-y-auto pr-0.5">
-                  {duplicateMatches.map((card, idx) => (
-                    <div
-                      key={card.id || idx}
-                      className="flex items-center justify-between gap-3 p-2 px-3 rounded-lg bg-white/90 dark:bg-slate-900/80 border border-amber-200/80 dark:border-amber-900/60"
-                    >
-                      <span className="text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-100 truncate">
-                        {card.term}
-                      </span>
+                  <div className="flex items-center justify-center w-6 h-6 rounded-md group-hover:bg-amber-200/60 dark:group-hover:bg-amber-800/60 text-amber-700 dark:text-amber-300 transition-colors">
+                    <IconChevronDown
+                      className={`w-4 h-4 transform transition-transform duration-300 ease-in-out ${
+                        isDuplicatesOpen ? 'rotate-180' : 'rotate-0'
+                      }`}
+                    />
+                  </div>
+                </button>
 
-                      <button
-                        type="button"
-                        onClick={() => setPreviewCardTarget(card)}
-                        className="px-2.5 py-1 text-xs font-semibold text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-950/60 hover:bg-purple-100 dark:hover:bg-purple-900/60 rounded-lg transition-colors cursor-pointer shrink-0"
-                      >
-                        Xem chi tiết
-                      </button>
+                <div
+                  className="grid transition-all duration-300 ease-out"
+                  style={{
+                    gridTemplateRows: isDuplicatesOpen ? '1fr' : '0fr',
+                    opacity: isDuplicatesOpen ? 1 : 0,
+                    transition: 'grid-template-rows 300ms cubic-bezier(0.16, 1, 0.3, 1), opacity 250ms ease-in-out'
+                  }}
+                >
+                  <div className="overflow-hidden">
+                    <div className="px-2.5 pb-2.5 pt-0.5 space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                      {duplicateMatches.map((card, idx) => (
+                        <div
+                          key={card.id || idx}
+                          className="flex items-center justify-between gap-3 p-2 px-3 rounded-lg bg-white/95 dark:bg-slate-900/90 border border-amber-200/80 dark:border-amber-900/60 shadow-xs"
+                        >
+                          <span className="text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-100 truncate">
+                            {card.term}
+                          </span>
+
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setPreviewCardTarget(card);
+                            }}
+                            className="px-2.5 py-1 text-xs font-semibold text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-950/60 hover:bg-purple-100 dark:hover:bg-purple-900/60 rounded-lg transition-colors cursor-pointer shrink-0"
+                          >
+                            Xem chi tiết
+                          </button>
+                        </div>
+                      ))}
                     </div>
-                  ))}
+                  </div>
                 </div>
               </div>
             )}
