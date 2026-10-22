@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useQuiz } from '../App';
 import { IconBook, IconCards, IconSettings } from './Icons';
 import SettingsModal from './SettingsModal';
+import ChangelogModal from './ChangelogModal';
 import { APP_VERSION } from '../version';
 
 export default function Header({ syncStatus, dark, toggleDark, appMode, setAppMode, ttsMuted, toggleTts, fontSizeState }) {
@@ -10,6 +11,7 @@ export default function Header({ syncStatus, dark, toggleDark, appMode, setAppMo
   const navigate = useNavigate();
   const location = useLocation();
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isChangelogOpen, setIsChangelogOpen] = useState(false);
 
   const colors = {
     synced: 'bg-emerald-500',
@@ -52,12 +54,14 @@ export default function Header({ syncStatus, dark, toggleDark, appMode, setAppMo
             <span className="text-xs px-2 py-0.5 rounded-md font-mono font-medium bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200/60 dark:border-slate-700/60">
               {appMode === 'language' ? 'Language' : 'Practice'}
             </span>
-            <span
-              className="text-[10px] sm:text-[11px] px-1.5 py-0.5 rounded-md font-mono font-semibold bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200/70 dark:border-purple-800/70 tracking-tight shadow-2xs select-none"
-              title={`Phiên bản ứng dụng: ${APP_VERSION}`}
+            <button
+              type="button"
+              onClick={() => setIsChangelogOpen(true)}
+              className="text-[10px] sm:text-[11px] px-1.5 py-0.5 rounded-md font-mono font-semibold bg-purple-50 dark:bg-purple-950/60 hover:bg-purple-100 dark:hover:bg-purple-900/60 text-purple-700 dark:text-purple-300 border border-purple-200/70 dark:border-purple-800/70 tracking-tight shadow-2xs select-none cursor-pointer transition-all hover:scale-105 active:scale-95"
+              title={`Xem nhật ký cập nhật phiên bản ${APP_VERSION}`}
             >
               {APP_VERSION}
-            </span>
+            </button>
           </div>
 
           {/* Settings button for mobile */}
@@ -146,6 +150,12 @@ export default function Header({ syncStatus, dark, toggleDark, appMode, setAppMo
         ttsMuted={ttsMuted}
         toggleTts={toggleTts}
         fontSizeState={fontSizeState}
+      />
+
+      {/* Changelog Modal */}
+      <ChangelogModal
+        isOpen={isChangelogOpen}
+        onClose={() => setIsChangelogOpen(false)}
       />
     </header>
   );
