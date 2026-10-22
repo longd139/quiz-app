@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { createVocabCard } from '../data/storage';
 import { uploadToCloudinary, getCloudinaryConfig } from '../lib/cloudinary';
 import { IconImage, IconPlus, IconEdit, IconTrash } from './Icons';
@@ -168,6 +168,81 @@ export default function CreateFlashcardModal({ deck, isOpen, onClose, onSaveCard
     }
   }, [editingCard, isOpen, resetForm]);
 
+  // Collect all cards across current deck and other user decks
+  const allCardsList = useMemo(() => {
+    if (!isOpen || !deck) return [];
+    const list = [];
+    const currentCards = Array.isArray(deck?.cards) ? deck.cards : [];
+    currentCards.forEach(c => {
+      if (c && c.term) {
+        list.push({ ...c, _deckName: deck?.name || 'Bộ từ hiện tại', _isCurrentDeck: true });
+      }
+    });
+
+    const allDecks = Array.isArray(vocabDecks) ? vocabDecks : [];
+    allDecks.forEach(d => {
+      if (d && Array.isArray(d.cards)) {
+        d.cards.forEach(c => {
+          if (c && c.term && !list.some(existing => existing.id === c.id)) {
+            list.push({ ...c, _deckName: d.name || 'Bộ từ khác', _isCurrentDeck: false });
+          }
+        });
+      }
+    });
+
+    return list;
+  }, [isOpen, deck, vocabDecks]);
+
+  // Find duplicate or matching cards as user types
+  const duplicateMatches = useMemo(() => {
+    if (!isOpen || !deck) return [];
+    const query = term.trim().toLowerCase();
+    if (!query || query.length < 1) return [];
+
+    return allCardsList.filter(c => {
+      if (editingCard && editingCard.id === c.id) return false;
+      const cardTerm = (c.term || '').trim().toLowerCase();
+      return cardTerm === query || cardTerm.startsWith(query) || (query.length >= 3 && cardTerm.includes(query));
+    }).sort((a, b) => {
+      const aTerm = (a.term || '').trim().toLowerCase();
+      const bTerm = (b.term || '').trim().toLowerCase();
+      const aExact = aTerm === query;
+      const bExact = bTerm === query;
+      if (aExact && !bExact) return -1;
+      if (!aExact && bExact) return 1;
+      if (a._isCurrentDeck && !b._isCurrentDeck) return -1;
+      if (!a._isCurrentDeck && b._isCurrentDeck) return 1;
+      return aTerm.localeCompare(bTerm);
+    }).slice(0, 5);
+  }, [isOpen, deck, term, allCardsList, editingCard]);
+
+  // Apply existing card's data into current creation form
+  const handleApplyExistingCard = (targetCard) => {
+    if (!targetCard) return;
+    setTerm(targetCard.term || '');
+    setMeaning(targetCard.meaning || '');
+    setPhonetic(targetCard.phonetic || '');
+    const pos = targetCard.partOfSpeech || '';
+    setPartOfSpeech(pos);
+    setBadgeColor(getColorForPos(pos, targetCard.badgeColor || 'emerald'));
+    setImage(targetCard.image || '');
+    const rawExs = Array.isArray(targetCard.examples) && targetCard.examples.length > 0
+      ? targetCard.examples
+      : (targetCard.example ? [targetCard.example] : []);
+    const initialHtml = rawExs.map(ex => {
+      const trimmed = ex.trim();
+      const withDash = trimmed.startsWith('-') ? trimmed : `- ${trimmed}`;
+      return `<div>${convertMarkdownToHtml(withDash)}</div>`;
+    }).join('');
+    setExamplesHtml(initialHtml);
+    if (editorRef.current) {
+      editorRef.current.innerHTML = initialHtml;
+    }
+    setNote(targetCard.note || '');
+    setIsExpanded(true);
+    setPreviewCardTarget(null);
+  };
+
   if (!isOpen || !deck) return null;
 
   const handleImageChange = async (e) => {
@@ -263,79 +338,6 @@ export default function CreateFlashcardModal({ deck, isOpen, onClose, onSaveCard
         setExamplesHtml(editorRef.current.innerHTML);
       }
     });
-  };
-
-  // Collect all cards across current deck and other user decks
-  const allCardsList = useMemo(() => {
-    const list = [];
-    const currentCards = Array.isArray(deck?.cards) ? deck.cards : [];
-    currentCards.forEach(c => {
-      if (c && c.term) {
-        list.push({ ...c, _deckName: deck?.name || 'Bộ từ hiện tại', _isCurrentDeck: true });
-      }
-    });
-
-    const allDecks = Array.isArray(vocabDecks) ? vocabDecks : [];
-    allDecks.forEach(d => {
-      if (d && Array.isArray(d.cards)) {
-        d.cards.forEach(c => {
-          if (c && c.term && !list.some(existing => existing.id === c.id)) {
-            list.push({ ...c, _deckName: d.name || 'Bộ từ khác', _isCurrentDeck: false });
-          }
-        });
-      }
-    });
-
-    return list;
-  }, [deck, vocabDecks]);
-
-  // Find duplicate or matching cards as user types
-  const duplicateMatches = useMemo(() => {
-    const query = term.trim().toLowerCase();
-    if (!query || query.length < 1) return [];
-
-    return allCardsList.filter(c => {
-      if (editingCard && editingCard.id === c.id) return false;
-      const cardTerm = (c.term || '').trim().toLowerCase();
-      return cardTerm === query || cardTerm.startsWith(query) || (query.length >= 3 && cardTerm.includes(query));
-    }).sort((a, b) => {
-      const aTerm = (a.term || '').trim().toLowerCase();
-      const bTerm = (b.term || '').trim().toLowerCase();
-      const aExact = aTerm === query;
-      const bExact = bTerm === query;
-      if (aExact && !bExact) return -1;
-      if (!aExact && bExact) return 1;
-      if (a._isCurrentDeck && !b._isCurrentDeck) return -1;
-      if (!a._isCurrentDeck && b._isCurrentDeck) return 1;
-      return aTerm.localeCompare(bTerm);
-    }).slice(0, 5);
-  }, [term, allCardsList, editingCard]);
-
-  // Apply existing card's data into current creation form
-  const handleApplyExistingCard = (targetCard) => {
-    if (!targetCard) return;
-    setTerm(targetCard.term || '');
-    setMeaning(targetCard.meaning || '');
-    setPhonetic(targetCard.phonetic || '');
-    const pos = targetCard.partOfSpeech || '';
-    setPartOfSpeech(pos);
-    setBadgeColor(getColorForPos(pos, targetCard.badgeColor || 'emerald'));
-    setImage(targetCard.image || '');
-    const rawExs = Array.isArray(targetCard.examples) && targetCard.examples.length > 0
-      ? targetCard.examples
-      : (targetCard.example ? [targetCard.example] : []);
-    const initialHtml = rawExs.map(ex => {
-      const trimmed = ex.trim();
-      const withDash = trimmed.startsWith('-') ? trimmed : `- ${trimmed}`;
-      return `<div>${convertMarkdownToHtml(withDash)}</div>`;
-    }).join('');
-    setExamplesHtml(initialHtml);
-    if (editorRef.current) {
-      editorRef.current.innerHTML = initialHtml;
-    }
-    setNote(targetCard.note || '');
-    setIsExpanded(true);
-    setPreviewCardTarget(null);
   };
 
   const buildCard = () => {

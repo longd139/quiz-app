@@ -81,7 +81,7 @@ export function parseExampleHtmlLines(htmlOrText) {
       // Strip leading bullet symbol e.g. "- ", "• ", "1. " while preserving inner tags
       return line
         .replace(/^([-•]|\*(?!\*))\s*/, '')
-        .replace(/^\d+[\.\)]\s*/, '')
+        .replace(/^\d+[.)]\s*/, '')
         .trim();
     })
     .filter(line => line.replace(/<[^>]+>/g, '').trim().length > 0)
