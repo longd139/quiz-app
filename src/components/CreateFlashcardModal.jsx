@@ -193,27 +193,17 @@ export default function CreateFlashcardModal({ deck, isOpen, onClose, onSaveCard
     return list;
   }, [isOpen, deck, vocabDecks]);
 
-  // Find duplicate or matching cards as user types
+  // Find duplicate cards as user types (only exact match)
   const duplicateMatches = useMemo(() => {
     if (!isOpen || !deck) return [];
     const query = term.trim().toLowerCase();
-    if (!query || query.length < 1) return [];
+    if (!query) return [];
 
     return allCardsList.filter(c => {
       if (editingCard && editingCard.id === c.id) return false;
       const cardTerm = (c.term || '').trim().toLowerCase();
-      return cardTerm === query || cardTerm.startsWith(query) || (query.length >= 3 && cardTerm.includes(query));
-    }).sort((a, b) => {
-      const aTerm = (a.term || '').trim().toLowerCase();
-      const bTerm = (b.term || '').trim().toLowerCase();
-      const aExact = aTerm === query;
-      const bExact = bTerm === query;
-      if (aExact && !bExact) return -1;
-      if (!aExact && bExact) return 1;
-      if (a._isCurrentDeck && !b._isCurrentDeck) return -1;
-      if (!a._isCurrentDeck && b._isCurrentDeck) return 1;
-      return aTerm.localeCompare(bTerm);
-    }).slice(0, 5);
+      return cardTerm === query;
+    });
   }, [isOpen, deck, term, allCardsList, editingCard]);
 
   // Apply existing card's data into current creation form
@@ -440,79 +430,33 @@ export default function CreateFlashcardModal({ deck, isOpen, onClose, onSaveCard
               className="w-full px-3.5 py-2.5 border border-slate-300 dark:border-slate-700 rounded-xl text-sm font-semibold bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 dark:focus:border-purple-400 dark:focus:ring-purple-400 transition-all resize-y min-h-[46px]"
             />
 
-            {/* Duplicate / Existing Word Matching List */}
+            {/* Duplicate Word Matching List */}
             {duplicateMatches.length > 0 && (
               <div className="mt-2 p-2.5 rounded-xl border border-amber-200/90 dark:border-amber-900/50 bg-amber-50/70 dark:bg-amber-950/20 space-y-2 animate-fadeIn">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5 text-xs font-semibold text-amber-800 dark:text-amber-300">
-                    <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-                    <span>
-                      {duplicateMatches.some(m => (m.term || '').toLowerCase().trim() === term.toLowerCase().trim())
-                        ? 'Từ vựng này đã tồn tại trong danh sách!'
-                        : `Từ vựng tương tự đã có (${duplicateMatches.length}):`}
-                    </span>
-                  </div>
-                  <span className="text-[10px] text-amber-600/90 dark:text-amber-400/90 font-medium">
-                    Nhấp vào để xem chi tiết
-                  </span>
+                <div className="flex items-center gap-1.5 text-xs font-semibold text-amber-800 dark:text-amber-300">
+                  <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                  <span>Từ vựng này đã có trong danh sách:</span>
                 </div>
 
                 <div className="space-y-1.5 max-h-48 overflow-y-auto pr-0.5">
-                  {duplicateMatches.map((card, idx) => {
-                    const isExact = (card.term || '').toLowerCase().trim() === term.toLowerCase().trim();
-                    const badge = getBadgeColor(card.badgeColor, card.partOfSpeech);
+                  {duplicateMatches.map((card, idx) => (
+                    <div
+                      key={card.id || idx}
+                      className="flex items-center justify-between gap-3 p-2 px-3 rounded-lg bg-white/90 dark:bg-slate-900/80 border border-amber-200/80 dark:border-amber-900/60"
+                    >
+                      <span className="text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-100 truncate">
+                        {card.term}
+                      </span>
 
-                    return (
-                      <div
-                        key={card.id || idx}
+                      <button
+                        type="button"
                         onClick={() => setPreviewCardTarget(card)}
-                        className={`flex items-center justify-between gap-2.5 p-2 rounded-lg border transition-all cursor-pointer group ${
-                          isExact
-                            ? 'bg-amber-100/60 dark:bg-amber-900/30 border-amber-300 dark:border-amber-800/80 hover:border-amber-400'
-                            : 'bg-white/80 dark:bg-slate-900/60 border-slate-200/80 dark:border-slate-800 hover:border-purple-300 dark:hover:border-purple-700'
-                        }`}
+                        className="px-2.5 py-1 text-xs font-semibold text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-950/60 hover:bg-purple-100 dark:hover:bg-purple-900/60 rounded-lg transition-colors cursor-pointer shrink-0"
                       >
-                        <div className="flex items-center gap-2 min-w-0 flex-1">
-                          <span className="text-xs font-bold text-slate-800 dark:text-slate-100 truncate">
-                            {card.term}
-                          </span>
-
-                          {card.partOfSpeech && (
-                            <span className={`px-1.5 py-0.2 rounded text-[10px] font-semibold shrink-0 border ${badge.bg} ${badge.text} ${badge.border}`}>
-                              {card.partOfSpeech}
-                            </span>
-                          )}
-
-                          {card.phonetic && (
-                            <span className="text-[11px] font-mono text-slate-400 dark:text-slate-500 hidden sm:inline truncate">
-                              {card.phonetic}
-                            </span>
-                          )}
-
-                          <span className="text-xs text-slate-500 dark:text-slate-400 truncate">
-                            &bull; {card.meaning}
-                          </span>
-                        </div>
-
-                        <div className="flex items-center gap-1.5 shrink-0">
-                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hidden md:inline">
-                            {card._deckName}
-                          </span>
-
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setPreviewCardTarget(card);
-                            }}
-                            className="px-2 py-0.5 text-[11px] font-semibold text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-950/60 hover:bg-purple-100 dark:hover:bg-purple-900/60 rounded-md transition-colors cursor-pointer"
-                          >
-                            Xem chi tiết
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
+                        Xem chi tiết
+                      </button>
+                    </div>
+                  ))}
                 </div>
               </div>
             )}
