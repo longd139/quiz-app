@@ -193,7 +193,7 @@ export default function CreateFlashcardModal({ deck, isOpen, onClose, onSaveCard
     return list;
   }, [isOpen, deck, vocabDecks]);
 
-  // Find duplicate cards as user types (only exact match)
+  // Find duplicate or matching cards as user types
   const duplicateMatches = useMemo(() => {
     if (!isOpen || !deck) return [];
     const query = term.trim().toLowerCase();
@@ -202,8 +202,22 @@ export default function CreateFlashcardModal({ deck, isOpen, onClose, onSaveCard
     return allCardsList.filter(c => {
       if (editingCard && editingCard.id === c.id) return false;
       const cardTerm = (c.term || '').trim().toLowerCase();
-      return cardTerm === query;
-    });
+      return cardTerm === query || cardTerm.startsWith(query) || (query.length >= 2 && cardTerm.includes(query));
+    }).sort((a, b) => {
+      const aTerm = (a.term || '').trim().toLowerCase();
+      const bTerm = (b.term || '').trim().toLowerCase();
+      const aExact = aTerm === query;
+      const bExact = bTerm === query;
+      if (aExact && !bExact) return -1;
+      if (!aExact && bExact) return 1;
+      const aStarts = aTerm.startsWith(query);
+      const bStarts = bTerm.startsWith(query);
+      if (aStarts && !bStarts) return -1;
+      if (!aStarts && bStarts) return 1;
+      if (a._isCurrentDeck && !b._isCurrentDeck) return -1;
+      if (!a._isCurrentDeck && b._isCurrentDeck) return 1;
+      return aTerm.localeCompare(bTerm);
+    }).slice(0, 5);
   }, [isOpen, deck, term, allCardsList, editingCard]);
 
   // Apply existing card's data into current creation form
@@ -435,7 +449,11 @@ export default function CreateFlashcardModal({ deck, isOpen, onClose, onSaveCard
               <div className="mt-2 p-2.5 rounded-xl border border-amber-200/90 dark:border-amber-900/50 bg-amber-50/70 dark:bg-amber-950/20 space-y-2 animate-fadeIn">
                 <div className="flex items-center gap-1.5 text-xs font-semibold text-amber-800 dark:text-amber-300">
                   <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-                  <span>Từ vựng này đã có trong danh sách:</span>
+                  <span>
+                    {duplicateMatches.some(m => (m.term || '').toLowerCase().trim() === term.toLowerCase().trim())
+                      ? 'Từ vựng này đã có trong danh sách:'
+                      : `Từ vựng trùng / tương tự đã có (${duplicateMatches.length}):`}
+                  </span>
                 </div>
 
                 <div className="space-y-1.5 max-h-48 overflow-y-auto pr-0.5">
