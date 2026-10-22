@@ -5,77 +5,77 @@ export const CHANGELOG_DATA = [
     version: 'v1.3.3',
     date: '23/10/2026',
     isLatest: true,
-    title: 'Định dạng câu ví dụ & Kiểm tra từ trùng thông minh',
-    tag: 'Bản cập nhật lớn',
+    title: 'Kiểm tra từ trùng & Soạn thảo câu ví dụ trực quan',
+    tag: 'Bản cập nhật hiện tại',
     changes: [
       {
         type: 'feature',
-        title: 'Kiểm tra từ vựng trùng lặp',
-        description: 'Tự động kiểm tra theo thời gian thực khi gõ "Từ mới" để cảnh báo từ vựng đã tồn tại trong bộ từ hiện tại hoặc các bộ từ khác.'
+        title: 'Phát hiện từ vựng trùng lặp khi gõ',
+        description: 'Tự động tra cứu ngay khi nhập "Từ mới" để thông báo nếu từ đã có trong bộ thẻ này hoặc bộ thẻ khác, tránh tạo trùng lặp.'
       },
       {
         type: 'feature',
-        title: 'Accordion danh sách từ trùng mượt mà',
-        description: 'Thanh thông báo trượt xuống tự động kèm số lượng từ trùng và mũi tên thu gọn/mở rộng với hiệu ứng chuyển tiếp êm ái.'
+        title: 'Thanh thông báo Accordion trượt êm ái',
+        description: 'Bảng từ trùng trượt ra nhẹ nhàng kèm số lượng và mũi tên xoay để mở rộng hoặc thu gọn danh sách mượt mà.'
       },
       {
         type: 'feature',
-        title: 'Popup xem chi tiết từ vựng',
-        description: 'Nút "Xem chi tiết" cho phép xem đầy đủ định nghĩa, loại từ, phát âm, ví dụ và hình ảnh của từ vựng đã có trước khi tạo mới.'
+        title: 'Popup xem trước chi tiết thẻ',
+        description: 'Nút "Xem chi tiết" mở nhanh cửa sổ tra cứu phát âm, từ loại, định nghĩa, ví dụ và hình ảnh minh họa của thẻ đã có.'
       },
       {
         type: 'feature',
-        title: 'Định dạng câu ví dụ WYSIWYG trực quan',
-        description: 'Soạn thảo ví dụ trực quan ngay trong khung: bôi đen chuột phải để in đậm, in nghiêng, gạch chân, đổi màu chữ và highlight màu sắc mà không hiện mã HTML thô.'
+        title: 'Soạn thảo câu ví dụ WYSIWYG trực quan',
+        description: 'Bôi đen chữ và nhấp chuột phải để in đậm, in nghiêng, gạch chân, đổi màu chữ và highlight màu sắc trực quan ngay trong ô nhập.'
       },
       {
         type: 'improvement',
-        title: 'Menu định dạng Linear/Notion',
-        description: 'Bảng công cụ định dạng thiết kế thanh lịch dạng floating pill, tinh tế và dễ thao tác trên cả máy tính lẫn di động.'
+        title: 'Thanh công cụ định dạng nổi tối giản',
+        description: 'Bảng chọn định dạng nổi dạng pill tinh tế (Linear style), chuyển động mượt và thao tác thuận tiện trên mọi thiết bị.'
       }
     ]
   },
   {
     version: 'v1.3.2',
     date: '20/10/2026',
-    title: 'Đồng bộ dữ liệu thời gian thực & Sao lưu tự động',
+    title: 'Đồng bộ đám mây thời gian thực & Sao lưu tự động',
     changes: [
       {
         type: 'feature',
         title: 'Đồng bộ cơ sở dữ liệu thời gian thực',
-        description: 'Dữ liệu từ vựng và tiến độ học tập được đồng bộ hóa tức thì giữa các phiên làm việc.'
+        description: 'Dữ liệu từ vựng và tiến độ luyện tập được cập nhật tức thì giữa các thiết bị.'
       },
       {
         type: 'feature',
         title: 'Sao lưu tự động định kỳ',
-        description: 'Tự động tạo bản sao lưu dữ liệu flashcard hàng ngày với cơ chế lưu trữ 2 ngày an toàn.'
+        description: 'Tự động sao lưu dữ liệu flashcard hàng ngày với cơ chế lưu trữ 2 ngày an toàn.'
       },
       {
         type: 'fix',
-        title: 'Sửa lỗi & Tối ưu hiệu năng',
-        description: 'Khắc phục các lỗi nhỏ về giao diện hiển thị flashcard và tăng tốc độ xử lý câu hỏi.'
+        title: 'Sửa lỗi giao diện & Tối ưu hiệu năng',
+        description: 'Tối ưu tốc độ tải thẻ flashcard và sửa các lỗi nhỏ trong hiển thị.'
       }
     ]
   },
   {
     version: 'v1.3.1',
     date: '18/10/2026',
-    title: 'Tìm kiếm, sắp xếp A-Z & Tối ưu mini game nối từ',
+    title: 'Tìm kiếm, sắp xếp A-Z & Cải tiến mini game nối từ',
     changes: [
       {
         type: 'feature',
-        title: 'Tìm kiếm & Sắp xếp theo A-Z',
-        description: 'Thêm thanh tìm kiếm nhanh và nút sắp xếp thứ tự bảng chữ cái A-Z trong trang chỉnh sửa bộ từ.'
+        title: 'Tìm kiếm & Sắp xếp A-Z',
+        description: 'Thanh tìm kiếm nhanh và nút sắp xếp theo thứ tự bảng chữ cái trong trang quản lý bộ từ.'
       },
       {
         type: 'improvement',
-        title: 'Nâng cấp mini game nối từ',
-        description: 'Chuyển sang cơ chế bấm chọn 2 thẻ trực quan, loại bỏ thao tác kéo thả phức tạp trên thiết bị cảm ứng.'
+        title: 'Cải tiến mini game nối từ',
+        description: 'Chuyển sang thao tác chạm/click chọn 2 thẻ trực quan, loại bỏ thao tác kéo thả phức tạp.'
       },
       {
         type: 'improvement',
-        title: 'Tối giản giao diện quản lý',
-        description: 'Bỏ nút áp dụng thứ tự thủ công để giao diện bộ từ gọn gàng, tinh gọn và nhanh hơn.'
+        title: 'Giao diện tinh giản',
+        description: 'Bỏ nút áp dụng thứ tự thủ công để màn hình quản lý gọn gàng và phản hồi nhanh hơn.'
       }
     ]
   },
@@ -86,18 +86,18 @@ export const CHANGELOG_DATA = [
     changes: [
       {
         type: 'feature',
-        title: 'Hệ thống tiến hóa ngọn lửa Streak',
-        description: 'Ngọn lửa học tập tiến hóa qua 8 cấp độ màu sắc và kích thước động theo chuỗi ngày streak.'
+        title: 'Ngọn lửa Streak tiến hóa 8 cấp độ',
+        description: 'Biểu tượng chuỗi học tập thay đổi màu sắc và kích thước động theo số ngày duy trì liên tục.'
       },
       {
         type: 'feature',
-        title: 'Popup chi tiết lộ trình Streak',
-        description: 'Nhấn vào biểu tượng ngọn lửa để xem thông tin chi tiết từng cấp bậc và số ngày cần đạt.'
+        title: 'Bảng lộ trình tiến hóa chuỗi ngày',
+        description: 'Nhấn vào ngọn lửa để theo dõi các mốc cấp độ tiếp theo cần đạt.'
       },
       {
         type: 'improvement',
-        title: 'Cải tiến hệ thống điểm Moosk & Heatmap',
-        description: 'Tối ưu hóa bảng đóng góp học tập Heatmap và thuật toán tích lũy điểm năng động Moosk.'
+        title: 'Hệ thống điểm Moosk & Heatmap',
+        description: 'Nâng cấp thuật toán tích lũy điểm năng động và bảng đóng góp học tập Heatmap.'
       }
     ]
   }
