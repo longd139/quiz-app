@@ -6,6 +6,7 @@ import { IconCards, IconTarget, IconEdit, IconTrash, IconPlus, IconFolder, IconS
 import { speakWord } from '../lib/tts';
 import CreateFlashcardModal from '../components/CreateFlashcardModal';
 import StreakHeatmap from '../components/StreakHeatmap';
+import FormattedText from '../components/FormattedText';
 
 export default function VocabDashboard() {
   const { data, update, showConfirm, showToast } = useQuiz();
@@ -642,10 +643,10 @@ export default function VocabDashboard() {
                           </p>
 
                           {card.example && (
-                            <p className="text-[11px] text-slate-500 dark:text-slate-400 italic font-serif">
-                              "{card.example}"
+                            <div className="text-[11px] text-slate-500 dark:text-slate-400 font-serif">
+                              &ldquo;<FormattedText text={card.example} />&rdquo;
                               {card.exampleMeaning && ` → ${card.exampleMeaning}`}
-                            </p>
+                            </div>
                           )}
                         </div>
 

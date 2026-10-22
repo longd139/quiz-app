@@ -6,6 +6,7 @@ import { recordStudyActivity } from '../data/streak';
 import { speakWord, speakWordAuto } from '../lib/tts';
 import { IconSpeaker, IconCheck, IconCross, IconCards, IconRotate, IconArrowLeft, IconSettings, IconLink } from '../components/Icons';
 import { getBadgeColor } from '../data/badgeColors';
+import FormattedText from '../components/FormattedText';
 
 // Smart answer matcher:
 // - Cho phép hoán đổi thứ tự các từ nhưng BẮT BUỘC ĐỦ CHỮ (VD: "thu tiền" <-> "tiền thu")
@@ -1676,9 +1677,9 @@ export default function VocabQuiz() {
 
                       {currentQ.card.example && (
                         <div className="pt-2">
-                          <p className={`text-xs italic ${flashcardSlide ? 'text-white' : 'text-slate-600 dark:text-slate-300'}`}>
-                            "{currentQ.card.example}"
-                          </p>
+                          <div className={`text-xs ${flashcardSlide ? 'text-white' : 'text-slate-600 dark:text-slate-300'}`}>
+                            &ldquo;<FormattedText text={currentQ.card.example} />&rdquo;
+                          </div>
                         </div>
                       )}
 
@@ -1975,10 +1976,10 @@ export default function VocabQuiz() {
                     {currentQ.card.meaning}
                   </p>
                   {currentQ.card.example && (
-                    <p className="text-slate-500 dark:text-slate-400 italic font-serif">
-                      "{currentQ.card.example}"
+                    <div className="text-slate-500 dark:text-slate-400 font-serif">
+                      &ldquo;<FormattedText text={currentQ.card.example} />&rdquo;
                       {currentQ.card.exampleMeaning && ` \u2192 ${currentQ.card.exampleMeaning}`}
-                    </p>
+                    </div>
                   )}
                 </div>
               )}

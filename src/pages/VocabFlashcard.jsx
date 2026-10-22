@@ -6,6 +6,7 @@ import { recordStudyActivity } from '../data/streak';
 import { speakWord, speakWordAuto } from '../lib/tts';
 import { IconSpeaker, IconRotate, IconShuffle, IconCheck, IconCross, IconArrowLeft, IconTarget } from '../components/Icons';
 import { getBadgeColor } from '../data/badgeColors';
+import FormattedText, { stripFormatting } from '../components/FormattedText';
 
 export default function VocabFlashcard() {
   const { data, update, showAlert, showToast } = useQuiz();
@@ -519,14 +520,14 @@ export default function VocabFlashcard() {
                       }`}
                     >
                       <div className="flex items-start justify-between gap-2">
-                        <p className={`text-xs italic ${slideStatus ? 'text-white' : 'text-slate-700 dark:text-slate-300'}`}>
-                          "{ex}"
-                        </p>
+                        <div className={`text-xs ${slideStatus ? 'text-white' : 'text-slate-700 dark:text-slate-300'}`}>
+                          &ldquo;<FormattedText text={ex} />&rdquo;
+                        </div>
                         <button
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation();
-                            speakWord(ex, currentDeck.targetLanguage || 'en-US');
+                            speakWord(stripFormatting(ex), currentDeck.targetLanguage || 'en-US');
                           }}
                           className={`p-1 cursor-pointer shrink-0 ${
                             slideStatus ? 'text-white/80 hover:text-white' : 'text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'

@@ -6,6 +6,7 @@ import { speakWord } from '../lib/tts';
 import { IconSpeaker, IconTrash, IconPlus, IconFolder, IconArrowLeft, IconEdit, IconSearch } from '../components/Icons';
 import CreateFlashcardModal from '../components/CreateFlashcardModal';
 import { getBadgeColor } from '../data/badgeColors';
+import FormattedText from '../components/FormattedText';
 
 export default function VocabEditor() {
   const { data, update, syncStatus, showToast, showConfirm } = useQuiz();
@@ -911,10 +912,10 @@ export default function VocabEditor() {
                   {((Array.isArray(card.examples) && card.examples.length > 0) ? card.examples : (card.example ? [card.example] : [])).length > 0 && (
                     <div className="space-y-1 pt-1.5 border-t border-dashed border-slate-100 dark:border-slate-800">
                       {((Array.isArray(card.examples) && card.examples.length > 0) ? card.examples : [card.example]).slice(0, 2).map((ex, i) => (
-                        <p key={i} className="text-[11px] text-slate-600 dark:text-slate-400 italic font-serif flex items-start gap-1.5 line-clamp-2">
+                        <div key={i} className="text-[11px] text-slate-600 dark:text-slate-400 font-serif flex items-start gap-1.5 line-clamp-2">
                           <span className="text-slate-400 font-mono not-italic select-none">•</span>
-                          <span>{ex}</span>
-                        </p>
+                          <span><FormattedText text={ex} /></span>
+                        </div>
                       ))}
                       {((Array.isArray(card.examples) && card.examples.length > 0) ? card.examples : [card.example]).length > 2 && (
                         <p className="text-[10px] text-slate-400 font-sans">
@@ -1090,7 +1091,7 @@ export default function VocabEditor() {
       {/* Create / Edit Flashcard Modal (Study4 Style) */}
       {showStudy4Modal && (
         <CreateFlashcardModal
-          deck={{ name: name || 'Bộ từ đang tạo' }}
+          deck={{ name: name || 'Bộ từ đang tạo', cards }}
           isOpen={showStudy4Modal}
           editingCard={editingCardIndex !== null ? cards[editingCardIndex] : null}
           onClose={() => {

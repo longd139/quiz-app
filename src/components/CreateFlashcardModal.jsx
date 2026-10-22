@@ -3,11 +3,19 @@ import { createVocabCard } from '../data/storage';
 import { uploadToCloudinary, getCloudinaryConfig } from '../lib/cloudinary';
 import { IconImage, IconPlus, IconEdit, IconTrash } from './Icons';
 import { BADGE_COLORS, getAllPosList, saveCustomPos, deletePos, updateCustomPos, getBadgeColor, getColorForPos, savePosColor } from '../data/badgeColors';
+import FormattedText, { parseExampleHtmlLines, convertMarkdownToHtml, HIGHLIGHT_COLORS, TEXT_COLORS } from './FormattedText';
+import TextFormatMenu from './TextFormatMenu';
+import CardDetailModal from './CardDetailModal';
+import { useQuiz } from '../App';
 
 export default function CreateFlashcardModal({ deck, isOpen, onClose, onSaveCard, editingCard = null }) {
+  const quizContext = useQuiz();
+  const vocabDecks = quizContext?.data?.vocabDecks || [];
+
   const [term, setTerm] = useState('');
   const [meaning, setMeaning] = useState('');
   const [isExpanded, setIsExpanded] = useState(false);
+  const [previewCardTarget, setPreviewCardTarget] = useState(null); // card to inspect in popup
 
   // Expanded fields
   const [image, setImage] = useState('');
@@ -16,12 +24,15 @@ export default function CreateFlashcardModal({ deck, isOpen, onClose, onSaveCard
   const [partOfSpeech, setPartOfSpeech] = useState('');
   const [badgeColor, setBadgeColor] = useState(() => getColorForPos('noun', 'emerald'));
   const [phonetic, setPhonetic] = useState('');
-  const [examplesText, setExamplesText] = useState('');
+  const [examplesHtml, setExamplesHtml] = useState('');
   const [note, setNote] = useState('');
 
   const [errorMsg, setErrorMsg] = useState('');
   const fileInputRef = useRef(null);
   const posDropdownRef = useRef(null);
+  const editorRef = useRef(null);
+  const savedRangeRef = useRef(null);
+  const [formatMenu, setFormatMenu] = useState(null); // { x, y, text }
 
   // Custom Part of Speech list, dropdown and modal state
   const [posList, setPosList] = useState(() => getAllPosList());
@@ -53,10 +64,12 @@ export default function CreateFlashcardModal({ deck, isOpen, onClose, onSaveCard
     setPartOfSpeech('');
     setBadgeColor(getColorForPos('noun', 'emerald'));
     setPhonetic('');
-    setExamplesText('');
+    setExamplesHtml('');
+    if (editorRef.current) editorRef.current.innerHTML = '';
     setNote('');
     setErrorMsg('');
     setIsOpenPosDropdown(false);
+    setFormatMenu(null);
     if (fileInputRef.current) fileInputRef.current.value = '';
   }, []);
 
@@ -139,10 +152,17 @@ export default function CreateFlashcardModal({ deck, isOpen, onClose, onSaveCard
       const rawExs = Array.isArray(editingCard.examples) && editingCard.examples.length > 0
         ? editingCard.examples
         : (editingCard.example ? [editingCard.example] : []);
-      const exLines = rawExs.map(ex => ex.trim().startsWith('-') ? ex.trim() : `- ${ex.trim()}`).join('\n');
-      setExamplesText(exLines);
+      const initialHtml = rawExs.map(ex => {
+        const trimmed = ex.trim();
+        const withDash = trimmed.startsWith('-') ? trimmed : `- ${trimmed}`;
+        return `<div>${convertMarkdownToHtml(withDash)}</div>`;
+      }).join('');
+      setExamplesHtml(initialHtml);
+      if (editorRef.current) {
+        editorRef.current.innerHTML = initialHtml;
+      }
       setNote(editingCard.note || '');
-      setIsExpanded(Boolean(editingCard.image || editingCard.partOfSpeech || editingCard.phonetic || exLines || editingCard.note));
+      setIsExpanded(Boolean(editingCard.image || editingCard.partOfSpeech || editingCard.phonetic || initialHtml || editingCard.note));
     } else {
       resetForm();
     }
@@ -182,16 +202,140 @@ export default function CreateFlashcardModal({ deck, isOpen, onClose, onSaveCard
     }
   };
 
-  const parseExampleLines = (text) => {
-    if (!text || !text.trim()) return [];
-    let lines = text.split('\n').map(s => s.trim()).filter(Boolean);
-    if (lines.length === 1 && (text.includes(' - ') || text.startsWith('- '))) {
-      lines = text.split(/\s*[-•]\s+/).map(s => s.trim()).filter(Boolean);
+  const isEditorEmpty = !examplesHtml || examplesHtml.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim().length === 0;
+
+  const handleEditorInput = (e) => {
+    setExamplesHtml(e.currentTarget.innerHTML);
+  };
+
+  const handleEditorContextMenu = (e) => {
+    const selection = window.getSelection();
+    const text = selection ? selection.toString() : '';
+    if (text && text.trim().length > 0) {
+      e.preventDefault();
+      try {
+        savedRangeRef.current = selection.getRangeAt(0).cloneRange();
+      } catch (err) {}
+      setFormatMenu({
+        x: e.clientX,
+        y: e.clientY,
+        text: text.trim()
+      });
     }
-    return lines
-      .map(line => line.replace(/^[-•*]\s*/, '').replace(/^\d+[\.\)]\s*/, '').trim())
-      .filter(Boolean)
-      .slice(0, 10);
+  };
+
+  const handleApplyFormat = (type, value = null) => {
+    const editor = editorRef.current;
+    if (!editor) return;
+
+    editor.focus();
+    if (savedRangeRef.current) {
+      try {
+        const selection = window.getSelection();
+        selection.removeAllRanges();
+        selection.addRange(savedRangeRef.current);
+      } catch (err) {}
+    }
+
+    if (type === 'bold') {
+      document.execCommand('bold', false, null);
+    } else if (type === 'italic') {
+      document.execCommand('italic', false, null);
+    } else if (type === 'underline') {
+      document.execCommand('underline', false, null);
+    } else if (type === 'strike') {
+      document.execCommand('strikeThrough', false, null);
+    } else if (type === 'highlight') {
+      document.execCommand('hiliteColor', false, value || '#fef08a');
+    } else if (type === 'color') {
+      document.execCommand('foreColor', false, value || '#ef4444');
+    } else if (type === 'clear') {
+      document.execCommand('removeFormat', false, null);
+    }
+
+    setExamplesHtml(editor.innerHTML);
+    setFormatMenu(null);
+  };
+
+  const handleEditorKeyDown = (e) => {
+    requestAnimationFrame(() => {
+      if (editorRef.current) {
+        setExamplesHtml(editorRef.current.innerHTML);
+      }
+    });
+  };
+
+  // Collect all cards across current deck and other user decks
+  const allCardsList = useMemo(() => {
+    const list = [];
+    const currentCards = Array.isArray(deck?.cards) ? deck.cards : [];
+    currentCards.forEach(c => {
+      if (c && c.term) {
+        list.push({ ...c, _deckName: deck?.name || 'Bộ từ hiện tại', _isCurrentDeck: true });
+      }
+    });
+
+    const allDecks = Array.isArray(vocabDecks) ? vocabDecks : [];
+    allDecks.forEach(d => {
+      if (d && Array.isArray(d.cards)) {
+        d.cards.forEach(c => {
+          if (c && c.term && !list.some(existing => existing.id === c.id)) {
+            list.push({ ...c, _deckName: d.name || 'Bộ từ khác', _isCurrentDeck: false });
+          }
+        });
+      }
+    });
+
+    return list;
+  }, [deck, vocabDecks]);
+
+  // Find duplicate or matching cards as user types
+  const duplicateMatches = useMemo(() => {
+    const query = term.trim().toLowerCase();
+    if (!query || query.length < 1) return [];
+
+    return allCardsList.filter(c => {
+      if (editingCard && editingCard.id === c.id) return false;
+      const cardTerm = (c.term || '').trim().toLowerCase();
+      return cardTerm === query || cardTerm.startsWith(query) || (query.length >= 3 && cardTerm.includes(query));
+    }).sort((a, b) => {
+      const aTerm = (a.term || '').trim().toLowerCase();
+      const bTerm = (b.term || '').trim().toLowerCase();
+      const aExact = aTerm === query;
+      const bExact = bTerm === query;
+      if (aExact && !bExact) return -1;
+      if (!aExact && bExact) return 1;
+      if (a._isCurrentDeck && !b._isCurrentDeck) return -1;
+      if (!a._isCurrentDeck && b._isCurrentDeck) return 1;
+      return aTerm.localeCompare(bTerm);
+    }).slice(0, 5);
+  }, [term, allCardsList, editingCard]);
+
+  // Apply existing card's data into current creation form
+  const handleApplyExistingCard = (targetCard) => {
+    if (!targetCard) return;
+    setTerm(targetCard.term || '');
+    setMeaning(targetCard.meaning || '');
+    setPhonetic(targetCard.phonetic || '');
+    const pos = targetCard.partOfSpeech || '';
+    setPartOfSpeech(pos);
+    setBadgeColor(getColorForPos(pos, targetCard.badgeColor || 'emerald'));
+    setImage(targetCard.image || '');
+    const rawExs = Array.isArray(targetCard.examples) && targetCard.examples.length > 0
+      ? targetCard.examples
+      : (targetCard.example ? [targetCard.example] : []);
+    const initialHtml = rawExs.map(ex => {
+      const trimmed = ex.trim();
+      const withDash = trimmed.startsWith('-') ? trimmed : `- ${trimmed}`;
+      return `<div>${convertMarkdownToHtml(withDash)}</div>`;
+    }).join('');
+    setExamplesHtml(initialHtml);
+    if (editorRef.current) {
+      editorRef.current.innerHTML = initialHtml;
+    }
+    setNote(targetCard.note || '');
+    setIsExpanded(true);
+    setPreviewCardTarget(null);
   };
 
   const buildCard = () => {
@@ -204,7 +348,7 @@ export default function CreateFlashcardModal({ deck, isOpen, onClose, onSaveCard
       return null;
     }
 
-    const exLines = parseExampleLines(examplesText);
+    const exLines = parseExampleHtmlLines(examplesHtml);
     const base = editingCard || createVocabCard();
 
     const targetPos = partOfSpeech.trim();
@@ -293,6 +437,83 @@ export default function CreateFlashcardModal({ deck, isOpen, onClose, onSaveCard
               placeholder="Nhập từ mới hoặc nhiều từ vựng (nhấn Enter để xuống dòng)..."
               className="w-full px-3.5 py-2.5 border border-slate-300 dark:border-slate-700 rounded-xl text-sm font-semibold bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 dark:focus:border-purple-400 dark:focus:ring-purple-400 transition-all resize-y min-h-[46px]"
             />
+
+            {/* Duplicate / Existing Word Matching List */}
+            {duplicateMatches.length > 0 && (
+              <div className="mt-2 p-2.5 rounded-xl border border-amber-200/90 dark:border-amber-900/50 bg-amber-50/70 dark:bg-amber-950/20 space-y-2 animate-fadeIn">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 text-xs font-semibold text-amber-800 dark:text-amber-300">
+                    <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                    <span>
+                      {duplicateMatches.some(m => (m.term || '').toLowerCase().trim() === term.toLowerCase().trim())
+                        ? 'Từ vựng này đã tồn tại trong danh sách!'
+                        : `Từ vựng tương tự đã có (${duplicateMatches.length}):`}
+                    </span>
+                  </div>
+                  <span className="text-[10px] text-amber-600/90 dark:text-amber-400/90 font-medium">
+                    Nhấp vào để xem chi tiết
+                  </span>
+                </div>
+
+                <div className="space-y-1.5 max-h-48 overflow-y-auto pr-0.5">
+                  {duplicateMatches.map((card, idx) => {
+                    const isExact = (card.term || '').toLowerCase().trim() === term.toLowerCase().trim();
+                    const badge = getBadgeColor(card.badgeColor, card.partOfSpeech);
+
+                    return (
+                      <div
+                        key={card.id || idx}
+                        onClick={() => setPreviewCardTarget(card)}
+                        className={`flex items-center justify-between gap-2.5 p-2 rounded-lg border transition-all cursor-pointer group ${
+                          isExact
+                            ? 'bg-amber-100/60 dark:bg-amber-900/30 border-amber-300 dark:border-amber-800/80 hover:border-amber-400'
+                            : 'bg-white/80 dark:bg-slate-900/60 border-slate-200/80 dark:border-slate-800 hover:border-purple-300 dark:hover:border-purple-700'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2 min-w-0 flex-1">
+                          <span className="text-xs font-bold text-slate-800 dark:text-slate-100 truncate">
+                            {card.term}
+                          </span>
+
+                          {card.partOfSpeech && (
+                            <span className={`px-1.5 py-0.2 rounded text-[10px] font-semibold shrink-0 border ${badge.bg} ${badge.text} ${badge.border}`}>
+                              {card.partOfSpeech}
+                            </span>
+                          )}
+
+                          {card.phonetic && (
+                            <span className="text-[11px] font-mono text-slate-400 dark:text-slate-500 hidden sm:inline truncate">
+                              {card.phonetic}
+                            </span>
+                          )}
+
+                          <span className="text-xs text-slate-500 dark:text-slate-400 truncate">
+                            &bull; {card.meaning}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hidden md:inline">
+                            {card._deckName}
+                          </span>
+
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setPreviewCardTarget(card);
+                            }}
+                            className="px-2 py-0.5 text-[11px] font-semibold text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-950/60 hover:bg-purple-100 dark:hover:bg-purple-900/60 rounded-md transition-colors cursor-pointer"
+                          >
+                            Xem chi tiết
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Định nghĩa */}
@@ -585,27 +806,134 @@ export default function CreateFlashcardModal({ deck, isOpen, onClose, onSaveCard
 
               {/* Ví dụ (tối đa 10 câu) */}
               <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                {/* Minimal Header & Quick Format Toolbar */}
+                <div className="flex items-center justify-between mb-1.5 flex-wrap gap-2">
+                  <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
                     Ví dụ (tối đa 10 câu)
                   </label>
-                  <span className="text-[11px] font-mono text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full">
-                    {parseExampleLines(examplesText).length}/10 câu
-                  </span>
+
+                  <div className="flex items-center gap-1">
+                    {/* Inline Quick Action Icons */}
+                    <div className="flex items-center gap-0.5 px-1 py-0.5 rounded-lg bg-slate-100 dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700/80 text-slate-600 dark:text-slate-300">
+                      <button
+                        type="button"
+                        onClick={() => handleApplyFormat('bold')}
+                        title="In đậm (Ctrl+B)"
+                        className="w-6 h-6 flex items-center justify-center rounded hover:bg-white dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition-colors cursor-pointer"
+                      >
+                        <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M6 4h8a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z" />
+                          <path d="M6 12h9a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z" />
+                        </svg>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleApplyFormat('italic')}
+                        title="In nghiêng (Ctrl+I)"
+                        className="w-6 h-6 flex items-center justify-center rounded hover:bg-white dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition-colors cursor-pointer"
+                      >
+                        <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <line x1="19" y1="4" x2="10" y2="4" />
+                          <line x1="14" y1="20" x2="5" y2="20" />
+                          <line x1="15" y1="4" x2="9" y2="20" />
+                        </svg>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleApplyFormat('underline')}
+                        title="Gạch chân (Ctrl+U)"
+                        className="w-6 h-6 flex items-center justify-center rounded hover:bg-white dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition-colors cursor-pointer"
+                      >
+                        <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M6 4v6a6 6 0 0 0 12 0V4" />
+                          <line x1="4" y1="20" x2="20" y2="20" />
+                        </svg>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleApplyFormat('strike')}
+                        title="Gạch ngang"
+                        className="w-6 h-6 flex items-center justify-center rounded hover:bg-white dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition-colors cursor-pointer"
+                      >
+                        <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M16 4H9a3 3 0 0 0-2.83 4" />
+                          <path d="M14 12a4 4 0 0 1 0 8H6" />
+                          <line x1="4" y1="12" x2="20" y2="12" />
+                        </svg>
+                      </button>
+                      <div className="w-px h-3 bg-slate-300 dark:bg-slate-700 mx-0.5" />
+                      <button
+                        type="button"
+                        onClick={() => handleApplyFormat('highlight', 'yellow')}
+                        title="Tô dạ quang vàng"
+                        className="w-6 h-6 flex items-center justify-center rounded hover:bg-white dark:hover:bg-slate-700 transition-colors cursor-pointer"
+                      >
+                        <span className="w-2.5 h-2.5 rounded-full bg-amber-400" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleApplyFormat('clear')}
+                        title="Xóa định dạng"
+                        className="w-6 h-6 flex items-center justify-center rounded hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/40 text-slate-400 transition-colors cursor-pointer"
+                      >
+                        <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21" />
+                          <path d="M22 21H7" />
+                        </svg>
+                      </button>
+                    </div>
+
+                    <span className="text-[11px] font-mono text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-md">
+                      {parseExampleHtmlLines(examplesHtml).length}/10
+                    </span>
+                  </div>
                 </div>
-                <textarea
-                  rows={4}
-                  value={examplesText}
-                  onChange={e => setExamplesText(e.target.value)}
-                  placeholder={"Nhập mỗi câu trên một dòng (hoặc bắt đầu bằng dấu gạch ngang -):\n- He is preparing for the exam.\n- Software testing is an important phase."}
-                  className="w-full px-3.5 py-2.5 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-serif bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 dark:focus:border-purple-400 dark:focus:ring-purple-400 transition-all resize-y leading-relaxed"
-                />
-                <div className="mt-2 flex items-start gap-2 px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800 text-[11.5px] leading-relaxed text-slate-600 dark:text-slate-400">
-                  <span className="text-purple-600 dark:text-purple-400 shrink-0 text-xs mt-0.5 select-none">💡</span>
-                  <p className="m-0 flex-1">
-                    <strong className="font-semibold text-slate-700 dark:text-slate-300">Cách tách câu:</strong> Xuống dòng hoặc thêm <code className="px-1.5 py-0.5 rounded bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 font-mono text-[10.5px] text-purple-600 dark:text-purple-400 font-bold shadow-2xs mx-0.5">-</code> ở đầu câu để tự động tách thành các câu riêng biệt.
-                  </p>
+
+                <div className="relative">
+                  <div
+                    ref={editorRef}
+                    contentEditable
+                    suppressContentEditableWarning
+                    onInput={handleEditorInput}
+                    onContextMenu={handleEditorContextMenu}
+                    onKeyDown={handleEditorKeyDown}
+                    className="w-full px-3.5 py-2.5 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-serif bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 dark:focus:border-purple-400 dark:focus:ring-purple-400 transition-all min-h-[96px] max-h-[220px] overflow-y-auto leading-relaxed"
+                  />
+                  {isEditorEmpty && (
+                    <div
+                      onClick={() => editorRef.current?.focus()}
+                      className="absolute top-2.5 left-3.5 right-3.5 text-xs text-slate-400 dark:text-slate-500 font-serif pointer-events-none whitespace-pre-line leading-relaxed select-none"
+                    >
+                      {"Nhập mỗi câu trên một dòng (hoặc bắt đầu bằng dấu gạch ngang -):\n- He is preparing for the exam.\n- Software testing is an important phase."}
+                    </div>
+                  )}
                 </div>
+
+                <div className="mt-1.5 flex items-center justify-between text-[11px] text-slate-400 dark:text-slate-500">
+                  <span>Tách câu bằng dấu <code className="text-purple-600 dark:text-purple-400 font-mono">-</code> hoặc xuống dòng</span>
+                  <span>Bôi đen &amp; chuột phải để mở thanh format</span>
+                </div>
+
+                {/* Live Preview */}
+                {parseExampleHtmlLines(examplesHtml).length > 0 && (
+                  <div className="mt-2.5 p-3 rounded-xl bg-slate-50 dark:bg-slate-900/40 border border-slate-200/80 dark:border-slate-800/80 space-y-2 animate-fadeIn">
+                    <div className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+                      Xem trước ({parseExampleHtmlLines(examplesHtml).length} câu)
+                    </div>
+                    <div className="space-y-1.5">
+                      {parseExampleHtmlLines(examplesHtml).map((ex, idx) => (
+                        <div key={idx} className="text-xs text-slate-700 dark:text-slate-300 font-serif flex items-start gap-2">
+                          <span className="text-purple-600 dark:text-purple-400 font-sans font-semibold text-[11px] select-none mt-0.5">
+                            {idx + 1}.
+                          </span>
+                          <div className="flex-1 leading-relaxed">
+                            <FormattedText text={ex} />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Ghi chú */}
@@ -768,6 +1096,23 @@ export default function CreateFlashcardModal({ deck, isOpen, onClose, onSaveCard
           </div>
         </div>
       )}
+
+      {/* Floating Text Format Context Menu */}
+      <TextFormatMenu
+        isOpen={Boolean(formatMenu)}
+        position={formatMenu}
+        selectedText={formatMenu?.text || ''}
+        onApplyFormat={handleApplyFormat}
+        onClose={() => setFormatMenu(null)}
+      />
+
+      {/* Existing Card Detail Preview Popup Modal */}
+      <CardDetailModal
+        card={previewCardTarget}
+        isOpen={Boolean(previewCardTarget)}
+        onClose={() => setPreviewCardTarget(null)}
+        onApplyToForm={handleApplyExistingCard}
+      />
     </div>
   );
 }
