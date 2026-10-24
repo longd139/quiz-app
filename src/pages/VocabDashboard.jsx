@@ -273,21 +273,34 @@ export default function VocabDashboard() {
 
                 {/* Bottom Actions */}
                 <div className="flex items-center gap-1.5 pt-3 border-t border-slate-100 dark:border-slate-800">
-                  {/* Nút Học (Đen) chính là Trắc nghiệm */}
+                  {/* Nút Học (Đen) */}
                   <button
                     onClick={() => handleStartStudy(deck)}
                     disabled={!deck.cards || deck.cards.length < 2}
-                    className="flex-1 bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-white px-2.5 py-1.5 rounded-lg text-xs font-semibold tracking-tight disabled:opacity-40 transition-colors flex items-center justify-center gap-1 cursor-pointer"
+                    className="flex-1 bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-white px-2 py-1.5 rounded-lg text-xs font-semibold tracking-tight disabled:opacity-40 transition-colors flex items-center justify-center gap-1 cursor-pointer"
+                    title="Luyện tập trắc nghiệm / tổng hợp"
                   >
                     <IconTarget className="w-3.5 h-3.5" />
                     <span>Học</span>
+                  </button>
+
+                  {/* Nút Gõ chữ */}
+                  <button
+                    onClick={() => navigate('/vocab-quiz', { state: { deckId: deck.id, mode: 'written' } })}
+                    disabled={!deck.cards || deck.cards.length < 2}
+                    className="flex-1 border border-purple-200 dark:border-purple-800/80 bg-purple-50/70 dark:bg-purple-950/40 hover:bg-purple-100/80 dark:hover:bg-purple-900/50 text-purple-700 dark:text-purple-300 px-2 py-1.5 rounded-lg text-xs font-semibold tracking-tight disabled:opacity-40 transition-colors flex items-center justify-center gap-1 cursor-pointer"
+                    title="Luyện gõ chữ (Hiện từ gõ nghĩa hoặc hiện nghĩa gõ từ)"
+                  >
+                    <IconEdit className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
+                    <span>Gõ chữ</span>
                   </button>
 
                   {/* Nút Flashcard */}
                   <button
                     onClick={() => navigate('/vocab-learn', { state: { deckId: deck.id } })}
                     disabled={!deck.cards || deck.cards.length === 0}
-                    className="flex-1 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 px-2.5 py-1.5 rounded-lg text-xs font-semibold tracking-tight disabled:opacity-40 transition-colors flex items-center justify-center gap-1 cursor-pointer"
+                    className="flex-1 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 px-2 py-1.5 rounded-lg text-xs font-semibold tracking-tight disabled:opacity-40 transition-colors flex items-center justify-center gap-1 cursor-pointer"
+                    title="Lật thẻ Flashcard"
                   >
                     <IconCards className="w-3.5 h-3.5 text-slate-500" />
                     <span>Flashcard</span>

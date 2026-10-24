@@ -34,12 +34,21 @@ function checkAnswerMatch(userInput, targetAnswer) {
       .replace(/Đ/g, 'd');
   };
 
+  const stripEnglishParticles = (str) => {
+    if (!str) return '';
+    return str.replace(/^(to|a|an|the)\s+/i, '').trim();
+  };
+
   const normUser = normalizeStr(userInput);
   if (!normUser) return false;
 
   const userWords = normUser.split(' ').filter(Boolean);
   const userSorted = userWords.slice().sort().join(' ');
   const userSortedNoAcc = removeAccents(normUser).split(' ').filter(Boolean).sort().join(' ');
+
+  const normUserNoParticle = stripEnglishParticles(normUser);
+  const userWordsNoPart = normUserNoParticle.split(' ').filter(Boolean);
+  const userSortedNoPart = userWordsNoPart.slice().sort().join(' ');
 
   // So sánh người dùng nhập với một chuỗi đáp án ứng viên
   const matchesCandidate = (candidate) => {
@@ -49,21 +58,33 @@ function checkAnswerMatch(userInput, targetAnswer) {
     // 1. Giống hệt 100%
     if (normUser === normCand) return true;
 
-    // 2. Giống khi bỏ dấu tiếng Việt
+    // 2. Giống khi bỏ mạo từ tiếng Anh (VD: "to run" <-> "run", "an apple" <-> "apple")
+    const normCandNoPart = stripEnglishParticles(normCand);
+    if (normUserNoParticle && normCandNoPart && normUserNoParticle === normCandNoPart) return true;
+
+    // 3. Giống khi bỏ dấu tiếng Việt
     if (removeAccents(normUser) === removeAccents(normCand)) return true;
+    if (removeAccents(normUserNoParticle) === removeAccents(normCandNoPart)) return true;
 
     const candWords = normCand.split(' ').filter(Boolean);
 
-    // BẮT BUỘC ĐỦ CHỮ: Số lượng chữ/từ phải bằng nhau (không chấp nhận thiếu từ)
-    if (userWords.length !== candWords.length) return false;
+    // BẮT BUỘC ĐỦ CHỮ: Số lượng chữ/từ bằng nhau
+    if (userWords.length === candWords.length) {
+      // Các từ giống hệt nhau (không quan trọng thứ tự, VD: "thu tiền" <-> "tiền thu")
+      const candSorted = candWords.slice().sort().join(' ');
+      if (userSorted === candSorted) return true;
 
-    // Các từ giống hệt nhau (không quan trọng thứ tự, VD: "thu tiền" <-> "tiền thu")
-    const candSorted = candWords.slice().sort().join(' ');
-    if (userSorted === candSorted) return true;
+      // So sánh các từ khi bỏ dấu
+      const candSortedNoAcc = removeAccents(normCand).split(' ').filter(Boolean).sort().join(' ');
+      if (userSortedNoAcc === candSortedNoAcc) return true;
+    }
 
-    // So sánh các từ khi bỏ dấu
-    const candSortedNoAcc = removeAccents(normCand).split(' ').filter(Boolean).sort().join(' ');
-    if (userSortedNoAcc === candSortedNoAcc) return true;
+    // So sánh sau khi bỏ mạo từ/tiểu từ tiếng Anh
+    const candWordsNoPart = normCandNoPart.split(' ').filter(Boolean);
+    if (userWordsNoPart.length === candWordsNoPart.length && userWordsNoPart.length > 0) {
+      const candSortedNoPart = candWordsNoPart.slice().sort().join(' ');
+      if (userSortedNoPart === candSortedNoPart) return true;
+    }
 
     return false;
   };
@@ -123,15 +144,42 @@ export default function VocabQuiz() {
     }
   }, [location.state?.studyMode, location.key]);
 
-  const [direction, setDirection] = useState('term-to-meaning'); // 'term-to-meaning' | 'meaning-to-term'
-  const [allowChoice, setAllowChoice] = useState(initialMode === 'matching' ? false : (initialMode === 'flashcard' ? false : true));
-  const [allowWritten, setAllowWritten] = useState(false);
-  const [allowFlashcard, setAllowFlashcard] = useState(initialMode === 'flashcard' ? true : false);
-  const [allowMatching, setAllowMatching] = useState(initialMode === 'matching' ? true : false);
+  const [direction, setDirection] = useState(() => {
+    return location.state?.direction || localStorage.getItem('vocab_quiz_direction') || 'term-to-meaning';
+  }); // 'term-to-meaning' | 'meaning-to-term' | 'mixed'
+
+  const [allowChoice, setAllowChoice] = useState(() => {
+    if (initialMode === 'written' || initialMode === 'flashcard' || initialMode === 'matching') return false;
+    const saved = localStorage.getItem('vocab_quiz_allow_choice');
+    return saved !== null ? saved === 'true' : true;
+  });
+  const [allowWritten, setAllowWritten] = useState(() => {
+    if (initialMode === 'written') return true;
+    if (initialMode === 'flashcard' || initialMode === 'matching' || initialMode === 'choice') return false;
+    const saved = localStorage.getItem('vocab_quiz_allow_written');
+    return saved !== null ? saved === 'true' : false;
+  });
+  const [allowFlashcard, setAllowFlashcard] = useState(() => {
+    if (initialMode === 'flashcard') return true;
+    if (initialMode === 'written' || initialMode === 'matching' || initialMode === 'choice') return false;
+    const saved = localStorage.getItem('vocab_quiz_allow_flashcard');
+    return saved !== null ? saved === 'true' : false;
+  });
+  const [allowMatching, setAllowMatching] = useState(() => {
+    if (initialMode === 'matching') return true;
+    if (initialMode === 'written' || initialMode === 'flashcard' || initialMode === 'choice') return false;
+    const saved = localStorage.getItem('vocab_quiz_allow_matching');
+    return saved !== null ? saved === 'true' : false;
+  });
   const [showSettings, setShowSettings] = useState(false);
   const [hidePhonetic, setHidePhonetic] = useState(() => {
     return localStorage.getItem('vocab_quiz_hide_phonetic') === 'true';
   });
+
+  const handleSetDirection = (newDir) => {
+    setDirection(newDir);
+    localStorage.setItem('vocab_quiz_direction', newDir);
+  };
 
   const handleToggleHidePhonetic = () => {
     setHidePhonetic(prev => {
@@ -270,7 +318,7 @@ export default function VocabQuiz() {
   // Ghi nhận ngay câu làm sai vào vocabStats (tăng wrongCount, đánh dấu cần ôn)
   const recordWrongCard = (card) => {
     if (!card) return;
-    requeueWrongQuestion(card);
+    requeueWrongQuestion(card, currentQ?.direction);
     setWrongItems(prev => prev.some(c => c.id === card.id) ? prev : [...prev, card]);
 
     const curData = dataRef.current || data;
@@ -294,22 +342,38 @@ export default function VocabQuiz() {
 
   const handleToggleChoice = () => {
     if (allowChoice && !allowWritten && !allowFlashcard && !allowMatching) return; // Keep at least 1 selected
-    setAllowChoice(prev => !prev);
+    setAllowChoice(prev => {
+      const next = !prev;
+      localStorage.setItem('vocab_quiz_allow_choice', String(next));
+      return next;
+    });
   };
 
   const handleToggleWritten = () => {
     if (allowWritten && !allowChoice && !allowFlashcard && !allowMatching) return; // Keep at least 1 selected
-    setAllowWritten(prev => !prev);
+    setAllowWritten(prev => {
+      const next = !prev;
+      localStorage.setItem('vocab_quiz_allow_written', String(next));
+      return next;
+    });
   };
 
   const handleToggleFlashcard = () => {
     if (allowFlashcard && !allowChoice && !allowWritten && !allowMatching) return; // Keep at least 1 selected
-    setAllowFlashcard(prev => !prev);
+    setAllowFlashcard(prev => {
+      const next = !prev;
+      localStorage.setItem('vocab_quiz_allow_flashcard', String(next));
+      return next;
+    });
   };
 
   const handleToggleMatching = () => {
     if (allowMatching && !allowChoice && !allowWritten && !allowFlashcard) return; // Keep at least 1 selected
-    setAllowMatching(prev => !prev);
+    setAllowMatching(prev => {
+      const next = !prev;
+      localStorage.setItem('vocab_quiz_allow_matching', String(next));
+      return next;
+    });
   };
 
   const resetSingleQuestionState = () => {
@@ -369,8 +433,13 @@ export default function VocabQuiz() {
   }, [isCompleted, currentDeck, data, update, showToast]);
 
   // Helper to generate a single question for a specific card
-  const makeQuestionForCard = (card, forcedType = null) => {
-    const isTermToMeaning = direction === 'term-to-meaning';
+  const makeQuestionForCard = (card, forcedType = null, forcedDirection = null) => {
+    const qDir = forcedDirection || (
+      direction === 'mixed'
+        ? (Math.random() < 0.5 ? 'term-to-meaning' : 'meaning-to-term')
+        : direction
+    );
+    const isTermToMeaning = qDir === 'term-to-meaning';
     const activeTypes = [];
     if (allowChoice) activeTypes.push('choice');
     if (allowWritten) activeTypes.push('written');
@@ -390,6 +459,7 @@ export default function VocabQuiz() {
     return {
       card,
       type,
+      direction: qDir,
       prompt,
       correctAnswer,
       options: allOptions,
@@ -398,9 +468,9 @@ export default function VocabQuiz() {
   };
 
   // Re-insert wrong question at a random future position (ngẫu nhiên không theo số câu nhất định)
-  const requeueWrongQuestion = (card) => {
+  const requeueWrongQuestion = (card, originalDirection = null) => {
     if (!card) return;
-    const newQ = makeQuestionForCard(card);
+    const newQ = makeQuestionForCard(card, null, originalDirection);
     setQuestions(prev => {
       const remainingAhead = prev.length - 1 - currentIndex;
       if (remainingAhead <= 0) {
@@ -448,7 +518,6 @@ export default function VocabQuiz() {
     }
 
     const cards = shuffle(targetCards);
-    const isTermToMeaning = direction === 'term-to-meaning';
 
     const enabledTypes = [];
     if (allowChoice) enabledTypes.push('choice');
@@ -472,6 +541,11 @@ export default function VocabQuiz() {
             chunk = [...chunk, ...fillers.slice(0, pairCount - chunk.length)];
           }
           if (chunk.length >= 2) {
+            const qDir = direction === 'mixed'
+              ? (i % 2 === 0 ? 'term-to-meaning' : 'meaning-to-term')
+              : direction;
+            const isTermToMeaning = qDir === 'term-to-meaning';
+
             const terms = shuffle(chunk.map(c => ({
               id: c.id,
               text: isTermToMeaning ? c.term : c.meaning,
@@ -484,6 +558,7 @@ export default function VocabQuiz() {
             })));
             generated.push({
               type: 'matching',
+              direction: qDir,
               cards: chunk,
               terms,
               meanings,
@@ -506,6 +581,11 @@ export default function VocabQuiz() {
       const qType = enabledTypes[qIdx % enabledTypes.length];
       qIdx++;
 
+      const qDir = direction === 'mixed'
+        ? (cardIndex % 2 === 0 ? 'term-to-meaning' : 'meaning-to-term')
+        : direction;
+      const isTermToMeaning = qDir === 'term-to-meaning';
+
       if (qType === 'matching' && cards.length >= 2) {
         const pairCount = Math.min(4, cards.length);
         let chunk = cards.slice(cardIndex, cardIndex + pairCount);
@@ -526,6 +606,7 @@ export default function VocabQuiz() {
           })));
           generated.push({
             type: 'matching',
+            direction: qDir,
             cards: chunk,
             terms,
             meanings,
@@ -549,6 +630,7 @@ export default function VocabQuiz() {
         generated.push({
           card,
           type: singleType,
+          direction: qDir,
           prompt,
           correctAnswer,
           options: allOptions,
@@ -577,7 +659,8 @@ export default function VocabQuiz() {
 
   // Speak word automatically when question loads (if term is visible and auto-read is enabled)
   useEffect(() => {
-    if (currentQ && currentDeck && direction === 'term-to-meaning') {
+    const qDir = currentQ?.direction || direction;
+    if (currentQ && currentDeck && qDir === 'term-to-meaning') {
       if (currentQ.type !== 'matching' && currentQ.card) {
         speakWordAuto(currentQ.card.term, currentDeck.targetLanguage || 'en-US');
       }
@@ -888,11 +971,12 @@ export default function VocabQuiz() {
   const handlePracticeMissed = () => {
     if (wrongItems.length === 0) return;
     const cards = shuffle([...wrongItems]);
-    const isTermToMeaning = direction === 'term-to-meaning';
 
     if (allowMatching && !allowChoice && !allowWritten && !allowFlashcard && cards.length >= 2) {
       const pairCount = Math.min(4, cards.length);
       const chunk = cards.slice(0, pairCount);
+      const qDir = direction === 'mixed' ? 'term-to-meaning' : direction;
+      const isTermToMeaning = qDir === 'term-to-meaning';
       const terms = shuffle(chunk.map(c => ({
         id: c.id,
         text: isTermToMeaning ? c.term : c.meaning,
@@ -905,6 +989,7 @@ export default function VocabQuiz() {
       })));
       setQuestions([{
         type: 'matching',
+        direction: qDir,
         cards: chunk,
         terms,
         meanings,
@@ -918,6 +1003,10 @@ export default function VocabQuiz() {
       if (activeTypes.length === 0) activeTypes.push('choice');
 
       const generated = cards.map((card, idx) => {
+        const qDir = direction === 'mixed'
+          ? (idx % 2 === 0 ? 'term-to-meaning' : 'meaning-to-term')
+          : direction;
+        const isTermToMeaning = qDir === 'term-to-meaning';
         const prompt = isTermToMeaning ? card.term : card.meaning;
         const correctAnswer = isTermToMeaning ? card.meaning : card.term;
         const type = activeTypes[idx % activeTypes.length];
@@ -931,6 +1020,7 @@ export default function VocabQuiz() {
         return {
           card,
           type,
+          direction: qDir,
           prompt,
           correctAnswer,
           options: allOptions,
@@ -1213,32 +1303,56 @@ export default function VocabQuiz() {
 
             {/* Hướng câu hỏi */}
             <div className="space-y-1.5 pt-1">
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
-                Hướng câu hỏi:
-              </label>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="flex items-center justify-between">
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                  Hướng câu hỏi:
+                </label>
+                <span className="text-[10px] text-purple-600 dark:text-purple-400 font-medium">
+                  {direction === 'term-to-meaning'
+                    ? 'Hiện Tiếng Anh → Trả lời Tiếng Việt'
+                    : direction === 'meaning-to-term'
+                      ? 'Hiện Tiếng Việt → Trả lời Tiếng Anh'
+                      : 'Xáo trộn ngẫu nhiên cả 2 chiều'}
+                </span>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
                 <button
                   type="button"
-                  onClick={() => setDirection('term-to-meaning')}
-                  className={`py-2 px-3 rounded-xl border text-xs font-semibold transition-all cursor-pointer text-center ${
+                  onClick={() => handleSetDirection('term-to-meaning')}
+                  className={`py-2 px-1.5 rounded-xl border text-xs font-semibold transition-all cursor-pointer text-center flex flex-col items-center justify-center gap-0.5 ${
                     direction === 'term-to-meaning'
-                      ? 'border-purple-500 bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 ring-2 ring-purple-500/20'
+                      ? 'border-purple-500 bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 ring-2 ring-purple-500/20 shadow-xs'
                       : 'border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300'
                   }`}
                 >
-                  Từ &rarr; Nghĩa
+                  <span className="font-bold text-[11px] sm:text-xs">Từ &rarr; Nghĩa</span>
+                  <span className="text-[9px] font-normal opacity-75">Hiện Anh &rarr; Gõ Việt</span>
                 </button>
 
                 <button
                   type="button"
-                  onClick={() => setDirection('meaning-to-term')}
-                  className={`py-2 px-3 rounded-xl border text-xs font-semibold transition-all cursor-pointer text-center ${
+                  onClick={() => handleSetDirection('meaning-to-term')}
+                  className={`py-2 px-1.5 rounded-xl border text-xs font-semibold transition-all cursor-pointer text-center flex flex-col items-center justify-center gap-0.5 ${
                     direction === 'meaning-to-term'
-                      ? 'border-purple-500 bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 ring-2 ring-purple-500/20'
+                      ? 'border-purple-500 bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 ring-2 ring-purple-500/20 shadow-xs'
                       : 'border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300'
                   }`}
                 >
-                  Nghĩa &rarr; Từ
+                  <span className="font-bold text-[11px] sm:text-xs">Nghĩa &rarr; Từ</span>
+                  <span className="text-[9px] font-normal opacity-75">Hiện Việt &rarr; Gõ Anh</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleSetDirection('mixed')}
+                  className={`py-2 px-1.5 rounded-xl border text-xs font-semibold transition-all cursor-pointer text-center flex flex-col items-center justify-center gap-0.5 ${
+                    direction === 'mixed'
+                      ? 'border-purple-500 bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 ring-2 ring-purple-500/20 shadow-xs'
+                      : 'border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300'
+                  }`}
+                >
+                  <span className="font-bold text-[11px] sm:text-xs">Xáo trộn</span>
+                  <span className="text-[9px] font-normal opacity-75">Đan xen 2 chiều</span>
                 </button>
               </div>
             </div>
@@ -1341,35 +1455,74 @@ export default function VocabQuiz() {
           }`}
         >
           {/* Prompt Section (for choice and written) */}
-          {currentQ.type !== 'matching' && currentQ.type !== 'flashcard' && currentQ.card && (
-            <div className="text-center py-2 space-y-2 border-b border-slate-100 dark:border-slate-800/80 pb-4">
-              {/* Audio Button */}
-              <div className="flex justify-center pb-0.5">
-                <button
-                  type="button"
-                  onClick={() => speakWord(currentQ.card.term, currentDeck.targetLanguage || 'en-US')}
-                  className="w-8 h-8 rounded-full border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 flex items-center justify-center transition-all cursor-pointer hover:scale-105 active:scale-95 shadow-2xs"
-                  title="Nghe phát âm"
-                >
-                  <IconSpeaker className="w-4 h-4" />
-                </button>
+          {currentQ.type !== 'matching' && currentQ.type !== 'flashcard' && currentQ.card && (() => {
+            const qDir = currentQ.direction || direction;
+            const isTermToMeaning = qDir === 'term-to-meaning';
+
+            return (
+              <div className="text-center py-2 space-y-2 border-b border-slate-100 dark:border-slate-800/80 pb-4">
+                {/* Header Tag / Badge */}
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className={`text-[10.5px] font-mono uppercase tracking-wider font-bold px-2 py-0.5 rounded-md border ${
+                      currentQ.type === 'written'
+                        ? isTermToMeaning
+                          ? 'text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-950/60 border-purple-200/70 dark:border-purple-800/70'
+                          : 'text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-950/60 border-indigo-200/70 dark:border-indigo-800/70'
+                        : 'text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 border-slate-200/60 dark:border-slate-700/60'
+                    }`}>
+                      {currentQ.type === 'written'
+                        ? (isTermToMeaning ? 'Gõ nghĩa tiếng Việt' : 'Gõ từ tiếng Anh')
+                        : 'Trắc nghiệm'}
+                    </span>
+
+                    <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200/50 dark:border-slate-700/50">
+                      {isTermToMeaning ? 'Hiện từ Anh → Gõ Việt' : 'Hiện nghĩa Việt → Gõ Anh'}
+                    </span>
+
+                    {currentQ.card.partOfSpeech && (
+                      <span className="text-[10px] font-mono text-slate-400 italic">
+                        ({currentQ.card.partOfSpeech})
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Audio Button */}
+                  {(isTermToMeaning || isAnswered) ? (
+                    <button
+                      type="button"
+                      onClick={() => speakWord(currentQ.card.term, currentDeck.targetLanguage || 'en-US')}
+                      className="w-7 h-7 rounded-full border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 flex items-center justify-center transition-all cursor-pointer hover:scale-105 active:scale-95 shadow-2xs"
+                      title="Nghe phát âm tiếng Anh"
+                    >
+                      <IconSpeaker className="w-3.5 h-3.5" />
+                    </button>
+                  ) : (
+                    <div
+                      className="w-7 h-7 rounded-full border border-dashed border-slate-200 dark:border-slate-800 text-slate-300 dark:text-slate-600 flex items-center justify-center text-[10px]"
+                      title="Phát âm tiếng Anh sẽ mở sau khi bạn trả lời"
+                    >
+                      <IconSpeaker className="w-3 h-3 opacity-30" />
+                    </div>
+                  )}
+                </div>
+
+                {/* Prompt text */}
+                <div className="pt-1">
+                  <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-950 dark:text-white">
+                    {currentQ.prompt}
+                  </h2>
+                </div>
+
+                {/* Phiên âm: chỉ hiện trước khi trả lời nếu là term-to-meaning; hoặc sau khi đã trả lời */}
+                {(isTermToMeaning || isAnswered) && currentQ.card.phonetic && !hidePhonetic && (
+                  <p className="text-xs font-mono font-medium text-slate-500 dark:text-slate-400">
+                    {currentQ.card.phonetic}
+                  </p>
+                )}
               </div>
-
-
-              {/* Prompt text (Từ vựng) */}
-              <div className="pt-0.5">
-                <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-950 dark:text-white">
-                  {currentQ.prompt}
-                </h2>
-              </div>
-
-              {direction === 'term-to-meaning' && currentQ.card.phonetic && !hidePhonetic && (
-                <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
-                  {currentQ.card.phonetic}
-                </p>
-              )}
-            </div>
-          )}
+            );
+          })()}
 
           {/* MODE 1: MULTIPLE CHOICE QUESTION */}
           {currentQ.type === 'choice' && (
@@ -1419,127 +1572,151 @@ export default function VocabQuiz() {
           )}
 
           {/* MODE 2: WRITTEN / TYPING QUESTION (Quizlet Style) */}
-          {currentQ.type === 'written' && (
-            <div className="space-y-4">
-              <form onSubmit={handleWrittenSubmit} className="space-y-3">
-                <input
-                  type="text"
-                  autoFocus
-                  disabled={isAnswered}
-                  value={typedAnswer}
-                  onChange={e => setTypedAnswer(e.target.value)}
-                  placeholder={direction === 'term-to-meaning' ? 'Gõ định nghĩa, nghĩa tiếng Việt...' : 'Gõ từ tiếng Anh tương ứng...'}
-                  className={`w-full px-4 py-3 rounded-xl border text-sm sm:text-base outline-none transition-all ${
-                    isAnswered
-                      ? isCorrectWritten
-                        ? 'border-emerald-500 bg-emerald-50/60 dark:bg-emerald-950/40 text-emerald-900 dark:text-emerald-100 font-semibold'
-                        : 'border-rose-400 bg-rose-50/60 dark:bg-rose-950/40 text-rose-900 dark:text-rose-100 font-semibold'
-                      : 'border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 focus:border-purple-500 focus:ring-1 focus:ring-purple-500 dark:focus:border-purple-400 dark:focus:ring-purple-400'
-                  }`}
-                />
+          {currentQ.type === 'written' && (() => {
+            const qDir = currentQ.direction || direction;
+            const isTermToMeaning = qDir === 'term-to-meaning';
 
-                {!isAnswered && (
-                  <div className="flex items-center justify-between gap-2 pt-1">
-                    <button
-                      type="button"
-                      onClick={handleDontKnow}
-                      className="px-3 py-1.5 rounded-lg text-xs font-medium text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
-                    >
-                      Tôi không biết
-                    </button>
+            return (
+              <div className="space-y-4">
+                <form onSubmit={handleWrittenSubmit} className="space-y-3">
+                  <input
+                    type="text"
+                    autoFocus
+                    disabled={isAnswered}
+                    value={typedAnswer}
+                    onChange={e => setTypedAnswer(e.target.value)}
+                    placeholder={isTermToMeaning ? 'Gõ định nghĩa, nghĩa tiếng Việt...' : 'Gõ từ tiếng Anh tương ứng...'}
+                    className={`w-full px-4 py-3 rounded-xl border text-sm sm:text-base outline-none transition-all ${
+                      isAnswered
+                        ? isCorrectWritten
+                          ? 'border-emerald-500 bg-emerald-50/60 dark:bg-emerald-950/40 text-emerald-900 dark:text-emerald-100 font-semibold'
+                          : 'border-rose-400 bg-rose-50/60 dark:bg-rose-950/40 text-rose-900 dark:text-rose-100 font-semibold'
+                        : 'border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 focus:border-purple-500 focus:ring-1 focus:ring-purple-500 dark:focus:border-purple-400 dark:focus:ring-purple-400'
+                    }`}
+                  />
 
-                    <button
-                      type="submit"
-                      disabled={!typedAnswer.trim()}
-                      className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold tracking-tight transition-all flex items-center gap-1.5 cursor-pointer ${
-                        typedAnswer.trim()
-                          ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-slate-100 active:scale-98 shadow-2xs'
-                          : 'bg-slate-100 dark:bg-slate-800 text-slate-400 cursor-not-allowed border border-slate-200 dark:border-slate-700'
-                      }`}
-                    >
-                      <span>Trả lời</span>
-                      <span className="text-[10px] font-mono opacity-60">(Enter)</span>
-                    </button>
-                  </div>
-                )}
-              </form>
+                  {!isAnswered && (
+                    <div className="flex items-center justify-between gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={handleDontKnow}
+                        className="px-3 py-1.5 rounded-lg text-xs font-medium text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                      >
+                        Tôi không biết
+                      </button>
 
-              {/* Feedback when answered */}
-              {isAnswered && (
-                <div className={`p-4 rounded-xl border text-xs space-y-2.5 transition-all ${
-                  isCorrectWritten
-                    ? 'border-emerald-200 dark:border-emerald-900/60 bg-emerald-50/70 dark:bg-emerald-950/30 text-emerald-900 dark:text-emerald-100'
-                    : 'border-rose-200 dark:border-rose-900/60 bg-rose-50/70 dark:bg-rose-950/30 text-rose-900 dark:text-rose-100'
-                }`}>
-                  <div className="flex items-center gap-1.5 font-bold text-sm">
-                    {isCorrectWritten ? (
-                      <>
-                        <IconCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                        <span className="text-emerald-700 dark:text-emerald-300">Chính xác! Làm rất tốt.</span>
-                      </>
-                    ) : (
-                      <>
-                        <IconCross className="w-4 h-4 text-rose-600 dark:text-rose-400" />
-                        <span className="text-rose-700 dark:text-rose-300">Chưa chính xác</span>
-                      </>
-                    )}
-                  </div>
-
-                  {!isCorrectWritten && (
-                    <div className="space-y-1.5 pt-1">
-                      <div className="bg-white/80 dark:bg-slate-900/80 p-2.5 rounded-lg border border-rose-100 dark:border-rose-900/40">
-                        <div className="text-[11px] text-slate-500 dark:text-slate-400">Câu trả lời của bạn:</div>
-                        <div className="line-through text-rose-600 dark:text-rose-400 font-semibold">{typedAnswer || '(Bỏ qua)'}</div>
-                      </div>
-
-                      <div className="bg-white/80 dark:bg-slate-900/80 p-2.5 rounded-lg border border-emerald-100 dark:border-emerald-900/40">
-                        <div className="text-[11px] text-slate-500 dark:text-slate-400">Đáp án chính xác:</div>
-                        <div className="text-emerald-600 dark:text-emerald-400 font-bold text-sm">{currentQ.correctAnswer}</div>
-                      </div>
-
-                      {/* Quizlet Copy-Down Feature: Gõ lại đáp án đúng để ghi nhớ */}
-                      <div className="pt-2">
-                        <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                          Gõ lại đáp án đúng để ghi nhớ:
-                        </label>
-                        <input
-                          type="text"
-                          autoFocus
-                          value={retypedText}
-                          onChange={e => setRetypedText(e.target.value)}
-                          placeholder={`Gõ lại: ${currentQ.correctAnswer}`}
-                          className={`w-full px-3 py-2 rounded-lg text-xs font-medium border outline-none transition-all ${
-                            checkAnswerMatch(retypedText, currentQ.correctAnswer)
-                              ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-200 font-bold'
-                              : 'border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 focus:border-purple-500'
-                          }`}
-                        />
-                        {checkAnswerMatch(retypedText, currentQ.correctAnswer) && (
-                          <p className="text-[11px] text-emerald-600 dark:text-emerald-400 mt-1 flex items-center gap-1 font-semibold">
-                            <IconCheck className="w-3.5 h-3.5" />
-                            <span>Đã gõ đúng! Bạn có thể chuyển sang câu tiếp theo.</span>
-                          </p>
-                        )}
-                      </div>
-
-                      {/* Override Button ("Đáp án của tôi đúng") */}
-                      {!isOverridden && (
-                        <div className="pt-1 text-right">
-                          <button
-                            type="button"
-                            onClick={handleOverrideCorrect}
-                            className="text-[11px] text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 underline cursor-pointer"
-                          >
-                            Đáp án của tôi đúng (Cộng điểm)
-                          </button>
-                        </div>
-                      )}
+                      <button
+                        type="submit"
+                        disabled={!typedAnswer.trim()}
+                        className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold tracking-tight transition-all flex items-center gap-1.5 cursor-pointer ${
+                          typedAnswer.trim()
+                            ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-slate-100 active:scale-98 shadow-2xs'
+                            : 'bg-slate-100 dark:bg-slate-800 text-slate-400 cursor-not-allowed border border-slate-200 dark:border-slate-700'
+                        }`}
+                      >
+                        <span>Trả lời</span>
+                        <span className="text-[10px] font-mono opacity-60">(Enter)</span>
+                      </button>
                     </div>
                   )}
-                </div>
-              )}
-            </div>
-          )}
+                </form>
+
+                {/* Feedback when answered */}
+                {isAnswered && (
+                  <div className={`p-4 rounded-xl border text-xs space-y-2.5 transition-all ${
+                    isCorrectWritten
+                      ? 'border-emerald-200 dark:border-emerald-900/60 bg-emerald-50/70 dark:bg-emerald-950/30 text-emerald-900 dark:text-emerald-100'
+                      : 'border-rose-200 dark:border-rose-900/60 bg-rose-50/70 dark:bg-rose-950/30 text-rose-900 dark:text-rose-100'
+                  }`}>
+                    <div className="flex items-center gap-1.5 font-bold text-sm">
+                      {isCorrectWritten ? (
+                        <>
+                          <IconCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                          <span className="text-emerald-700 dark:text-emerald-300">Chính xác! Làm rất tốt.</span>
+                        </>
+                      ) : (
+                        <>
+                          <IconCross className="w-4 h-4 text-rose-600 dark:text-rose-400" />
+                          <span className="text-rose-700 dark:text-rose-300">Chưa chính xác</span>
+                        </>
+                      )}
+                    </div>
+
+                    {!isCorrectWritten && (
+                      <div className="space-y-2 pt-1">
+                        <div className="bg-white/80 dark:bg-slate-900/80 p-2.5 rounded-lg border border-rose-100 dark:border-rose-900/40">
+                          <div className="text-[11px] text-slate-500 dark:text-slate-400">Câu trả lời của bạn:</div>
+                          <div className="line-through text-rose-600 dark:text-rose-400 font-semibold">{typedAnswer || '(Bỏ qua)'}</div>
+                        </div>
+
+                        <div className="bg-white/80 dark:bg-slate-900/80 p-2.5 rounded-lg border border-emerald-100 dark:border-emerald-900/40">
+                          <div className="text-[11px] text-slate-500 dark:text-slate-400">
+                            Đáp án chính xác ({isTermToMeaning ? 'Nghĩa tiếng Việt' : 'Từ tiếng Anh'}):
+                          </div>
+                          <div className="text-emerald-600 dark:text-emerald-400 font-bold text-sm flex items-center justify-between gap-2 mt-0.5">
+                            <span>{currentQ.correctAnswer}</span>
+                            {!isTermToMeaning && (
+                              <button
+                                type="button"
+                                onClick={() => speakWord(currentQ.card.term, currentDeck.targetLanguage || 'en-US')}
+                                className="w-7 h-7 rounded-full bg-emerald-100 dark:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 flex items-center justify-center hover:scale-105 active:scale-95 transition-all cursor-pointer"
+                                title="Nghe lại phát âm tiếng Anh"
+                              >
+                                <IconSpeaker className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </div>
+                          {!isTermToMeaning && currentQ.card.phonetic && (
+                            <div className="text-[11px] text-slate-400 font-mono mt-0.5">
+                              {currentQ.card.phonetic}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Quizlet Copy-Down Feature: Gõ lại đáp án đúng để ghi nhớ */}
+                        <div className="pt-2">
+                          <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                            Gõ lại đáp án đúng để ghi nhớ ({isTermToMeaning ? 'Nghĩa tiếng Việt' : 'Từ tiếng Anh'}):
+                          </label>
+                          <input
+                            type="text"
+                            autoFocus
+                            value={retypedText}
+                            onChange={e => setRetypedText(e.target.value)}
+                            placeholder={`Gõ lại: ${currentQ.correctAnswer}`}
+                            className={`w-full px-3 py-2 rounded-lg text-xs font-medium border outline-none transition-all ${
+                              checkAnswerMatch(retypedText, currentQ.correctAnswer)
+                                ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-200 font-bold'
+                                : 'border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 focus:border-purple-500'
+                            }`}
+                          />
+                          {checkAnswerMatch(retypedText, currentQ.correctAnswer) && (
+                            <p className="text-[11px] text-emerald-600 dark:text-emerald-400 mt-1 flex items-center gap-1 font-semibold">
+                              <IconCheck className="w-3.5 h-3.5" />
+                              <span>Đã gõ đúng! Bạn có thể chuyển sang câu tiếp theo.</span>
+                            </p>
+                          )}
+                        </div>
+
+                        {/* Override Button ("Đáp án của tôi đúng") */}
+                        {!isOverridden && (
+                          <div className="pt-1 text-right">
+                            <button
+                              type="button"
+                              onClick={handleOverrideCorrect}
+                              className="text-[11px] text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 underline cursor-pointer"
+                            >
+                              Đáp án của tôi đúng (Cộng điểm)
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
 
           {/* MODE 2: FLASHCARD QUESTION (Lật thẻ) */}
           {currentQ.type === 'flashcard' && currentQ.card && (
@@ -1577,7 +1754,7 @@ export default function VocabQuiz() {
                             : 'text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-950/60 border-purple-200/60 dark:border-purple-800'
                         }`}
                       >
-                        {direction === 'term-to-meaning' ? 'Từ vựng' : 'Định nghĩa'}
+                        {(currentQ.direction || direction) === 'term-to-meaning' ? 'Từ vựng' : 'Định nghĩa'}
                       </span>
                       <button
                         type="button"
@@ -1607,9 +1784,9 @@ export default function VocabQuiz() {
                         </div>
                       )}
                       <h2 className={`text-2xl sm:text-3xl font-extrabold tracking-tight whitespace-pre-line ${flashcardSlide ? 'text-white' : 'text-slate-950 dark:text-white'}`}>
-                        {direction === 'term-to-meaning' ? currentQ.card.term : currentQ.card.meaning}
+                        {(currentQ.direction || direction) === 'term-to-meaning' ? currentQ.card.term : currentQ.card.meaning}
                       </h2>
-                      {direction === 'term-to-meaning' && currentQ.card.phonetic && !hidePhonetic && (
+                      {(currentQ.direction || direction) === 'term-to-meaning' && currentQ.card.phonetic && !hidePhonetic && (
                         <p className={`text-xs font-medium ${flashcardSlide ? 'text-white/90' : 'text-slate-500 dark:text-slate-400'}`}>
                           {currentQ.card.phonetic}
                         </p>
@@ -1646,7 +1823,7 @@ export default function VocabQuiz() {
                             : 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 border-emerald-200/60 dark:border-emerald-800'
                         }`}
                       >
-                        {direction === 'term-to-meaning' ? 'Định nghĩa' : 'Từ vựng'}
+                        {(currentQ.direction || direction) === 'term-to-meaning' ? 'Định nghĩa' : 'Từ vựng'}
                       </span>
                       <button
                         type="button"
@@ -1667,9 +1844,9 @@ export default function VocabQuiz() {
 
                     <div className="text-center my-auto space-y-2.5 px-2 py-2">
                       <h3 className={`text-xl sm:text-2xl font-bold whitespace-pre-line ${flashcardSlide ? 'text-white' : 'text-slate-900 dark:text-slate-100'}`}>
-                        {direction === 'term-to-meaning' ? currentQ.card.meaning : currentQ.card.term}
+                        {(currentQ.direction || direction) === 'term-to-meaning' ? currentQ.card.meaning : currentQ.card.term}
                       </h3>
-                      {direction === 'meaning-to-term' && currentQ.card.phonetic && !hidePhonetic && (
+                      {(currentQ.direction || direction) === 'meaning-to-term' && currentQ.card.phonetic && !hidePhonetic && (
                         <p className={`text-xs font-medium ${flashcardSlide ? 'text-white/90' : 'text-slate-500 dark:text-slate-400'}`}>
                           {currentQ.card.phonetic}
                         </p>
