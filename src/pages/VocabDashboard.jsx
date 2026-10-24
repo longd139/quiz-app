@@ -7,6 +7,7 @@ import { speakWord } from '../lib/tts';
 import CreateFlashcardModal from '../components/CreateFlashcardModal';
 import StreakHeatmap from '../components/StreakHeatmap';
 import FormattedText from '../components/FormattedText';
+import { recordAuditLog, AUDIT_TYPES, AUDIT_CATEGORIES } from '../data/auditTrail';
 
 export default function VocabDashboard() {
   const { data, update, showConfirm, showToast } = useQuiz();
@@ -41,8 +42,20 @@ export default function VocabDashboard() {
 
   const handleDelete = (deckId, name) => {
     showConfirm(`Bạn có chắc muốn xóa bộ từ vựng "${name}"? Thao tác này không thể hoàn tác.`, () => {
+      const targetDeck = vocabDecks.find(d => d.id === deckId);
       const nextDecks = vocabDecks.filter(d => d.id !== deckId);
       update({ ...data, vocabDecks: nextDecks });
+      recordAuditLog({
+        type: AUDIT_TYPES.VOCAB_DECK_DELETE,
+        category: AUDIT_CATEGORIES.VOCAB,
+        title: `Xóa bộ từ vựng: "${name}"`,
+        detail: {
+          deckId,
+          deckName: name,
+          cardsCount: (targetDeck?.cards || []).length
+        }
+      });
+      showToast(`Đã xóa bộ từ vựng "${name}"`, 'info');
     });
   };
 
@@ -54,6 +67,12 @@ export default function VocabDashboard() {
     const newCol = createVocabCollection(newColName.trim());
     update({ ...data, vocabCollections: [...vocabCollections, newCol] });
     setNewColName('');
+    recordAuditLog({
+      type: AUDIT_TYPES.VOCAB_COLLECTION_CREATE,
+      category: AUDIT_CATEGORIES.VOCAB,
+      title: `Tạo bộ sưu tập: "${newCol.name}"`,
+      detail: { id: newCol.id, name: newCol.name }
+    });
     showToast(`Đã thêm bộ sưu tập "${newCol.name}"`, 'success');
   };
 
@@ -88,6 +107,21 @@ export default function VocabDashboard() {
       return d;
     });
     update({ ...data, vocabDecks: nextDecks });
+    recordAuditLog({
+      type: AUDIT_TYPES.VOCAB_CARD_CREATE,
+      category: AUDIT_CATEGORIES.VOCAB,
+      title: `Tạo từ vựng mới: "${newCard.term}"`,
+      detail: {
+        term: newCard.term,
+        meaning: newCard.meaning,
+        phonetic: newCard.phonetic,
+        partOfSpeech: newCard.partOfSpeech,
+        deckName: createModalDeck.name,
+        examples: newCard.examples || (newCard.example ? [newCard.example] : []),
+        hasImage: Boolean(newCard.image),
+        note: newCard.note || ''
+      }
+    });
     showToast(`Đã thêm "${newCard.term}" vào bộ "${createModalDeck.name}"`, 'success');
     if (shouldClose) {
       setCreateModalDeck(null);

@@ -5,16 +5,14 @@ const quizTabs = [
   { path: '/', label: 'Trang chủ' },
   { path: '/editor', label: 'Soạn bài' },
   { path: '/practice-setup', label: 'Luyện tập' },
-  { path: '/history', label: 'Lịch sử' },
-  { path: '/data', label: 'Dữ liệu' }
+  { path: '/history', label: 'Lịch sử' }
 ];
 
 const languageTabs = [
   { path: '/vocab', label: 'Bộ từ vựng' },
   { path: '/vocab-editor', label: 'Soạn từ' },
   { path: '/vocab-learn', label: 'Flashcard' },
-  { path: '/vocab-quiz', label: 'Trắc nghiệm' },
-  { path: '/data', label: 'Dữ liệu' }
+  { path: '/vocab-quiz', label: 'Trắc nghiệm' }
 ];
 
 export default function TabNav() {

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useQuiz } from '../App';
 import { getFilteredTests, getCollectionName, escHtml, truncate, fmtDate } from '../data/storage';
 import StreakHeatmap from '../components/StreakHeatmap';
+import { recordAuditLog, AUDIT_TYPES, AUDIT_CATEGORIES } from '../data/auditTrail';
 
 export default function Dashboard() {
   const { data, update, showConfirm, showAlert } = useQuiz();
@@ -16,6 +17,15 @@ export default function Dashboard() {
     showConfirm(`Xóa bài "${test.name}" (${test.questions.length} câu)? Hành động này không thể hoàn tác.`, () => {
       const d = { ...data, tests: data.tests.filter((_, i) => i !== idx) };
       update(d);
+      recordAuditLog({
+        type: AUDIT_TYPES.TEST_DELETE,
+        category: AUDIT_CATEGORIES.TEST,
+        title: `Xóa bài test: "${test.name}"`,
+        detail: {
+          testName: test.name,
+          questionsCount: test.questions.length
+        }
+      });
     });
   };
 

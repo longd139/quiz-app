@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useQuiz } from '../App';
 import { createQuestion, createTest, createCollection, uid, escHtml, getFilteredTests, renderMd } from '../data/storage';
 import { parseBulkPaste } from '../data/parser';
+import { recordAuditLog, AUDIT_TYPES, AUDIT_CATEGORIES } from '../data/auditTrail';
 
 export default function Editor() {
   const { data, update, showConfirm, showAlert, showToast } = useQuiz();
@@ -193,6 +194,16 @@ export default function Editor() {
       d = { ...data, tests: [...data.tests, test] };
     }
     update(d);
+    recordAuditLog({
+      type: existingTest ? AUDIT_TYPES.TEST_UPDATE : AUDIT_TYPES.TEST_CREATE,
+      category: AUDIT_CATEGORIES.TEST,
+      title: `${existingTest ? 'Cập nhật' : 'Tạo mới'} bài test: "${testName}"`,
+      detail: {
+        testName,
+        questionsCount: questions.length,
+        isNew: !existingTest
+      }
+    });
     if (existingTest) {
       showToast(`✅ Đã cập nhật bài test "${testName}" thành công.`, 'success');
     } else {

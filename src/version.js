@@ -1,12 +1,44 @@
-export const APP_VERSION = 'v1.3.4';
+export const APP_VERSION = 'v1.3.5';
 
 export const CHANGELOG_DATA = [
   {
+    version: 'v1.3.5',
+    date: '25/10/2026',
+    isLatest: true,
+    title: 'Hệ thống Audit Trail & Hợp nhất Quản lý Dữ liệu vào Cài đặt',
+    tag: 'Bản cập nhật hiện tại',
+    changes: [
+      {
+        type: 'feature',
+        title: 'Hợp nhất Dữ liệu & Đồng bộ vào Cài đặt hệ thống',
+        description: 'Đưa toàn bộ tính năng đồng bộ Supabase Cloud, mã phòng, xuất/nhập file JSON và bản sao lưu hàng ngày vào modal Cài đặt, cho phép truy cập nhanh từ mọi trang.'
+      },
+      {
+        type: 'feature',
+        title: 'Nhật ký kiểm toán chi tiết (Audit Trail) bảo vệ mật khẩu',
+        description: 'Khu vực Audit được bảo vệ bằng mật khẩu (VITE_AUDIT_PASSWORD), lưu vết chi tiết từng từ vựng được tạo ra/chỉnh sửa (từ, nghĩa, phát âm, từ loại, ví dụ, bộ từ) và mọi request gửi lên Supabase Cloud.'
+      },
+      {
+        type: 'improvement',
+        title: 'Bộ lọc & Tìm kiếm lịch sử thao tác thông minh',
+        description: 'Hỗ trợ lọc theo danh mục (Từ vựng, Cloud Request, Bài test, Sao lưu) và tìm kiếm từ vựng hoặc hành động ngay trong Audit Trail.'
+      },
+      {
+        type: 'feature',
+        title: 'Xuất báo cáo Audit Trail (.json)',
+        description: 'Cho phép xuất toàn bộ lịch sử thao tác và request thành file JSON để kiểm tra đối chiếu khi cần.'
+      },
+      {
+        type: 'improvement',
+        title: 'Tinh giản thanh điều hướng',
+        description: 'Lược bỏ tab Dữ liệu khỏi thanh menu Học câu hỏi để giao diện tập trung và nhất quán giữa các chế độ học.'
+      }
+    ]
+  },
+  {
     version: 'v1.3.4',
     date: '24/10/2026',
-    isLatest: true,
     title: 'Luyện gõ chữ đa chiều & Giao diện thẻ Flashcard mới',
-    tag: 'Bản cập nhật hiện tại',
     changes: [
       {
         type: 'feature',
