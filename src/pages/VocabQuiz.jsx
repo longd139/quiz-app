@@ -4,7 +4,7 @@ import { useQuiz } from '../App';
 import { shuffle } from '../data/storage';
 import { recordStudyActivity } from '../data/streak';
 import { speakWord, speakWordAuto } from '../lib/tts';
-import { IconSpeaker, IconCheck, IconCross, IconCards, IconRotate, IconArrowLeft, IconSettings, IconLink } from '../components/Icons';
+import { IconSpeaker, IconCheck, IconCross, IconCards, IconRotate, IconRepeat, IconArrowLeft, IconSettings, IconLink } from '../components/Icons';
 import { getBadgeColor } from '../data/badgeColors';
 import FormattedText, { stripFormatting } from '../components/FormattedText';
 
@@ -1721,7 +1721,7 @@ export default function VocabQuiz() {
                     >
                       <div className="flex items-center justify-between">
                         <span
-                          className={`text-[11px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-md border ${
+                          className={`text-xs font-semibold px-2.5 py-0.5 rounded-lg border ${
                             flashcardSlide
                               ? 'bg-white/20 border-white/40 text-white'
                               : 'text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-950/60 border-purple-200/60 dark:border-purple-800'
@@ -1729,21 +1729,32 @@ export default function VocabQuiz() {
                         >
                           {isTermToMeaning ? 'Từ vựng' : 'Định nghĩa'}
                         </span>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            speakWord(currentQ.card.term, currentDeck.targetLanguage || 'en-US');
-                          }}
-                          className={`w-8 h-8 rounded-full border flex items-center justify-center transition-colors cursor-pointer ${
-                            flashcardSlide
-                              ? 'border-white/30 bg-white/20 text-white'
-                              : 'border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300'
-                          }`}
-                          title="Nghe phát âm"
-                        >
-                          <IconSpeaker className="w-4 h-4" />
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={`px-2.5 py-0.5 rounded-lg text-xs font-semibold ${
+                              flashcardSlide
+                                ? 'bg-white/20 text-white'
+                                : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200/60 dark:border-slate-700'
+                            }`}
+                          >
+                            Ôn tập
+                          </span>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              speakWord(currentQ.card.term, currentDeck.targetLanguage || 'en-US');
+                            }}
+                            className={`w-7 h-7 rounded-full border flex items-center justify-center transition-colors cursor-pointer ${
+                              flashcardSlide
+                                ? 'border-white/30 bg-white/20 text-white'
+                                : 'border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300'
+                            }`}
+                            title="Nghe phát âm"
+                          >
+                            <IconSpeaker className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </div>
 
                       <div className="text-center my-auto space-y-2 py-3">
@@ -1767,34 +1778,27 @@ export default function VocabQuiz() {
 
                         {/* Ghi chú khi mặt trước là định nghĩa */}
                         {!isTermToMeaning && currentQ.card.note && (
-                          <div
-                            className={`rounded-xl p-2.5 border text-left text-xs mt-2 ${
-                              flashcardSlide
-                                ? 'bg-white/15 border-white/25 text-white'
-                                : 'bg-amber-50/70 dark:bg-amber-950/30 border-amber-200/60 dark:border-amber-900/40 text-amber-900 dark:text-amber-200'
-                            }`}
-                          >
-                            <span
-                              className={`font-semibold text-[10px] uppercase tracking-wider block mb-0.5 ${
-                                flashcardSlide ? 'text-white/90' : 'text-amber-700 dark:text-amber-400'
-                              }`}
-                            >
-                              Ghi chú
-                            </span>
-                            <p className="whitespace-pre-line leading-relaxed">{currentQ.card.note}</p>
+                          <div className="text-left pt-2 space-y-1">
+                            <h4 className={`font-bold text-sm sm:text-base ${flashcardSlide ? 'text-white' : 'text-slate-900 dark:text-slate-100'}`}>
+                              Ghi chú:
+                            </h4>
+                            <p className={`text-xs sm:text-sm leading-relaxed whitespace-pre-line ${flashcardSlide ? 'text-white/95' : 'text-slate-700 dark:text-slate-200'}`}>
+                              {currentQ.card.note}
+                            </p>
                           </div>
                         )}
                       </div>
 
-                      <div
-                        className={`text-center pt-2.5 border-t text-xs flex items-center justify-center gap-1.5 font-sans ${
-                          flashcardSlide
-                            ? 'border-white/20 text-white/80'
-                            : 'border-slate-100 dark:border-slate-800/80 text-slate-400'
-                        }`}
-                      >
-                        <IconRotate className={`w-3.5 h-3.5 ${flashcardSlide ? 'text-white' : 'text-slate-400'}`} />
-                        <span>Bấm vào thẻ hoặc phím <strong className={flashcardSlide ? 'text-white font-bold' : 'font-semibold text-slate-600 dark:text-slate-300'}>Space</strong> để lật</span>
+                      <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-800/80">
+                        <span className={`text-[11px] font-sans ${flashcardSlide ? 'text-white/80' : 'text-slate-400'}`}>
+                          Bấm vào thẻ hoặc phím <strong className={flashcardSlide ? 'text-white font-bold' : 'font-semibold text-slate-600 dark:text-slate-300'}>Space</strong> để lật
+                        </span>
+                        <div
+                          className={`p-1 ${flashcardSlide ? 'text-white' : 'text-slate-500 dark:text-slate-400'}`}
+                          title="Lật thẻ"
+                        >
+                          <IconRepeat className="w-4 h-4" />
+                        </div>
                       </div>
                     </div>
 
@@ -1805,12 +1809,12 @@ export default function VocabQuiz() {
                           ? 'bg-emerald-600 border-emerald-500 text-white shadow-2xl shadow-emerald-600/30'
                           : flashcardSlide === 'review'
                           ? 'bg-rose-600 border-rose-500 text-white shadow-2xl shadow-rose-600/30'
-                          : 'bg-[#fafaf9] dark:bg-[#0e131f] border-slate-300/80 dark:border-slate-700 text-slate-900 dark:text-slate-100'
+                          : 'bg-white dark:bg-slate-900 border-slate-200/90 dark:border-slate-800 text-slate-900 dark:text-slate-100'
                       }`}
                     >
                       <div className="flex items-center justify-between">
                         <span
-                          className={`text-[11px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-md border ${
+                          className={`text-xs font-semibold px-2.5 py-0.5 rounded-lg border ${
                             flashcardSlide
                               ? 'bg-white/20 border-white/40 text-white'
                               : 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 border-emerald-200/60 dark:border-emerald-800'
@@ -1818,48 +1822,67 @@ export default function VocabQuiz() {
                         >
                           {isTermToMeaning ? 'Định nghĩa' : 'Từ vựng'}
                         </span>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            speakWord(currentQ.card.term, currentDeck.targetLanguage || 'en-US');
-                          }}
-                          className={`w-8 h-8 rounded-full border flex items-center justify-center transition-colors cursor-pointer ${
-                            flashcardSlide
-                              ? 'border-white/30 bg-white/20 text-white'
-                              : 'border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300'
-                          }`}
-                          title="Nghe lại phát âm"
-                        >
-                          <IconSpeaker className="w-4 h-4" />
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={`px-2.5 py-0.5 rounded-lg text-xs font-semibold ${
+                              flashcardSlide
+                                ? 'bg-white/20 text-white'
+                                : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200/60 dark:border-slate-700'
+                            }`}
+                          >
+                            Ôn tập
+                          </span>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              speakWord(currentQ.card.term, currentDeck.targetLanguage || 'en-US');
+                            }}
+                            className={`w-7 h-7 rounded-full border flex items-center justify-center transition-colors cursor-pointer ${
+                              flashcardSlide
+                                ? 'border-white/30 bg-white/20 text-white'
+                                : 'border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300'
+                            }`}
+                            title="Nghe lại phát âm"
+                          >
+                            <IconSpeaker className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </div>
 
-                      <div className="text-center my-auto space-y-2.5 px-2 py-2">
-                        <h3 className={`text-xl sm:text-2xl font-bold whitespace-pre-line ${flashcardSlide ? 'text-white' : 'text-slate-900 dark:text-slate-100'}`}>
-                          {isTermToMeaning ? currentQ.card.meaning : currentQ.card.term}
-                        </h3>
-                        {!isTermToMeaning && currentQ.card.phonetic && !hidePhonetic && (
-                          <p className={`text-xs font-medium ${flashcardSlide ? 'text-white/90' : 'text-slate-500 dark:text-slate-400'}`}>
-                            {currentQ.card.phonetic}
+                      <div className="flex-1 text-left space-y-3.5 overflow-y-auto pr-1 my-auto py-2">
+                        {/* Phần định nghĩa */}
+                        <div>
+                          <h4 className={`font-bold text-sm sm:text-base mb-1 ${flashcardSlide ? 'text-white' : 'text-slate-900 dark:text-slate-100'}`}>
+                            {isTermToMeaning ? 'Định nghĩa:' : 'Từ vựng:'}
+                          </h4>
+                          <p className={`text-xs sm:text-sm leading-relaxed whitespace-pre-line ${flashcardSlide ? 'text-white/95' : 'text-slate-700 dark:text-slate-200'}`}>
+                            {isTermToMeaning ? currentQ.card.meaning : currentQ.card.term}
                           </p>
-                        )}
+                          {!isTermToMeaning && currentQ.card.phonetic && !hidePhonetic && (
+                            <p className={`text-xs font-medium pt-0.5 ${flashcardSlide ? 'text-white/90' : 'text-slate-500 dark:text-slate-400'}`}>
+                              {currentQ.card.phonetic}
+                            </p>
+                          )}
+                        </div>
 
-                        {/* Danh sách ví dụ */}
+                        {/* Phần ví dụ */}
                         {cardExamples.length > 0 && (
-                          <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1 text-left">
-                            {cardExamples.map((ex, i) => (
-                              <div
-                                key={i}
-                                className={`rounded-xl p-2.5 border text-left space-y-1 ${
-                                  flashcardSlide
-                                    ? 'bg-white/15 border-white/25 text-white'
-                                    : 'bg-white/80 dark:bg-slate-900/80 border-slate-200/60 dark:border-slate-800 text-slate-700 dark:text-slate-300'
-                                }`}
-                              >
-                                <div className="flex items-start justify-between gap-2">
-                                  <div className={`text-xs ${flashcardSlide ? 'text-white' : 'text-slate-700 dark:text-slate-300'}`}>
-                                    &ldquo;<FormattedText text={ex} />&rdquo;
+                          <div>
+                            <h4 className={`font-bold text-sm sm:text-base mb-1.5 ${flashcardSlide ? 'text-white' : 'text-slate-900 dark:text-slate-100'}`}>
+                              Ví dụ:
+                            </h4>
+                            <ul className="space-y-2 text-xs sm:text-sm leading-relaxed">
+                              {cardExamples.map((ex, i) => (
+                                <li key={i} className="flex items-start gap-2">
+                                  <span className={`font-bold select-none text-sm leading-5 shrink-0 ${flashcardSlide ? 'text-white/80' : 'text-slate-900 dark:text-slate-100'}`}>•</span>
+                                  <div className={`flex-1 ${flashcardSlide ? 'text-white/95' : 'text-slate-700 dark:text-slate-200'}`}>
+                                    <FormattedText text={ex} />
+                                    {i === 0 && currentQ.card.exampleMeaning && !ex.includes('(') && (
+                                      <span className={flashcardSlide ? 'text-white/80 ml-1' : 'text-slate-500 dark:text-slate-400 ml-1'}>
+                                        ({currentQ.card.exampleMeaning})
+                                      </span>
+                                    )}
                                   </div>
                                   <button
                                     type="button"
@@ -1867,54 +1890,42 @@ export default function VocabQuiz() {
                                       e.stopPropagation();
                                       speakWord(stripFormatting(ex), currentDeck.targetLanguage || 'en-US');
                                     }}
-                                    className={`p-1 cursor-pointer shrink-0 ${
-                                      flashcardSlide ? 'text-white/80 hover:text-white' : 'text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+                                    className={`p-1 shrink-0 opacity-40 hover:opacity-100 transition-opacity cursor-pointer ${
+                                      flashcardSlide ? 'text-white' : 'text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
                                     }`}
                                     title="Đọc câu ví dụ"
                                   >
                                     <IconSpeaker className="w-3.5 h-3.5" />
                                   </button>
-                                </div>
-                                {i === 0 && currentQ.card.exampleMeaning && (
-                                  <p className={`text-[11px] pt-0.5 ${flashcardSlide ? 'text-white/90' : 'text-slate-500 dark:text-slate-400'}`}>
-                                    &rarr; {currentQ.card.exampleMeaning}
-                                  </p>
-                                )}
-                              </div>
-                            ))}
+                                </li>
+                              ))}
+                            </ul>
                           </div>
                         )}
 
-                        {/* Ghi chú của người dùng */}
+                        {/* Phần ghi chú */}
                         {currentQ.card.note && (
-                          <div
-                            className={`rounded-xl p-2.5 border text-left text-xs ${
-                              flashcardSlide
-                                ? 'bg-white/15 border-white/25 text-white'
-                                : 'bg-amber-50/70 dark:bg-amber-950/30 border-amber-200/60 dark:border-amber-900/40 text-amber-900 dark:text-amber-200'
-                            }`}
-                          >
-                            <span
-                              className={`font-semibold text-[10px] uppercase tracking-wider block mb-0.5 ${
-                                flashcardSlide ? 'text-white/90' : 'text-amber-700 dark:text-amber-400'
-                              }`}
-                            >
-                              Ghi chú
-                            </span>
-                            <p className="whitespace-pre-line leading-relaxed">{currentQ.card.note}</p>
+                          <div>
+                            <h4 className={`font-bold text-sm sm:text-base mb-1 ${flashcardSlide ? 'text-white' : 'text-slate-900 dark:text-slate-100'}`}>
+                              Ghi chú:
+                            </h4>
+                            <p className={`text-xs sm:text-sm leading-relaxed whitespace-pre-line ${flashcardSlide ? 'text-white/95' : 'text-slate-700 dark:text-slate-200'}`}>
+                              {currentQ.card.note}
+                            </p>
                           </div>
                         )}
                       </div>
 
-                      <div
-                        className={`text-center pt-2.5 border-t text-xs flex items-center justify-center gap-1.5 ${
-                          flashcardSlide
-                            ? 'border-white/20 text-white/80'
-                            : 'border-slate-200 dark:border-slate-800 text-slate-400'
-                        }`}
-                      >
-                        <IconRotate className={`w-3.5 h-3.5 ${flashcardSlide ? 'text-white' : 'text-slate-400'}`} />
-                        <span>Bấm để lật lại mặt trước</span>
+                      <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-800/80">
+                        <span className={`text-[11px] ${flashcardSlide ? 'text-white/80' : 'text-slate-400'}`}>
+                          Bấm để lật lại mặt trước
+                        </span>
+                        <div
+                          className={`p-1 ${flashcardSlide ? 'text-white' : 'text-slate-500 dark:text-slate-400'}`}
+                          title="Lật thẻ"
+                        >
+                          <IconRepeat className="w-4 h-4" />
+                        </div>
                       </div>
                     </div>
                   </div>
