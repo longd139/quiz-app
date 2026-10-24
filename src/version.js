@@ -1,12 +1,39 @@
-export const APP_VERSION = 'v1.3.3';
+export const APP_VERSION = 'v1.3.4';
 
 export const CHANGELOG_DATA = [
   {
+    version: 'v1.3.4',
+    date: '24/10/2026',
+    isLatest: true,
+    title: 'Luyện gõ chữ đa chiều & Giao diện thẻ Flashcard mới',
+    tag: 'Bản cập nhật hiện tại',
+    changes: [
+      {
+        type: 'feature',
+        title: 'Luyện gõ chữ đa chiều (Anh ⇄ Việt, Xáo trộn)',
+        description: 'Tùy chọn chiều câu hỏi linh hoạt: Hiện từ tiếng Anh gõ nghĩa tiếng Việt, hiện nghĩa tiếng Việt gõ từ tiếng Anh, hoặc xáo trộn cả hai chiều ngẫu nhiên.'
+      },
+      {
+        type: 'improvement',
+        title: 'Bộ kiểm tra đáp án thông minh',
+        description: 'Chấp nhận tiếng Việt không dấu, linh hoạt đảo từ hợp lý, tự động bỏ qua mạo từ to/a/an/the và hỗ trợ nhiều từ đồng nghĩa ngăn cách bởi dấu phẩy.'
+      },
+      {
+        type: 'feature',
+        title: 'Giao diện thẻ Flashcard mới chuẩn tối giản',
+        description: 'Trình bày định nghĩa rõ ràng, câu ví dụ dạng danh sách gạch đầu dòng có phát âm và hiển thị ghi chú cá nhân của người dùng.'
+      },
+      {
+        type: 'improvement',
+        title: 'Đồng bộ biểu tượng lật thẻ & Tinh giản giao diện',
+        description: 'Bổ sung biểu tượng lật thẻ 2 chiều ở góc dưới và lược bỏ nút gõ chữ trùng lặp tại trang danh sách bộ từ.'
+      }
+    ]
+  },
+  {
     version: 'v1.3.3',
     date: '23/10/2026',
-    isLatest: true,
     title: 'Kiểm tra từ trùng & Soạn thảo câu ví dụ trực quan',
-    tag: 'Bản cập nhật hiện tại',
     changes: [
       {
         type: 'feature',
