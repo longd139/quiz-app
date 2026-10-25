@@ -7,17 +7,16 @@ import { anonClient, hasSupabase } from '../lib/supabase';
 
 const ROOM_KEY = 'quiz_room_config';
 
+export { hasSupabase };
 export const DEFAULT_ROOM_SECRET = import.meta.env.VITE_DEFAULT_ROOM_SECRET || (import.meta.env.DEV ? 'dev_local_quiz_app' : 'main_quiz_app');
 
 export function getRoomConfig() {
+  if (!hasSupabase) return null;
   try {
     const raw = localStorage.getItem(ROOM_KEY);
     if (raw) return JSON.parse(raw);
   } catch (_e) {}
-  if (hasSupabase) {
-    return { secret: DEFAULT_ROOM_SECRET, room_id: 'default_main', isDefault: true };
-  }
-  return null;
+  return { secret: DEFAULT_ROOM_SECRET, room_id: 'default_main', isDefault: true };
 }
 
 export function setRoomConfig(cfg) { localStorage.setItem(ROOM_KEY, JSON.stringify(cfg)); }

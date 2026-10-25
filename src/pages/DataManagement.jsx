@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import { useQuiz } from '../App';
-import { getRoomConfig, isConfigured } from '../data/supabaseSync';
+import { getRoomConfig, isConfigured, hasSupabase } from '../data/supabaseSync';
 import { getCloudinaryConfig, setCloudinaryCloudName } from '../lib/cloudinary';
 import { loadLocalBackups, saveLocalBackups, checkAndCreateDailyBackup, restoreFromBackup, getTodayDateString } from '../data/backupManager';
 
@@ -144,55 +144,86 @@ export default function DataManagement() {
 
   return (
     <div>
-      {/* Sync */}
-      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm dark:shadow-none border-t-2 border-primary-600 p-4 mb-4">
-        <h3 className="text-base font-semibold mb-1">Đồng bộ Cloud (Supabase)</h3>
-        <p className="text-xs text-slate-500 dark:text-slate-400 mb-0">Đồng bộ dữ liệu giữa các thiết bị qua Supabase (Postgres, realtime). Cùng một mã phòng = chung dữ liệu.</p>
-
-        {!configured || showConfig ? (
-          <div className="mt-3">
-            <label className="font-semibold text-sm block mb-1.5">Nhập mã phòng:</label>
-            <div className="flex gap-2">
-              <input type="text" value={roomSecret} onChange={e => setRoomSecret(e.target.value)}
-                placeholder="Dán mã phòng đã tạo ở thiết bị kia"
-                className="flex-1 px-3 py-2.5 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-mono focus:border-primary-500 outline-none" />
-              <button onClick={handleJoinRoom} className="bg-primary-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-primary-700 active:scale-95">Kết nối</button>
+      {/* Sync / Storage Mode */}
+      <div className={`bg-white dark:bg-slate-800 rounded-xl shadow-sm dark:shadow-none border-t-2 ${hasSupabase ? 'border-primary-600' : 'border-emerald-500'} p-4 mb-4`}>
+        {!hasSupabase ? (
+          <div>
+            <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
+              <h3 className="text-base font-semibold">Lưu trữ dữ liệu (LocalStorage)</h3>
+              <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 border border-emerald-200/80 dark:border-emerald-800/60 flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                Đang lưu trong LocalStorage (Nội bộ máy)
+              </span>
             </div>
-            <div className="flex items-center gap-3 mt-3 border-t border-slate-200 dark:border-slate-700 pt-3">
-              <span className="text-xs text-slate-500 dark:text-slate-400">Chưa có phòng?</span>
-              <button onClick={handleCreateRoom} className="bg-success-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-success-700 active:scale-95">Tạo phòng mới</button>
-            </div>
-            {newRoomSecret && (
-              <div className="mt-3 bg-slate-50 dark:bg-slate-700/40 p-3 rounded-lg">
-                <div className="text-xs font-semibold mb-1">✅ Phòng đã tạo. Sao chép mã này và dán vào thiết bị khác:</div>
-                <div className="flex gap-2 items-center">
-                  <code className="flex-1 break-all bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-2 rounded text-xs">{newRoomSecret}</code>
-                  <button onClick={() => handleCopy(newRoomSecret, 'mã phòng')} className="bg-primary-600 text-white px-3 py-2 rounded-lg text-xs font-semibold hover:bg-primary-700 active:scale-95">Copy</button>
-                </div>
+            <p className="text-xs text-slate-600 dark:text-slate-400 mb-3 leading-relaxed">
+              Ứng dụng đang chạy hoàn toàn ở chế độ nội bộ. Toàn bộ câu hỏi, từ vựng và lịch sử học tập được lưu an toàn trong trình duyệt của bạn, hoàn toàn không gửi hay đồng bộ lên cơ sở dữ liệu Cloud.
+            </p>
+            <div className="bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-lg p-3 text-xs text-slate-500 dark:text-slate-400 flex items-start gap-2.5">
+              <span className="text-base leading-none mt-0.5">💡</span>
+              <div className="flex-1">
+                <div className="font-semibold text-slate-700 dark:text-slate-200 mb-0.5">Tính năng Cloud & Mã phòng đang ẩn</div>
+                <p className="text-[11px] leading-relaxed">
+                  Các chức năng mã phòng và đồng bộ đám mây (Production) đã được ẩn vì cấu hình Supabase đang đóng. Khi mở comment cấu hình trong file <code className="text-slate-800 dark:text-slate-200 font-mono px-1 py-0.5 bg-slate-200/60 dark:bg-slate-800 rounded">.env.local</code>, hệ thống sẽ tự động hiển thị lại thông tin mã phòng và kết nối Cloud.
+                </p>
               </div>
-            )}
-            {configured && <button onClick={() => setShowConfig(false)} className="mt-3 border border-slate-200 dark:border-slate-700 px-4 py-2 rounded-lg text-sm text-slate-600 dark:bg-slate-800">Hủy</button>}
+            </div>
           </div>
         ) : (
           <div>
-            <div className={`flex items-center gap-1.5 text-sm py-2 px-3 rounded-lg mt-3 ${statusColors[syncStatus] || 'bg-slate-50 dark:bg-slate-800'}`}>
-              <span>{statusLabels[syncStatus] || statusLabels.synced}</span>
-              {cfg?.last_synced_at && <span className="text-xs ml-auto">Lúc {new Date(cfg.last_synced_at).toLocaleTimeString('vi-VN')}</span>}
+            <div className="flex items-center justify-between flex-wrap gap-2 mb-1">
+              <h3 className="text-base font-semibold">Đồng bộ Cloud (Supabase)</h3>
+              <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400 border border-blue-200/60 dark:border-blue-800/40">
+                Cloud Sync đang bật
+              </span>
             </div>
-            {cfg?.secret && (
-              <div className="text-xs text-slate-500 dark:text-slate-400 my-2 flex items-center gap-2">
-                <span className="flex-1 break-all">
-                  Mã phòng: <code className="text-xs font-semibold">{cfg.secret}</code> {cfg.isDefault && <span className="text-primary-600 dark:text-primary-400 font-semibold">(Cơ sở dữ liệu đám mây chung)</span>}
-                </span>
-                <button onClick={() => handleCopy(cfg.secret, 'mã phòng')} className="text-primary-600 underline text-xs cursor-pointer">Copy</button>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mb-0">Đồng bộ dữ liệu giữa các thiết bị qua Supabase (Postgres, realtime). Cùng một mã phòng = chung dữ liệu.</p>
+
+            {!configured || showConfig ? (
+              <div className="mt-3">
+                <label className="font-semibold text-sm block mb-1.5">Nhập mã phòng:</label>
+                <div className="flex gap-2">
+                  <input type="text" value={roomSecret} onChange={e => setRoomSecret(e.target.value)}
+                    placeholder="Dán mã phòng đã tạo ở thiết bị kia"
+                    className="flex-1 px-3 py-2.5 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-mono focus:border-primary-500 outline-none" />
+                  <button onClick={handleJoinRoom} className="bg-primary-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-primary-700 active:scale-95">Kết nối</button>
+                </div>
+                <div className="flex items-center gap-3 mt-3 border-t border-slate-200 dark:border-slate-700 pt-3">
+                  <span className="text-xs text-slate-500 dark:text-slate-400">Chưa có phòng?</span>
+                  <button onClick={handleCreateRoom} className="bg-success-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-success-700 active:scale-95">Tạo phòng mới</button>
+                </div>
+                {newRoomSecret && (
+                  <div className="mt-3 bg-slate-50 dark:bg-slate-700/40 p-3 rounded-lg">
+                    <div className="text-xs font-semibold mb-1">✅ Phòng đã tạo. Sao chép mã này và dán vào thiết bị khác:</div>
+                    <div className="flex gap-2 items-center">
+                      <code className="flex-1 break-all bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-2 rounded text-xs">{newRoomSecret}</code>
+                      <button onClick={() => handleCopy(newRoomSecret, 'mã phòng')} className="bg-primary-600 text-white px-3 py-2 rounded-lg text-xs font-semibold hover:bg-primary-700 active:scale-95">Copy</button>
+                    </div>
+                  </div>
+                )}
+                {configured && <button onClick={() => setShowConfig(false)} className="mt-3 border border-slate-200 dark:border-slate-700 px-4 py-2 rounded-lg text-sm text-slate-600 dark:bg-slate-800">Hủy</button>}
+              </div>
+            ) : (
+              <div>
+                <div className={`flex items-center gap-1.5 text-sm py-2 px-3 rounded-lg mt-3 ${statusColors[syncStatus] || 'bg-slate-50 dark:bg-slate-800'}`}>
+                  <span>{statusLabels[syncStatus] || statusLabels.synced}</span>
+                  {cfg?.last_synced_at && <span className="text-xs ml-auto">Lúc {new Date(cfg.last_synced_at).toLocaleTimeString('vi-VN')}</span>}
+                </div>
+                {cfg?.secret && (
+                  <div className="text-xs text-slate-500 dark:text-slate-400 my-2 flex items-center gap-2">
+                    <span className="flex-1 break-all">
+                      Mã phòng: <code className="text-xs font-semibold">{cfg.secret}</code> {cfg.isDefault && <span className="text-primary-600 dark:text-primary-400 font-semibold">(Cơ sở dữ liệu đám mây chung)</span>}
+                    </span>
+                    <button onClick={() => handleCopy(cfg.secret, 'mã phòng')} className="text-primary-600 underline text-xs cursor-pointer">Copy</button>
+                  </div>
+                )}
+                <div className="flex flex-wrap gap-2">
+                  <button onClick={doPush} className="bg-primary-600 text-white px-3 py-2 rounded-lg text-xs font-semibold hover:bg-primary-700 active:scale-95">Push lên cloud</button>
+                  <button onClick={doPull} className="border border-slate-200 dark:border-slate-700 px-3 py-2 rounded-lg text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-800 text-slate-600">Pull từ cloud</button>
+                  <button onClick={handleReconfig} className="border border-slate-200 dark:border-slate-700 px-3 py-2 rounded-lg text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-800 text-slate-600">Đổi phòng</button>
+                  <button onClick={handleDisconnect} className="border border-slate-200 dark:border-slate-700 px-3 py-2 rounded-lg text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-800 text-slate-600">Ngắt kết nối</button>
+                </div>
               </div>
             )}
-            <div className="flex flex-wrap gap-2">
-              <button onClick={doPush} className="bg-primary-600 text-white px-3 py-2 rounded-lg text-xs font-semibold hover:bg-primary-700 active:scale-95">Push lên cloud</button>
-              <button onClick={doPull} className="border border-slate-200 dark:border-slate-700 px-3 py-2 rounded-lg text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-800 text-slate-600">Pull từ cloud</button>
-              <button onClick={handleReconfig} className="border border-slate-200 dark:border-slate-700 px-3 py-2 rounded-lg text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-800 text-slate-600">Đổi phòng</button>
-              <button onClick={handleDisconnect} className="border border-slate-200 dark:border-slate-700 px-3 py-2 rounded-lg text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-800 text-slate-600">Ngắt kết nối</button>
-            </div>
           </div>
         )}
       </div>
