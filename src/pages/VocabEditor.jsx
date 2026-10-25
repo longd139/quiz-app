@@ -7,6 +7,7 @@ import { IconSpeaker, IconTrash, IconPlus, IconFolder, IconArrowLeft, IconEdit, 
 import CreateFlashcardModal from '../components/CreateFlashcardModal';
 import { getBadgeColor } from '../data/badgeColors';
 import FormattedText from '../components/FormattedText';
+import { recordAuditLog, AUDIT_TYPES, AUDIT_CATEGORIES } from '../data/auditTrail';
 
 export default function VocabEditor() {
   const { data, update, syncStatus, showToast, showConfirm } = useQuiz();
@@ -192,6 +193,17 @@ export default function VocabEditor() {
     try {
       // update() sẽ lập tức lưu vào localStorage và đẩy lên Supabase DB qua RPC
       await update({ ...data, vocabDecks: nextDecks });
+      recordAuditLog({
+        type: existingIndex >= 0 ? AUDIT_TYPES.VOCAB_DECK_UPDATE : AUDIT_TYPES.VOCAB_DECK_CREATE,
+        category: AUDIT_CATEGORIES.VOCAB,
+        title: `${existingIndex >= 0 ? 'Lưu cập nhật' : 'Tạo mới'} bộ từ: "${finalName}"`,
+        detail: {
+          deckId: currentId,
+          deckName: finalName,
+          cardsCount: finalCards.length,
+          description: finalDesc
+        }
+      });
       try { localStorage.removeItem('vocab_draft_new'); } catch (_e) {}
     } finally {
       setIsSavingCard(false);
@@ -248,12 +260,28 @@ export default function VocabEditor() {
   };
 
   const handleSaveFromStudy4Modal = (savedCard, shouldClose) => {
+    const deckNameStr = name.trim() || 'Bộ từ vựng mới';
     if (editingCardIndex !== null) {
       const nextCards = [...cardsRef.current];
       nextCards[editingCardIndex] = savedCard;
       cardsRef.current = nextCards;
       setCards(nextCards);
       syncDeckToDatabase(nextCards);
+      recordAuditLog({
+        type: AUDIT_TYPES.VOCAB_CARD_UPDATE,
+        category: AUDIT_CATEGORIES.VOCAB,
+        title: `Cập nhật từ vựng: "${savedCard.term}"`,
+        detail: {
+          term: savedCard.term,
+          meaning: savedCard.meaning,
+          phonetic: savedCard.phonetic,
+          partOfSpeech: savedCard.partOfSpeech,
+          examples: savedCard.examples || (savedCard.example ? [savedCard.example] : []),
+          hasImage: Boolean(savedCard.image),
+          deckName: deckNameStr,
+          note: savedCard.note || ''
+        }
+      });
       showToast(`Đã lưu thay đổi từ "${savedCard.term}" vào Database`, 'success');
       setEditingCardIndex(null);
       setShowStudy4Modal(false);
@@ -262,6 +290,21 @@ export default function VocabEditor() {
       cardsRef.current = nextCards;
       setCards(nextCards);
       syncDeckToDatabase(nextCards);
+      recordAuditLog({
+        type: AUDIT_TYPES.VOCAB_CARD_CREATE,
+        category: AUDIT_CATEGORIES.VOCAB,
+        title: `Tạo từ vựng mới: "${savedCard.term}"`,
+        detail: {
+          term: savedCard.term,
+          meaning: savedCard.meaning,
+          phonetic: savedCard.phonetic,
+          partOfSpeech: savedCard.partOfSpeech,
+          examples: savedCard.examples || (savedCard.example ? [savedCard.example] : []),
+          hasImage: Boolean(savedCard.image),
+          deckName: deckNameStr,
+          note: savedCard.note || ''
+        }
+      });
       showToast(`Đã thêm từ "${savedCard.term}" và lưu vào Database`, 'success');
       if (shouldClose) {
         setShowStudy4Modal(false);
@@ -270,9 +313,20 @@ export default function VocabEditor() {
   };
 
   const handleDeleteCard = (idx) => {
+    const deletedCard = cards[idx];
     const nextCards = cards.filter((_, i) => i !== idx);
     setCards(nextCards);
     syncDeckToDatabase(nextCards);
+    recordAuditLog({
+      type: AUDIT_TYPES.VOCAB_CARD_DELETE,
+      category: AUDIT_CATEGORIES.VOCAB,
+      title: `Xóa từ vựng: "${deletedCard?.term || 'Thẻ từ'}"`,
+      detail: {
+        term: deletedCard?.term,
+        meaning: deletedCard?.meaning,
+        deckName: name.trim() || 'Bộ từ vựng'
+      }
+    });
     showToast('Đã xóa từ vựng khỏi Database', 'info');
   };
 

@@ -6,6 +6,7 @@ import {
   pullRoomData, pushRoomData, schedulePush, startPolling, stopPolling,
   clearRoomConfig
 } from '../data/supabaseSync';
+import { recordAuditLog, AUDIT_TYPES, AUDIT_CATEGORIES } from '../data/auditTrail';
 
 export function useQuizData() {
   const [data, setData] = useState(() => {
@@ -37,9 +38,31 @@ export function useQuizData() {
       try {
         await pushRoomData(cfg.secret, dataWithBackups);
         setSyncStatus('synced');
+        recordAuditLog({
+          type: AUDIT_TYPES.CLOUD_PUSH,
+          category: AUDIT_CATEGORIES.SYNC,
+          title: 'Đồng bộ dữ liệu lên Cloud Supabase',
+          detail: {
+            roomSecret: cfg.secret,
+            testsCount: (dataWithBackups.tests || []).length,
+            decksCount: (dataWithBackups.vocabDecks || []).length,
+            autoSync: true
+          },
+          status: 'success'
+        });
       } catch (e) {
         console.error('Supabase push failed:', e);
         setSyncStatus('error');
+        recordAuditLog({
+          type: AUDIT_TYPES.CLOUD_PUSH,
+          category: AUDIT_CATEGORIES.SYNC,
+          title: 'Lỗi gửi request đồng bộ lên Cloud',
+          detail: {
+            roomSecret: cfg.secret,
+            error: e.message || String(e)
+          },
+          status: 'error'
+        });
       }
     }
   }, []);
@@ -127,8 +150,24 @@ export function useQuizData() {
         setSyncStatus('synced');
       });
       setSyncStatus('synced');
+      recordAuditLog({
+        type: AUDIT_TYPES.CLOUD_CREATE_ROOM,
+        category: AUDIT_CATEGORIES.SYNC,
+        title: `Tạo phòng Cloud mới: ${secret}`,
+        detail: { secret, room_id }
+      });
       return { secret, room_id };
-    } catch (e) { setSyncStatus('error'); throw e; }
+    } catch (e) {
+      setSyncStatus('error');
+      recordAuditLog({
+        type: AUDIT_TYPES.CLOUD_CREATE_ROOM,
+        category: AUDIT_CATEGORIES.SYNC,
+        title: 'Lỗi khởi tạo phòng Cloud mới',
+        detail: { error: e.message || String(e) },
+        status: 'error'
+      });
+      throw e;
+    }
   }, []);
 
   const doJoinRoom = useCallback(async (secret) => {
@@ -155,22 +194,66 @@ export function useQuizData() {
         setSyncStatus('synced');
       });
       setSyncStatus('synced');
+      recordAuditLog({
+        type: AUDIT_TYPES.CLOUD_JOIN_ROOM,
+        category: AUDIT_CATEGORIES.SYNC,
+        title: `Đã kết nối vào phòng Cloud: ${secret}`,
+        detail: { secret, hasCloudData: Boolean(hasCloud) }
+      });
       return result;
-    } catch (e) { setSyncStatus('error'); throw e; }
+    } catch (e) {
+      setSyncStatus('error');
+      recordAuditLog({
+        type: AUDIT_TYPES.CLOUD_JOIN_ROOM,
+        category: AUDIT_CATEGORIES.SYNC,
+        title: `Lỗi kết nối phòng Cloud: ${secret}`,
+        detail: { secret, error: e.message || String(e) },
+        status: 'error'
+      });
+      throw e;
+    }
   }, []);
 
   const doDisconnectSync = useCallback(() => {
     stopPolling();
     clearRoomConfig();
     setSyncStatus('unconfigured');
+    recordAuditLog({
+      type: AUDIT_TYPES.CLOUD_DISCONNECT,
+      category: AUDIT_CATEGORIES.SYNC,
+      title: 'Đã ngắt kết nối đồng bộ Cloud',
+      detail: {}
+    });
   }, []);
 
   const doPush = useCallback(async () => {
     const cfg = getRoomConfig();
     if (!cfg || !cfg.secret) { setSyncStatus('unconfigured'); return; }
     setSyncStatus('syncing');
-    try { await pushRoomData(cfg.secret, dataRef.current); setSyncStatus('synced'); }
-    catch (e) { setSyncStatus('error'); throw e; }
+    try {
+      await pushRoomData(cfg.secret, dataRef.current);
+      setSyncStatus('synced');
+      recordAuditLog({
+        type: AUDIT_TYPES.CLOUD_PUSH,
+        category: AUDIT_CATEGORIES.SYNC,
+        title: 'Thủ công đẩy dữ liệu lên Cloud Supabase',
+        detail: {
+          roomSecret: cfg.secret,
+          testsCount: (dataRef.current.tests || []).length,
+          decksCount: (dataRef.current.vocabDecks || []).length
+        }
+      });
+    } catch (e) {
+      setSyncStatus('error');
+      recordAuditLog({
+        type: AUDIT_TYPES.CLOUD_PUSH,
+        category: AUDIT_CATEGORIES.SYNC,
+        title: 'Thất bại khi đẩy dữ liệu lên Cloud',
+        detail: { roomSecret: cfg.secret, error: e.message || String(e) },
+        status: 'error'
+      });
+      throw e;
+    }
   }, []);
 
   const doPull = useCallback(async () => {
@@ -179,13 +262,33 @@ export function useQuizData() {
     setSyncStatus('syncing');
     try {
       const { data: cloud } = await pullRoomData(cfg.secret);
-      if (cloud && (cloud.tests?.length || cloud.history?.length)) {
+      if (cloud && (cloud.tests?.length || cloud.history?.length || cloud.vocabDecks?.length)) {
         const n = ensureCollections(cloud).data;
         dataRef.current = n; saveData(n); setData(n);
       }
       setSyncStatus('synced');
+      recordAuditLog({
+        type: AUDIT_TYPES.CLOUD_PULL,
+        category: AUDIT_CATEGORIES.SYNC,
+        title: 'Thủ công kéo dữ liệu từ Cloud Supabase',
+        detail: {
+          roomSecret: cfg.secret,
+          testsCount: (cloud?.tests || []).length,
+          decksCount: (cloud?.vocabDecks || []).length
+        }
+      });
       return cloud;
-    } catch (e) { setSyncStatus('error'); throw e; }
+    } catch (e) {
+      setSyncStatus('error');
+      recordAuditLog({
+        type: AUDIT_TYPES.CLOUD_PULL,
+        category: AUDIT_CATEGORIES.SYNC,
+        title: 'Thất bại khi kéo dữ liệu từ Cloud',
+        detail: { roomSecret: cfg.secret, error: e.message || String(e) },
+        status: 'error'
+      });
+      throw e;
+    }
   }, []);
 
   return {
