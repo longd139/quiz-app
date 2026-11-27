@@ -141,21 +141,13 @@ export default function RedeemSourceModal({ open, onClose, onRedeemed }) {
               </div>
             )}
 
-            <div className="flex items-center gap-2">
+            <div>
               <button
                 type="submit"
                 disabled={submitting}
-                className="flex-1 py-2.5 px-4 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs sm:text-sm font-semibold hover:bg-slate-800 dark:hover:bg-slate-100 disabled:opacity-50 cursor-pointer"
+                className="w-full py-2.5 px-4 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs sm:text-sm font-semibold hover:bg-slate-800 dark:hover:bg-slate-100 disabled:opacity-50 cursor-pointer"
               >
                 {submitting ? 'Đang xác thực...' : 'Xác nhận mã'}
-              </button>
-              <button
-                type="button"
-                onClick={handleClose}
-                disabled={submitting}
-                className="py-2.5 px-4 rounded-xl border border-slate-200 dark:border-slate-700 text-xs sm:text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer"
-              >
-                Đóng
               </button>
             </div>
 
