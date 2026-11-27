@@ -63,18 +63,18 @@ export default function Dashboard() {
       <StreakHeatmap />
 
       <div className="flex flex-wrap gap-2 mb-5 items-center">
-        <select value={filterId} onChange={e => setFilterId(e.target.value)} className="px-3 py-2.5 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-semibold bg-white dark:bg-slate-800 dark:text-slate-200 outline-none focus:border-primary-500">
+        <select value={filterId} onChange={e => setFilterId(e.target.value)} className="px-3 py-2.5 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-semibold bg-white dark:bg-slate-800 dark:text-slate-200 outline-none focus:border-slate-400 dark:focus:border-slate-500">
           <option value="">Tất cả collection</option>
           {data.collections.map(c => (
             <option key={c.id} value={c.id}>{escHtml(c.name)}</option>
           ))}
         </select>
-        <button onClick={() => navigate('/editor')} className="bg-primary-600 text-white px-4 py-2.5 rounded-lg text-sm font-semibold hover:bg-primary-700 active:scale-95 transition-all">+ Thêm bài mới</button>
-        <button onClick={() => navigate('/exam-setup')} className="bg-success-600 text-white px-4 py-2.5 rounded-lg text-sm font-semibold hover:bg-success-700 active:scale-95 transition-all">Tạo bài kiểm tra</button>
-        <button onClick={handleReviewWrong} className="bg-warning-600 text-white px-4 py-2.5 rounded-lg text-sm font-semibold hover:bg-warning-700 active:scale-95 transition-all">Ôn lại câu sai</button>
+        <button onClick={() => navigate('/editor')} className="bg-slate-900 text-white dark:bg-white dark:text-slate-900 px-4 py-2.5 rounded-lg text-sm font-semibold hover:bg-slate-800 dark:hover:bg-slate-100 active:scale-95 transition-all cursor-pointer">+ Thêm bài mới</button>
+        <button onClick={() => navigate('/exam-setup')} className="border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 px-4 py-2.5 rounded-lg text-sm font-semibold hover:bg-slate-50 dark:hover:bg-slate-700 active:scale-95 transition-all cursor-pointer">Tạo bài kiểm tra</button>
+        <button onClick={handleReviewWrong} className="border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 px-4 py-2.5 rounded-lg text-sm font-semibold hover:bg-slate-50 dark:hover:bg-slate-700 active:scale-95 transition-all cursor-pointer">Ôn lại câu sai</button>
         <span className="flex-1" />
-        <button onClick={() => navigate('/data')} className="border border-slate-200 dark:border-slate-700 px-3 py-2 rounded-lg text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-800 transition-all text-slate-600">Xuất JSON</button>
-        <button onClick={() => navigate('/data')} className="border border-slate-200 dark:border-slate-700 px-3 py-2 rounded-lg text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-800 transition-all text-slate-600">Nhập JSON</button>
+        <button onClick={() => navigate('/data')} className="border border-slate-200 dark:border-slate-700 px-3 py-2 rounded-lg text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-800 transition-all text-slate-600 dark:text-slate-300 cursor-pointer">Xuất JSON</button>
+        <button onClick={() => navigate('/data')} className="border border-slate-200 dark:border-slate-700 px-3 py-2 rounded-lg text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-800 transition-all text-slate-600 dark:text-slate-300 cursor-pointer">Nhập JSON</button>
       </div>
 
       {filteredTests.length === 0 ? (
@@ -93,7 +93,7 @@ export default function Dashboard() {
                   <h3 className="text-sm font-semibold">{escHtml(test.name)}</h3>
                   <span className="text-[0.7rem] text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-900 px-2 py-0.5 rounded-full whitespace-nowrap">{test.questions.length} câu</span>
                 </div>
-                <p className="text-[0.65rem] text-primary-600 font-medium mb-1">{escHtml(collName)}</p>
+                <p className="text-[0.65rem] text-slate-500 dark:text-slate-400 font-medium mb-1">{escHtml(collName)}</p>
                 <p className="text-[0.7rem] text-slate-500 dark:text-slate-400 mb-3">{fmtDate(test.createdAt)} &middot; {fmtDate(test.updatedAt)}</p>
                 {test.questions.length > 0 && (
                   <p className="text-[0.7rem] text-slate-500 dark:text-slate-400 mb-3">
@@ -102,9 +102,9 @@ export default function Dashboard() {
                   </p>
                 )}
                 <div className="flex gap-2">
-                  <button onClick={() => handleEdit(idx)} className="border border-slate-200 dark:border-slate-700 px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-800 transition-all text-slate-600">Sửa</button>
-                  <button onClick={() => handlePracticeCard(idx)} className="bg-success-600 text-white px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-success-700 active:scale-95 transition-all">Luyện tập</button>
-                  <button onClick={() => handleDelete(idx)} className="border border-slate-200 dark:border-slate-700 px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-800 transition-all text-danger-600">Xóa</button>
+                  <button onClick={() => handleEdit(idx)} className="border border-slate-200 dark:border-slate-700 px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-800 transition-all text-slate-600 dark:text-slate-300 cursor-pointer">Sửa</button>
+                  <button onClick={() => handlePracticeCard(idx)} className="bg-slate-900 text-white dark:bg-white dark:text-slate-900 px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-slate-800 dark:hover:bg-slate-100 active:scale-95 transition-all cursor-pointer">Luyện tập</button>
+                  <button onClick={() => handleDelete(idx)} className="border border-slate-200 dark:border-slate-700 px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-800 transition-all text-slate-500 dark:text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 cursor-pointer">Xóa</button>
                 </div>
               </div>
             );
