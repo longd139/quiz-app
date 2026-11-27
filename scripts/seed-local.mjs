@@ -93,7 +93,7 @@ async function main() {
   const q1Id = '11111111-1111-4111-8111-111111111301';
   const q2Id = '11111111-1111-4111-8111-111111111302';
 
-  await sb.from('quiz_collections').upsert({ id: qColId, name: 'Kiểm thử phần mềm (ISTQB)', created_by: adminId });
+  await sb.from('quiz_collections').upsert({ id: qColId, name: 'Kiểm thử phần mềm (ISTQB)', term: 'Kỳ 1', created_by: adminId });
   await sb.from('quiz_sets').upsert({ id: qSetId, collection_id: qColId, name: 'Đề mẫu ISTQB Foundation', created_by: adminId });
   await sb.from('questions').upsert([
     { id: q1Id, quiz_set_id: qSetId, prompt: 'Mục tiêu chính của Regression Testing là gì?', explanation: 'Đảm bảo thay đổi mới không làm hỏng tính năng cũ.', sort_order: 0 },

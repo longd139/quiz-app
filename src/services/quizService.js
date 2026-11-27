@@ -60,6 +60,7 @@ export async function fetchQuizDomain() {
   const collections = colsData.map((c) => ({
     id: c.id,
     name: c.name,
+    term: c.term || '',
     description: c.description || '',
     createdAt: c.created_at,
   }));
@@ -84,6 +85,7 @@ export async function upsertQuizCollection(col, userId) {
     .upsert({
       id: col.id,
       name: col.name,
+      term: col.term || '',
       description: col.description || '',
       created_by: userId,
     })

@@ -63,8 +63,8 @@ export function createTest(name, collectionId) {
   return { id: uid(), name, collectionId: collectionId || null, questions: [], createdAt: now, updatedAt: now };
 }
 
-export function createCollection(name) {
-  return { id: uid(), name, createdAt: new Date().toISOString() };
+export function createCollection(name, term = '') {
+  return { id: uid(), name, term: term.trim(), createdAt: new Date().toISOString() };
 }
 
 export function getCollectionName(collections, id) {

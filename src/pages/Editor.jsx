@@ -20,6 +20,7 @@ export default function Editor() {
   const [parseFeedback, setParseFeedback] = useState('');
   const [showNewCollection, setShowNewCollection] = useState(false);
   const [newCollectionName, setNewCollectionName] = useState('');
+  const [newCollectionTerm, setNewCollectionTerm] = useState('Kỳ 1');
   const [errors, setErrors] = useState({});
 
   // Refs for scroll-to-error
@@ -80,7 +81,7 @@ export default function Editor() {
   const handleCreateCollection = () => {
     const name = newCollectionName.trim();
     if (!name) { showAlert('Chưa nhập tên', 'Vui lòng nhập tên collection.', 'warning'); return; }
-    const newColl = createCollection(name);
+    const newColl = createCollection(name, newCollectionTerm);
     const d = { ...data, collections: [...data.collections, newColl] };
     update(d);
     setCollectionId(newColl.id);
@@ -250,10 +251,11 @@ export default function Editor() {
           <option value="__new__">+ Tạo collection mới</option>
         </select>
         {showNewCollection && (
-          <div className="mt-2 flex gap-2">
-            <input type="text" value={newCollectionName} onChange={e => setNewCollectionName(e.target.value)} placeholder="Tên collection mới..." className="flex-1 px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm focus:border-primary-500 outline-none" />
+          <div className="mt-2 flex flex-wrap gap-2">
+            <input type="text" value={newCollectionTerm} onChange={e => setNewCollectionTerm(e.target.value)} placeholder="Kỳ (VD: Kỳ 1)..." className="w-32 px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm focus:border-primary-500 outline-none" />
+            <input type="text" value={newCollectionName} onChange={e => setNewCollectionName(e.target.value)} placeholder="Tên môn / collection mới..." className="flex-1 min-w-[180px] px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm focus:border-primary-500 outline-none" />
             <button onClick={handleCreateCollection} className="bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-3 py-2 rounded-lg text-xs font-semibold whitespace-nowrap cursor-pointer">Tạo</button>
-            <button onClick={() => { setShowNewCollection(false); setCollectionId(''); }} className="border border-slate-200 dark:border-slate-700 px-3 py-2 rounded-lg text-xs text-slate-600">Hủy</button>
+            <button onClick={() => { setShowNewCollection(false); setCollectionId(''); }} className="border border-slate-200 dark:border-slate-700 px-3 py-2 rounded-lg text-xs text-slate-600 cursor-pointer">Hủy</button>
           </div>
         )}
       </div>
