@@ -36,3 +36,11 @@ Chỉ cấu hình các biến public:
 - `VITE_SUPABASE_URL`
 - `VITE_SUPABASE_PUBLISHABLE_KEY`
 - `VITE_UPLOAD_ADAPTER=cloudinary`
+
+## Edge Functions & Private Storage (Production Checklist)
+
+- Deploy Edge Functions: `admin-users`, `password-change`, `media-upload`, `admin-source`, `redeem-source`.
+- Thiết lập secrets trên Supabase Edge Functions:
+  - `SOURCE_CODE_PEPPER`: chuỗi bí mật ngẫu nhiên server-side dùng cho HMAC lookup digest mã SRC.
+  - `MAX_SOURCE_FILE_BYTES`: mặc định `20971520` (20 MB, phù hợp giới hạn free-tier; gói lớn ưu tiên `LINK` HTTPS).
+- Đảm bảo bucket `source-packages` ở trạng thái **private** (`public = false`) và không cấp policy đọc trực tiếp cho `anon` hoặc `authenticated`.

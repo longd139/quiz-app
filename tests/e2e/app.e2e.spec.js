@@ -72,7 +72,7 @@ test.describe('Quiz App V2.0 E2E Regression', () => {
 
     await page.getByRole('link', { name: /Tài khoản/i }).click();
     await expect(page).toHaveURL(/\/admin\/users/);
-    await expect(page.getByText('usera@quiz.local')).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText('usera@quiz.local').first()).toBeVisible({ timeout: 10_000 });
 
     await page.getByRole('link', { name: /Nhật ký Audit/i }).click();
     await expect(page).toHaveURL(/\/admin\/audit-logs/);
@@ -176,5 +176,53 @@ test.describe('Quiz App V2.0 E2E Regression', () => {
       const afterDark = await page.evaluate(() => document.documentElement.classList.contains('dark'));
       expect(afterDark).not.toBe(beforeDark);
     }
+  });
+
+  test('SRC E2E: Admin creates LINK package + code, User redeems & views SRC history', async ({ page }) => {
+    // 1. Admin creates LINK source package & random access code
+    await loginThroughUI(page, 'admin@quiz.local');
+    await expect(page).toHaveURL(/\/$/);
+    await page.goto('/admin/source-packages');
+    await expect(page.getByText(/Quản lý Gói Source Code/i)).toBeVisible({ timeout: 15_000 });
+
+    await page.getByRole('button', { name: /Tạo gói SRC/i }).click();
+    await page.locator('form input[type="text"]').first().fill('Quiz App E2E SRC');
+    await page.locator('form select').nth(0).selectOption('LINK');
+    await page.locator('form select').nth(1).selectOption('ACTIVE');
+    await page.locator('form input[type="url"]').fill('https://github.com/longd139/quiz-app');
+    await page.getByRole('button', { name: /Lưu gói SRC/i }).click();
+
+    await expect(page.getByText('Quiz App E2E SRC').first()).toBeVisible({ timeout: 10_000 });
+    await page.getByRole('button', { name: /Mã truy cập/i }).first().click();
+    await page.getByRole('button', { name: /\+ Tạo mã truy cập/i }).click();
+    const codeEl = page.getByTestId('revealed-access-code');
+    await expect(codeEl).toBeVisible({ timeout: 10_000 });
+    const accessCode = (await codeEl.textContent()).trim();
+    expect(accessCode.length).toBeGreaterThanOrEqual(12);
+
+    // 2. Real logout & login as User A
+    await page.evaluate(() => localStorage.clear());
+    await loginThroughUI(page, 'usera@quiz.local');
+    await expect(page).toHaveURL(/\/$/);
+
+    // 3. Click Nhận SRC -> test wrong code -> test valid code
+    await page.getByRole('button', { name: /Nhận SRC/i }).click();
+    await expect(page.getByRole('heading', { name: /Nhận Source Code/i })).toBeVisible();
+
+    await page.locator('#src-access-code').fill('WrongCode999');
+    await page.getByRole('button', { name: /Xác nhận mã/i }).click();
+    await expect(page.getByRole('alert')).toBeVisible({ timeout: 10_000 });
+
+    await page.locator('#src-access-code').fill(accessCode);
+    await page.getByRole('button', { name: /Xác nhận mã/i }).click();
+    await expect(page.getByText(/Xác nhận mã thành công/i)).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText('Quiz App E2E SRC')).toBeVisible();
+    await expect(page.getByRole('link', { name: /Mở Source Code/i })).toBeVisible();
+    await page.getByRole('button', { name: 'Đóng' }).last().click();
+
+    // 4. Verify SRC history in /data
+    await page.goto('/data');
+    await expect(page.getByText(/SRC đã nhận/i)).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText('Quiz App E2E SRC').first()).toBeVisible({ timeout: 10_000 });
   });
 });

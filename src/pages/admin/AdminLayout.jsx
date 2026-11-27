@@ -1,11 +1,12 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { IconArrowLeft, IconShield, IconDatabase, IconBook, IconSettings, IconLock } from '../../components/Icons';
+import { IconArrowLeft, IconShield, IconDatabase, IconBook, IconSettings, IconLock, IconDownload } from '../../components/Icons';
 import { useAuth } from '../../contexts/AuthContext';
 
 const ADMIN_NAV = [
   { to: '/admin', end: true, label: 'Tổng quan', icon: IconShield },
   { to: '/admin/users', label: 'Tài khoản', icon: IconLock },
   { to: '/admin/content', label: 'Nội dung chung', icon: IconBook },
+  { to: '/admin/source-packages', label: 'Quản lý SRC', icon: IconDownload },
   { to: '/admin/audit-logs', label: 'Nhật ký Audit', icon: IconDatabase },
   { to: '/admin/backups', label: 'Sao lưu & Khôi phục', icon: IconDatabase },
   { to: '/admin/settings', label: 'Cài đặt hệ thống', icon: IconSettings },

@@ -1,4 +1,4 @@
-/* global process, crypto */
+/* global process, crypto, fetch, FormData, Blob */
 import { describe, it, before } from 'node:test';
 import assert from 'node:assert/strict';
 import { execSync } from 'node:child_process';
@@ -492,6 +492,232 @@ describe('Local Supabase Integration Suite (Auth, RLS, Transactions, Isolation, 
     const { data: restoredCol } = await adminClient.from('quiz_collections').select('term').eq('id', colId).single();
     assert.equal(restoredCol.term, 'Kỳ 10');
 
+    // BUG-25: Replace restore must be rejected
+    const { error: replaceErr } = await adminClient.rpc('restore_backup_atomic', {
+      p_backup_id: backup.id,
+      p_mode: 'replace',
+      p_dry_run: false,
+    });
+    assert.ok(replaceErr && replaceErr.message.includes('merge'));
+
+    // BUG-27: Old backup without term field must preserve existing term in merge mode
+    const { data: oldBackup } = await adminClient
+      .from('backup_metadata')
+      .insert({
+        created_by: user.id,
+        scope: 'shared_content',
+        status: 'completed',
+        app_version: 'v2.0.0',
+        entity_counts: { quizCollections: 1, quizSets: 0 },
+        snapshot_data: {
+          collections: [{ id: colId, name: 'Môn Kỳ 10 (Old Backup)', description: '' }],
+          tests: [],
+          vocabCollections: [],
+          vocabDecks: [],
+        },
+      })
+      .select('id')
+      .single();
+
+    const { error: mergeOldErr } = await adminClient.rpc('restore_backup_atomic', {
+      p_backup_id: oldBackup.id,
+      p_mode: 'merge',
+      p_dry_run: false,
+    });
+    assert.equal(mergeOldErr, null);
+
+    const { data: preservedCol } = await adminClient.from('quiz_collections').select('term').eq('id', colId).single();
+    assert.equal(preservedCol.term, 'Kỳ 10');
+
     await adminClient.from('quiz_collections').delete().eq('id', colId);
+  });
+
+  // ---------------------------------------------------------------------------
+  // Group H — Secure Source Code Distribution (SRC-01 .. SRC-25)
+  // ---------------------------------------------------------------------------
+  it('SRC-01..SRC-25: Full Source Package, Private Storage, Access Codes, Concurrency, Idempotency & Rate Limit', async () => {
+    const admin = await signInAs('admin@quiz.local');
+    const userA = await signInAs('usera@quiz.local');
+    const userB = await signInAs('userb@quiz.local');
+    const disabled = await signInAs('disabled@quiz.local');
+    const firstLogin = await signInAs('firstlogin@quiz.local');
+    const sbService = makeAdminServiceClient();
+
+    const callAdminSrc = async (token, body) => {
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/admin-source`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(body),
+      });
+      return { status: res.status, data: await res.json() };
+    };
+
+    const callRedeemSrc = async (token, body) => {
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/redeem-source`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(body),
+      });
+      return { status: res.status, data: await res.json() };
+    };
+
+    // SRC-20 & SRC-24: Regular user cannot create package; unsafe URL rejected
+    const userCreateRes = await callAdminSrc(userA.session.access_token, {
+      action: 'create_package',
+      name: 'Hack',
+      delivery_type: 'LINK',
+      external_url: 'https://example.com',
+    });
+    assert.equal(userCreateRes.status, 403);
+
+    const badLinkRes = await callAdminSrc(admin.session.access_token, {
+      action: 'create_package',
+      name: 'Unsafe Link',
+      delivery_type: 'LINK',
+      external_url: 'javascript:alert(1)',
+      status: 'ACTIVE',
+    });
+    assert.equal(badLinkRes.status, 400);
+
+    // SRC-01 & SRC-02: Admin creates FILE package and uploads minimal valid empty ZIP (PK\x05\x06)
+    const createPkgRes = await callAdminSrc(admin.session.access_token, {
+      action: 'create_package',
+      name: 'Quiz App Starter ZIP',
+      description: 'Sample archive',
+      version: '2.0.0',
+      delivery_type: 'FILE',
+      status: 'DRAFT',
+    });
+    assert.equal(createPkgRes.status, 200);
+    const pkgId = createPkgRes.data.package.id;
+
+    const emptyZipBytes = new Uint8Array([
+      0x50, 0x4b, 0x05, 0x06, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    ]);
+    const form = new FormData();
+    form.append('packageId', pkgId);
+    form.append('file', new Blob([emptyZipBytes], { type: 'application/zip' }), 'starter.zip');
+
+    const upRes = await fetch(`${SUPABASE_URL}/functions/v1/admin-source`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${admin.session.access_token}` },
+      body: form,
+    });
+    assert.equal(upRes.status, 200);
+    const upJson = await upRes.json();
+    const storagePath = upJson.package.storage_path;
+    assert.ok(storagePath && upJson.package.file_name === 'starter.zip');
+
+    // Activate package
+    const actRes = await callAdminSrc(admin.session.access_token, {
+      action: 'update_package',
+      id: pkgId,
+      name: 'Quiz App Starter ZIP',
+      delivery_type: 'FILE',
+      status: 'ACTIVE',
+    });
+    assert.equal(actRes.status, 200);
+
+    // SRC-12 & SRC-13: User cannot read code_hash or private storage object directly
+    const { error: hashReadErr } = await userA.client.from('source_access_codes').select('code_hash');
+    assert.ok(hashReadErr);
+    const { data: directFile, error: directStorageErr } = await userA.client.storage
+      .from('source-packages')
+      .download(storagePath);
+    assert.equal(directFile, null);
+    assert.ok(directStorageErr);
+
+    // SRC-03: Admin creates 1-use code + normal code
+    const code1Res = await callAdminSrc(admin.session.access_token, {
+      action: 'create_code',
+      source_package_id: pkgId,
+      mode: 'manual',
+      code: 'OneUseCode2026',
+      max_redemptions: 1,
+      max_redemptions_per_user: 1,
+    });
+    assert.equal(code1Res.status, 200);
+    assert.equal(code1Res.data.plaintextCode, 'OneUseCode2026');
+
+    // SRC-09, SRC-10, SRC-11: Anon, Disabled, First-login blocked
+    const anonRes = await fetch(`${SUPABASE_URL}/functions/v1/redeem-source`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ accessCode: 'OneUseCode2026', operationId: 'anon-1' }),
+    });
+    assert.equal(anonRes.status, 401);
+    assert.equal((await callRedeemSrc(disabled.session.access_token, { accessCode: 'OneUseCode2026', operationId: 'dis-1' })).status, 403);
+    assert.equal((await callRedeemSrc(firstLogin.session.access_token, { accessCode: 'OneUseCode2026', operationId: 'fl-1' })).status, 403);
+
+    // SRC-16 & SRC-17: Concurrent 2-user race on 1-use code -> only 1 succeeds
+    const [rA, rB] = await Promise.all([
+      callRedeemSrc(userA.session.access_token, { accessCode: 'OneUseCode2026', operationId: `race-a-${Date.now()}` }),
+      callRedeemSrc(userB.session.access_token, { accessCode: 'OneUseCode2026', operationId: `race-b-${Date.now()}` }),
+    ]);
+    const statuses = [rA.status, rB.status].sort((a, b) => a - b);
+    assert.deepEqual(statuses, [200, 400]);
+
+    const winner = rA.status === 200 ? { user: userA, res: rA } : { user: userB, res: rB };
+    const loser = rA.status === 200 ? userB : userA;
+
+    // SRC-14: Signed download URL works
+    const dlFetch = await fetch(winner.res.data.signedUrl);
+    assert.equal(dlFetch.status, 200);
+    const dlBytes = new Uint8Array(await dlFetch.arrayBuffer());
+    assert.equal(dlBytes.length, emptyZipBytes.length);
+
+    // SRC-18 & SRC-25: Retry same operationId & re-download do NOT increment redemption_count
+    const retryOpId = `idem-${Date.now()}`;
+    const code2Res = await callAdminSrc(admin.session.access_token, {
+      action: 'create_code',
+      source_package_id: pkgId,
+      mode: 'random',
+      max_redemptions: 5,
+    });
+    const code2Plain = code2Res.data.plaintextCode;
+    assert.ok(code2Plain.length >= 12);
+
+    const firstRedeem = await callRedeemSrc(winner.user.session.access_token, { accessCode: code2Plain, operationId: retryOpId });
+    const replayRedeem = await callRedeemSrc(winner.user.session.access_token, { accessCode: code2Plain, operationId: retryOpId });
+    assert.equal(firstRedeem.status, 200);
+    assert.equal(replayRedeem.status, 200);
+    assert.equal(replayRedeem.data.idempotent, true);
+
+    const { data: code2Row } = await sbService
+      .from('source_access_codes')
+      .select('redemption_count')
+      .eq('id', code2Res.data.code.id)
+      .single();
+    assert.equal(code2Row.redemption_count, 1);
+
+    // SRC-19: Loser cannot see winner's redemption history
+    const loserHist = await callRedeemSrc(loser.session.access_token, { action: 'list_my_redemptions' });
+    assert.equal(loserHist.data.redemptions.length, 0);
+
+    // SRC-21: Rotate code -> old code stops working
+    const rotRes = await callAdminSrc(admin.session.access_token, {
+      action: 'rotate_code',
+      source_package_id: pkgId,
+      revoke_code_id: code2Res.data.code.id,
+    });
+    assert.equal(rotRes.status, 200);
+    const oldAfterRotate = await callRedeemSrc(loser.session.access_token, {
+      accessCode: code2Plain,
+      operationId: `after-rot-${Date.now()}`,
+    });
+    assert.equal(oldAfterRotate.status, 400);
+
+    // SRC-05 & SRC-22: 5 invalid attempts trigger 429 rate limit for loser (winner unaffected)
+    for (let i = 0; i < 5; i++) {
+      await callRedeemSrc(loser.session.access_token, { accessCode: 'WrongCode123', operationId: `rl-${i}-${Date.now()}` });
+    }
+    const rlBlocked = await callRedeemSrc(loser.session.access_token, { accessCode: rotRes.data.plaintextCode, operationId: `rl-blk-${Date.now()}` });
+    assert.equal(rlBlocked.status, 429);
+
+    // Cleanup test SRC artifacts
+    await sbService.from('source_redemptions').delete().eq('source_package_id', pkgId);
+    await sbService.from('source_access_codes').delete().eq('source_package_id', pkgId);
+    await sbService.from('source_packages').delete().eq('id', pkgId);
+    await sbService.storage.from('source-packages').remove([storagePath]);
   });
 });

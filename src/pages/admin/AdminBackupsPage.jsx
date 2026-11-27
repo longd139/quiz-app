@@ -76,7 +76,7 @@ export default function AdminBackupsPage() {
         <div>
           <h2 className="text-sm font-bold">Sao lưu &amp; Khôi phục Tập trung</h2>
           <p className="text-xs text-slate-500">
-            Lưu trữ metadata &amp; snapshot nội dung học tập chung trên PostgreSQL. Tự động tạo bản pre-restore trước khi khôi phục.
+            Lưu trữ metadata &amp; snapshot nội dung học tập chung trên PostgreSQL. Chỉ hỗ trợ khôi phục chế độ merge (bảo toàn dữ liệu học tập cá nhân) và tự động tạo bản pre-restore.
           </p>
         </div>
         <button

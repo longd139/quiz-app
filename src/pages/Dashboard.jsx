@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { useQuiz } from '../App';
 import { getFilteredTests, getCollectionName, escHtml, truncate, fmtDate, normalizeQuizTerm, compareQuizTerms } from '../data/storage';
 import StreakHeatmap from '../components/StreakHeatmap';
+import RedeemSourceModal from '../components/RedeemSourceModal';
+import { IconDownload } from '../components/Icons';
 import { recordAuditLog, AUDIT_TYPES, AUDIT_CATEGORIES } from '../data/auditTrail';
 
 const SUBJECT_ACCENTS = [
@@ -36,6 +38,7 @@ export default function Dashboard() {
   const { data, isAdmin, update, showConfirm, showAlert } = useQuiz();
   const navigate = useNavigate();
   const [selectedCollectionId, setSelectedCollectionId] = useState(null);
+  const [redeemOpen, setRedeemOpen] = useState(false);
 
   const collectionCards = useMemo(() => {
     const tests = data.tests || [];
@@ -154,6 +157,7 @@ export default function Dashboard() {
   return (
     <div className="space-y-5">
       <StreakHeatmap />
+      <RedeemSourceModal open={redeemOpen} onClose={() => setRedeemOpen(false)} />
 
       {/* Breadcrumb & Actions Toolbar */}
       <div className="flex flex-wrap gap-2.5 mb-5 items-center">
@@ -204,6 +208,14 @@ export default function Dashboard() {
           className="border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold hover:bg-slate-50 dark:hover:bg-slate-700 active:scale-95 transition-all cursor-pointer"
         >
           Tạo bài kiểm tra
+        </button>
+        <button
+          type="button"
+          onClick={() => setRedeemOpen(true)}
+          className="inline-flex items-center gap-1.5 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold hover:bg-slate-50 dark:hover:bg-slate-700 active:scale-95 transition-all cursor-pointer"
+        >
+          <IconDownload className="w-4 h-4" />
+          <span>Nhận SRC</span>
         </button>
         <button
           type="button"

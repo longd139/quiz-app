@@ -5,10 +5,10 @@
 Quiz App V2.0.0 đã hoàn tất **Review 02 Remediation** trên nhánh `feat/v2-auth-centralized-storage`, thiết lập hoàn chỉnh **Local Docker + Supabase CLI Development Environment** tách biệt khỏi Production, khắc phục toàn bộ **BUG-01 đến BUG-14**, và kiểm thử thực tế trên PostgreSQL/Auth/PostgREST local và trình duyệt Playwright (Desktop + Mobile).
 
 - **ESLint (`npm run lint`)**: **PASS** — `0 errors, 0 warnings` (`LINT_EXIT=0`).
-- **Unit Tests (`npm run test:unit`)**: **PASS** — `40/40` tests trên `12` suites (`UNIT_EXIT=0`).
-- **Integration Tests (`npm run test:integration`)**: **PASS** — `14/14` suites/cases chạy trên stack `quiz-app-test` độc lập (`127.0.0.1:54331`, `INT_EXIT=0`).
-- **Playwright E2E (`npm run test:e2e`)**: **PASS** — `18/18` tests (`desktop-chromium` + `mobile-chromium`, `127.0.0.1:5174`, `E2E_EXIT=0`).
-- **Production Build (`npm run build`)**: **PASS** — `193 modules transformed`, sinh PWA `dist/sw.js`, `dist/manifest.webmanifest` (`BUILD_EXIT=0`).
+- **Unit Tests (`npm run test:unit`)**: **PASS** — `44/44` tests trên `13` suites (`UNIT_EXIT=0`).
+- **Integration Tests (`npm run test:integration`)**: **PASS** — `15/15` suites/cases chạy trên stack `quiz-app-test` độc lập (`127.0.0.1:54331`, `INT_EXIT=0`).
+- **Playwright E2E (`npm run test:e2e`)**: **PASS** — `20/20` tests (`desktop-chromium` + `mobile-chromium`, `127.0.0.1:5174`, `E2E_EXIT=0`).
+- **Production Build (`npm run build`)**: **PASS** — `197 modules transformed`, sinh PWA `dist/sw.js`, `dist/manifest.webmanifest` (`BUILD_EXIT=0`).
 
 ## 2. Git & Local Environment Architecture
 
@@ -55,10 +55,17 @@ Quiz App V2.0.0 đã hoàn tất **Review 02 Remediation** trên nhánh `feat/v2
 | Gate | Command | Exit Code | Result |
 |---|---|---|---|
 | ESLint | `npm run lint` | `0` | **PASS** (`0 errors, 0 warnings`) |
-| Unit Tests | `npm run test:unit` | `0` | **PASS** (`40/40`, `12` suites) |
-| Integration Tests | `npm run test:integration` | `0` | **PASS** (`14/14` trên `quiz-app-test` `54331`) |
-| E2E Tests | `npm run test:e2e` | `0` | **PASS** (`18/18` Desktop + Mobile trên `5174`) |
-| Production Build | `npm run build` | `0` | **PASS** (`193` modules + PWA) |
+| Unit Tests | `npm run test:unit` | `0` | **PASS** (`44/44`, `13` suites) |
+| Integration Tests | `npm run test:integration` | `0` | **PASS** (`15/15` trên `quiz-app-test` `54331`) |
+| E2E Tests | `npm run test:e2e` | `0` | **PASS** (`20/20` Desktop + Mobile trên `5174`) |
+| Production Build | `npm run build` | `0` | **PASS** (`197` modules + PWA) |
+
+## 6. Secure Source Code Distribution & Review 05 Patches
+
+- **Database & Private Storage**: Migration `20261127000007_v2_source_distribution_and_review05.sql` tạo `source_packages`, `source_access_codes`, `source_redemptions`, `source_redeem_rate_limits`, private bucket `source-packages` (20 MB), và `redeem_source_package_atomic()`.
+- **Edge Functions**: `admin-source` (quản lý gói SRC, upload ZIP, tạo/thu hồi/xoay mã CSPRNG 12+ ký tự với PBKDF2-SHA256 + HMAC lookup digest) và `redeem-source` (rate limit DB, idempotent redeem, signed URL 60s, lịch sử cá nhân).
+- **UI/UX**: Nút `Nhận SRC` + `RedeemSourceModal` trên Dashboard, mục `SRC đã nhận` trong `/data`, và `/admin/source-packages` trong `AdminLayout`.
+- **Review 05 (`BUG-25`..`BUG-28`)**: Khóa chế độ `replace` restore (chỉ giữ `merge`), `verify:local` bao gồm đầy đủ E2E, `merge` restore giữ nguyên `term` khi backup cũ không có field `term`.
 
 ## 6. Final Hardening Summary (ENV-01..03, BUG-15..24, Lightweight Docker)
 

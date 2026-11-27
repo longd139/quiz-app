@@ -31,6 +31,7 @@ import AdminContentPage from './pages/admin/AdminContentPage';
 import AdminAuditLogsPage from './pages/admin/AdminAuditLogsPage';
 import AdminBackupsPage from './pages/admin/AdminBackupsPage';
 import AdminSettingsPage from './pages/admin/AdminSettingsPage';
+import AdminSourcePackagesPage from './pages/admin/AdminSourcePackagesPage';
 import { isTtsMuted, setTtsMuted } from './lib/tts';
 import { useState, useCallback, createContext, useContext, useEffect, Component } from 'react';
 
@@ -280,6 +281,7 @@ export default function App() {
                   <Route path="content" element={<AdminContentPage />} />
                   <Route path="audit-logs" element={<AdminAuditLogsPage />} />
                   <Route path="backups" element={<AdminBackupsPage />} />
+                  <Route path="source-packages" element={<AdminSourcePackagesPage />} />
                   <Route path="settings" element={<AdminSettingsPage />} />
                 </Route>
                 <Route
