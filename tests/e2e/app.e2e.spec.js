@@ -43,7 +43,9 @@ test.describe('Quiz App V2.0 E2E Regression', () => {
   test('Regular User can access Quiz, Vocab, History and is blocked from /admin', async ({ page }) => {
     await loginThroughUI(page, 'usera@quiz.local');
     await expect(page).toHaveURL(/\/$/);
-    await expect(page.getByText(/Đề mẫu ISTQB Foundation/i)).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText(/Kiểm thử phần mềm \(ISTQB\)/i)).toBeVisible({ timeout: 15_000 });
+    await page.getByText(/Kiểm thử phần mềm \(ISTQB\)/i).click();
+    await expect(page.getByText(/Đề mẫu ISTQB Foundation/i)).toBeVisible({ timeout: 10_000 });
 
     // Blocked from /admin
     await page.goto('/admin');
