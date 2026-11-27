@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { useQuiz } from '../App';
 import { useAuth } from '../contexts/AuthContext';
 import { calculateStreakStats } from '../data/streak';
-import { IconBook, IconCards, IconSettings, IconShield, IconLock } from './Icons';
+import { IconBook, IconCards, IconSettings, IconShield, IconLock, IconSun, IconMoon } from './Icons';
+import AnimatedFlame from './AnimatedFlame';
 import SettingsModal from './SettingsModal';
 import ChangelogModal from './ChangelogModal';
 import { APP_VERSION } from '../version';
@@ -86,10 +87,11 @@ export default function Header({ dark, toggleDark, appMode, setAppMode, ttsMuted
           {/* Mobile right controls */}
           <div className="sm:hidden flex items-center gap-1.5">
             <span
-              className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200/70 dark:border-amber-800/60 text-[11px] font-bold text-amber-700 dark:text-amber-300"
+              className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-100 dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700/80 text-[11px] font-bold text-slate-800 dark:text-slate-200"
               title="Chuỗi ngày học liên tiếp"
             >
-              🔥 {streakStats.currentStreak}
+              <AnimatedFlame className="w-3.5 h-3.5" streak={streakStats.currentStreak} active={streakStats.currentStreak > 0} showSparks={false} />
+              <span>{streakStats.currentStreak}</span>
             </span>
             <button
               type="button"
@@ -136,21 +138,21 @@ export default function Header({ dark, toggleDark, appMode, setAppMode, ttsMuted
         {/* Right: Streak, Dark mode & Account Dropdown */}
         <div className="hidden sm:flex items-center justify-end gap-2 sm:min-w-[180px]" ref={dropdownRef}>
           <div
-            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-50/90 dark:bg-amber-950/40 border border-amber-200/70 dark:border-amber-800/60 text-xs font-bold text-amber-700 dark:text-amber-300"
+            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-100/90 dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700/80 text-xs font-bold text-slate-800 dark:text-slate-200"
             title="Chuỗi ngày học liên tiếp"
           >
-            <span>🔥</span>
+            <AnimatedFlame className="w-4 h-4" streak={streakStats.currentStreak} active={streakStats.currentStreak > 0} showSparks={false} />
             <span>{streakStats.currentStreak}</span>
           </div>
 
           <button
             type="button"
             onClick={toggleDark}
-            className="w-8 h-8 flex items-center justify-center rounded-lg border border-slate-200/80 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800/60 text-xs cursor-pointer"
+            className="w-8 h-8 flex items-center justify-center rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800/60 text-slate-700 dark:text-slate-200 transition-colors cursor-pointer"
             title={dark ? 'Chuyển sang giao diện sáng' : 'Chuyển sang giao diện tối'}
             aria-label="Đổi giao diện Sáng/Tối"
           >
-            {dark ? '☀️' : '🌙'}
+            {dark ? <IconSun className="w-4 h-4" /> : <IconMoon className="w-4 h-4" />}
           </button>
 
           <div className="relative">
@@ -161,7 +163,7 @@ export default function Header({ dark, toggleDark, appMode, setAppMode, ttsMuted
               aria-expanded={dropdownOpen}
               aria-haspopup="menu"
             >
-              <span className="w-6 h-6 rounded-lg bg-indigo-600 text-white text-[11px] font-bold flex items-center justify-center">
+              <span className="w-6 h-6 rounded-lg bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-[11px] font-bold flex items-center justify-center">
                 {initials}
               </span>
               <span className="text-xs font-semibold text-slate-700 dark:text-slate-200 max-w-[100px] truncate">
