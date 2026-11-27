@@ -1,73 +1,74 @@
-# BÁO CÁO NGHIỆM THU — QUIZ APP V2.0 (REVIEW 01 REMEDIATION)
+# BÁO CÁO NGHIỆM THU — QUIZ APP V2.0 (REVIEW 02 REMEDIATION & LOCAL RUNTIME ACCEPTANCE)
 
 ## 1. Executive Summary
 
-Phiên bản **Quiz App V2.0.0** đã hoàn thành khắc phục toàn bộ các điểm mã nguồn từ Review 01 trên nhánh `feat/v2-auth-centralized-storage`:
+Quiz App V2.0.0 đã hoàn tất **Review 02 Remediation** trên nhánh `feat/v2-auth-centralized-storage`, thiết lập hoàn chỉnh **Local Docker + Supabase CLI Development Environment** tách biệt khỏi Production, khắc phục toàn bộ **BUG-01 đến BUG-14**, và kiểm thử thực tế trên PostgreSQL/Auth/PostgREST local và trình duyệt Playwright (Desktop + Mobile).
 
-- **ESLint**: Đã xử lý triệt để toàn bộ **0 errors, 0 warnings** (giảm từ 8 errors, 31 warnings ở Review 01).
-- **Automated Unit Tests**: **26/26 PASS** trên `8` suites (import trực tiếp production code).
-- **Production Build & PWA**: **PASS** (`vite build`, sinh `dist/sw.js`, `dist/manifest.webmanifest`, `dist/icon-192.png`, `dist/icon-512.png`, không chứa secret trong bundle).
-- **Security Hardening bổ sung**:
-  - Chặn user tự sửa `must_change_password` qua REST API trực tiếp tại trigger `guard_profile_update()`.
-  - Bổ sung Edge Function `supabase/functions/password-change/index.ts` xử lý xác thực mật khẩu cũ, đổi mật khẩu và xóa cờ `must_change_password` ở trusted server.
-  - Bổ sung cơ chế compensation (`auth.admin.deleteUser`) trong `admin-users` nếu lưu `profiles` thất bại để tránh orphan auth accounts.
-  - Bổ sung `allowed_formats=jpg,png,webp,gif` vào chuỗi ký server-side của `cloudinary-sign`.
-- **Hạng mục cần hạ tầng Supabase/Docker thực tế**: Chưa chạy được live DB/RLS integration tests và E2E trình duyệt do Docker Desktop daemon chưa chạy và không có Supabase CLI / credentials production trong môi trường này (đánh dấu `BLOCKED` / `NOT TESTED` trung thực).
+- **ESLint (`npm run lint`)**: **PASS** — `0 errors, 0 warnings` (`LINT_EXIT=0`).
+- **Unit Tests (`npm run test:unit`)**: **PASS** — `28/28` tests trên `9` suites (`UNIT_EXIT=0`).
+- **Integration Tests (`npm run test:integration`)**: **PASS** — `11/11` suites/cases chạy trực tiếp trên Supabase Auth + PostgreSQL + PostgREST local (`INT_EXIT=0`).
+- **Playwright E2E (`npm run test:e2e`)**: **PASS** — `12/12` tests (`desktop-chromium` + `mobile-chromium`, `E2E_EXIT=0`).
+- **Production Build (`npm run build`)**: **PASS** — `192 modules transformed`, sinh PWA `dist/sw.js`, `dist/manifest.webmanifest`, `dist/icon-192.png`, `dist/icon-512.png` (`BUILD_EXIT=0`).
 
-## 2. Git Branch & Commit
+## 2. Git & Local Environment Architecture
 
 - **Repository**: `https://github.com/longd139/quiz-app.git`
 - **Branch**: `feat/v2-auth-centralized-storage`
-- **Base commit (main)**: `8ad7c6c`
-- **Review 01 commit**: `b27e48a` (tiếp tục commit remediation và push lên `origin/feat/v2-auth-centralized-storage`).
+- **Local Project ID**: `quiz-app-local` (`supabase/config.toml`)
+- **Docker**: Docker Desktop `4.99.0` (Engine `29.9.3`, Compose `v5.7.0`)
+- **Supabase CLI**: `3.4.0` (pinned trong `devDependencies`)
+- **Local Endpoints**:
+  - Frontend (Vite): `http://127.0.0.1:5173`
+  - Supabase API / Auth / REST: `http://127.0.0.1:54321`
+  - PostgreSQL Local: `127.0.0.1:54322`
+  - Supabase Studio: `http://127.0.0.1:54323`
+  - Local SMTP (Mailpit): `http://127.0.0.1:54324`
+- **Setup Command**: `npm run setup:local` (tự động kiểm tra Docker, khởi động stack, áp dụng 4 migrations, tạo `.env.development.local`, `.env.test.local`, `supabase/functions/.env.local`, và seed 6 tài khoản test).
 
-## 3. Review 01 Remediation — Các vấn đề đã sửa
+## 3. Production Isolation Evidence
 
-1. **ESLint (0 errors, 0 warnings)**:
-   - Loại bỏ unused imports/variables (`CardDetailModal.jsx`, `ChangelogModal.jsx`, `TextFormatMenu.jsx`, `TabNav.jsx`, `StreakHeatmap.jsx`, `CreateFlashcardModal.jsx`, `VocabEditor.jsx`, `VocabQuiz.jsx`).
-   - Xử lý toàn bộ `no-empty` catch blocks (`backupManager.js`, `badgeColors.js`, `CreateFlashcardModal.jsx`, `VocabEditor.jsx`, `tts.js`).
-   - Chuẩn hóa `useMemo`/`useEffect` dependencies (`VocabDashboard.jsx`, `VocabFlashcard.jsx`, `VocabEditor.jsx`, `VocabQuiz.jsx`, `CreateFlashcardModal.jsx`).
-2. **Auth & Authorization Hardening**:
-   - `guard_profile_update()` trong `20261127000001_v2_centralized_schema.sql`: chặn non-admin sửa `role`, `status`, `email`, và `must_change_password` qua REST API.
-   - `supabase/functions/password-change/index.ts`: thực hiện reauthentication, cập nhật mật khẩu và clear `must_change_password` phía server.
-   - `supabase/functions/admin-users/index.ts`: xóa Auth user vừa tạo nếu upsert `profiles` lỗi (tránh orphan account).
-3. **Cloudinary Signed Upload**:
-   - `supabase/functions/cloudinary-sign/index.ts` & `src/lib/cloudinary.js`: bổ sung `allowed_formats=jpg,png,webp,gif` vào chữ ký SHA-1 phía server.
-4. **Node ESM & Unit Test Coverage**:
-   - Sửa relative ESM import `.js` trong `src/data/parser.js` và `src/data/storage.js`.
-   - Bổ sung `tests/quizAndParser.test.mjs` và mở rộng `tests/securityAndPolicy.test.mjs`.
+- `scripts/lib/environment-guard.mjs` kiểm tra `APP_ENV`, `SUPABASE_URL` và `DATABASE_URL` — từ chối mọi remote host hoặc `production`/`staging` (được kiểm chứng bởi unit tests `SEC-07` trong `tests/securityAndPolicy.test.mjs`).
+- `supabase/config.toml` cấu hình `[auth] enable_signup = false` và `[auth.email] enable_signup = true`, kiểm chứng thực tế qua `AUTH-04` (public `auth.signUp` bị từ chối).
+- Không có bất kỳ thao tác `supabase link`, migration, seed, hay deploy nào lên Production.
 
-## 4. Kết quả Kiểm thử, Lint & Build (Evidence thực tế)
+## 4. Review 02 Remediation (BUG-01 đến BUG-14)
 
-| Hạng mục | Trạng thái | Chi tiết quan sát |
-|---|---|---|
-| `npm run lint` | **PASS** | `LINT_EXIT=0` — **0 errors, 0 warnings**. |
-| Unit Tests (`npm test`) | **PASS** | `TEST_EXIT=0` — **26/26 tests PASS**, `8` suites (`tests/vocabWritten.test.mjs`, `tests/quizAndParser.test.mjs`, `tests/securityAndPolicy.test.mjs`). |
-| `npm run build` | **PASS** | `BUILD_EXIT=0` — `192 modules transformed`, sinh `dist/sw.js`, `dist/manifest.webmanifest`, `dist/icon-192.png`, `dist/icon-512.png`. |
-| `git diff --check` | **PASS** | `DIFF_CHECK_EXIT=0` — không có whitespace/conflict marker lỗi. |
-| Bundle Secret Scan (`dist/`) | **PASS** | Không có API Secret, Service Role Key, hoặc `app_rooms` logic trong bundle (chỉ có tên biến hướng dẫn trong UI Admin và tên key cần lọc trong `auditService.js`). |
-| Database Migration & RLS Integration | **BLOCKED** | Docker Desktop daemon không chạy (`//./pipe/dockerDesktopLinuxEngine` không khả dụng), chưa cài Supabase CLI và không có credentials Supabase Staging/Production. |
-| Playwright E2E Regression | **NOT TESTED** | Phụ thuộc backend Supabase Auth/PostgreSQL chạy thực tế. |
+| BUG | Vấn đề | File thay đổi chính | Kiểm thử / Kết quả | Status |
+|---|---|---|---|---|
+| **BUG-01** | Non-atomic optimistic locking | `20261127000003_v2_review02_remediation.sql`, `quizService.js`, `vocabularyService.js` | `TX-04`: cập nhật đồng thời cùng version gây `CONFLICT` | **PASS** |
+| **BUG-02** | Multi-table save không có transaction | `save_quiz_set_atomic`, `save_vocab_deck_atomic`, `save_quiz_attempt_atomic` | `TX-01`: lưu nguyên tử trong 1 transaction PostgreSQL | **PASS** |
+| **BUG-03** | Cache sai sau mutation lỗi | `src/hooks/useQuizData.js` | `useMutation` rollback `onError` + invalidate authoritative query | **PASS** |
+| **BUG-04** | Frontend version không cập nhật | `src/hooks/useQuizData.js`, `quizService.js`, `vocabularyService.js` | `TX-06`: trả về canonical `{ id, version, updated_at }` cập nhật cache | **PASS** |
+| **BUG-05** | Progress bị ghi đè khi dùng nhiều thiết bị | `apply_learning_progress_event`, `learning_progress_events`, `learningProgressService.js` | `TX-08`, `TX-09`: 2 request song song cộng đủ + replay `operationId` là no-op | **PASS** |
+| **BUG-06** | Legacy RPC còn quyền `PUBLIC` | `20261127000003_v2_review02_remediation.sql` (`cutover_disable_legacy_rooms`) | `MIG-10`: `REVOKE ALL ... FROM PUBLIC, anon, authenticated` | **PASS** |
+| **BUG-07** | Thiếu dữ liệu di trú legacy & fresh install lỗi `app_rooms` | `20261127000002_v2_legacy_migration.sql`, `20261127000004_v2_legacy_migration_v2.sql` | `setup:local` cài mới 4 migrations PASS + bảo toàn `questionStats`, `history`, `settings` | **PASS** |
+| **BUG-08** | Lệch schema Quiz History & parent ownership | `20261127000003_v2_review02_remediation.sql`, `src/services/historyService.js` | `ISO-05` + E2E History PASS (thêm `test_names`, `questions_snapshot`, composite FK) | **PASS** |
+| **BUG-09** | Restore báo thành công một phần | `restore_backup_atomic`, `src/services/backupService.js`, `AdminBackupsPage.jsx` | `SEC-02`: transactional restore + pre-restore backup + từ chối user thường | **PASS** |
+| **BUG-10** | Query thiếu phân trang (giới hạn 1000 rows) | `quizService.js`, `vocabularyService.js`, `historyService.js`, `learningProgressService.js`, `backupService.js` | Vòng lặp `.range()` phân trang đầy đủ | **PASS** |
+| **BUG-11** | Bypass đổi mật khẩu lần đầu qua API | `is_active_user()`, `is_admin()`, `supabase/functions/password-change/index.ts` | `AUTH-06`, `AUTH-07` + E2E: chặn đọc shared content & REST bypass | **PASS** |
+| **BUG-12** | Admin có thể bypass luồng quản trị qua REST | `guard_profile_update()`, `admin_update_profile_tx()`, `admin-users/index.ts`, `AuthContext.jsx` | `RBAC-08`, `RBAC-09`: chặn sửa protected fields qua REST + khóa admin cuối | **PASS** |
+| **BUG-13** | Client giả mạo audit log | `audit_logs_insert_own` RLS, `src/services/auditService.js` | `SEC-03`: từ chối client chèn `ADMIN_USER_CREATE` giả | **PASS** |
+| **BUG-14** | Upload size/type chỉ kiểm tra ở browser | `supabase/functions/media-upload/index.ts`, `src/lib/cloudinary.js` | Server đọc actual `byteLength <= 5MB` + kiểm tra magic bytes (JPG/PNG/WebP/GIF) + adapter local Supabase Storage | **PASS (local adapter) / BLOCKED (live Cloudinary external)** |
 
-## 5. Production Deployment Blockers & Manual Setup
+## 5. Quality Gates Summary
 
-1. **Tắt Public Signup**: Vào **Supabase Dashboard → Authentication → Providers → Email** và tắt **Allow new users to sign up**.
-2. **Rotate Cloudinary Secret**: Bắt buộc revoke/rotate `CLOUDINARY_API_SECRET` cũ từng xuất hiện trong lịch sử Git của nhánh `main` (v1.x).
-3. **Áp dụng Migrations & Edge Functions**:
-   - Chạy `supabase/migrations/20261127000001_v2_centralized_schema.sql` và `20261127000002_v2_legacy_migration.sql`.
-   - Deploy `admin-users`, `cloudinary-sign`, `password-change` và cấu hình secrets (`CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`).
-   - Chạy `scripts/bootstrap-admin.mjs` để tạo tài khoản Admin đầu tiên.
-4. **Di trú dữ liệu Legacy (`app_rooms`)**:
-   - Chạy `analyze_legacy_rooms()` → `migrate_legacy_room(..., true)` (dry-run) → `migrate_legacy_room(..., false)` → `cutover_disable_legacy_rooms()`.
-   - Xem hướng dẫn chi tiết tại [docs/DATABASE_MIGRATION.md](DATABASE_MIGRATION.md) và [docs/DEPLOYMENT.md](DEPLOYMENT.md).
+| Gate | Command | Exit Code | Result |
+|---|---|---|---|
+| ESLint | `npm run lint` | `0` | **PASS** (`0 errors, 0 warnings`) |
+| Unit Tests | `npm run test:unit` | `0` | **PASS** (`28/28`, `9` suites) |
+| Integration Tests | `npm run test:integration` | `0` | **PASS** (`11/11`, `1` suite trên Supabase local) |
+| E2E Tests | `npm run test:e2e` | `0` | **PASS** (`12/12` Desktop + Mobile) |
+| Production Build | `npm run build` | `0` | **PASS** (`192` modules + PWA) |
 
-## 6. Acceptance Checklist
+## 6. Remaining External Production Blockers
 
-- [x] **PASS** — ESLint (`0 errors, 0 warnings`).
-- [x] **PASS** — Unit Tests (`26/26 PASS`).
-- [x] **PASS** — Production Build & PWA assets (`vite build`).
-- [x] **PASS** — Repository cleanup & legacy room removal.
-- [x] **PASS** — Auth, Admin & Security source code implementation (`password-change`, `admin-users`, `cloudinary-sign`, `DOMPurify`).
-- [ ] **BLOCKED** — Live Supabase migration, RLS integration tests & Public Signup disable verification.
-- [ ] **BLOCKED** — Cloudinary credential rotation (yêu cầu chủ dự án thực hiện).
-- [ ] **NOT TESTED** — Full browser E2E against live Supabase.
+1. **Cloudinary Credential Rotation**: Chủ dự án cần revoke/rotate `CLOUDINARY_API_SECRET` cũ từng xuất hiện trong lịch sử Git v1.x và cấu hình secret mới trên Supabase Edge Functions (`media-upload`). *(Không sử dụng credential cũ để kiểm thử).*
+2. **Supabase Production Public Signup**: Chủ dự án cần tắt **Allow new users to sign up** trong Supabase Production Dashboard → Authentication → Providers → Email.
+3. **Vercel Preview / Production Env Separation**: Chủ dự án cần tách riêng Environment Variables giữa Preview và Production trên Vercel Dashboard.
+4. **Production Migration & Cutover**: Áp dụng 4 migration files, deploy Edge Functions (`admin-users`, `password-change`, `media-upload`), chạy `bootstrap-admin.mjs`, di trú `app_rooms` bằng `migrate_legacy_room()` và chạy `cutover_disable_legacy_rooms()`.
+
+## 7. Acceptance Status
+
+- **Local Development Acceptance**: **PASS** (Docker + Supabase CLI + 4 migrations + 6 seeded accounts + Vite local hoạt động đầy đủ).
+- **Source Code & Automated Runtime Acceptance**: **PASS** (ESLint 0/0, Unit 28/28, Integration 11/11, E2E 12/12, Build PASS).
+- **Production Release Readiness**: **BLOCKED BY EXTERNAL MANUAL STEPS** (chờ chủ dự án rotate Cloudinary secret, tắt Public Signup trên Supabase Cloud, cấu hình Vercel Preview/Prod env và phê duyệt cutover).

@@ -16,8 +16,8 @@ export default function AdminBackupsPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const list = await listBackups();
-      setBackups(list);
+      const res = await listBackups();
+      setBackups(res.backups || []);
     } catch (err) {
       setMessage({ type: 'error', text: err.message || 'Lỗi tải danh sách sao lưu.' });
     } finally {
@@ -48,7 +48,7 @@ export default function AdminBackupsPage() {
     setBusy(true);
     setMessage(null);
     try {
-      await restoreCentralBackup(restoreTarget.id, user.id);
+      await restoreCentralBackup(restoreTarget.id, { mode: 'merge', dryRun: false });
       await refresh();
       setMessage({ type: 'success', text: 'Khôi phục dữ liệu thành công (đã tự động tạo bản sao lưu an toàn trước khi khôi phục).' });
       setRestoreTarget(null);

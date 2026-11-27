@@ -1,26 +1,43 @@
 import { supabase } from '../lib/supabase';
 
+const PAGE_SIZE = 1000;
+
+async function fetchAllPaginated(table, orderColumns = ['created_at']) {
+  const rows = [];
+  let offset = 0;
+
+  while (true) {
+    let query = supabase.from(table).select('*');
+    for (const col of orderColumns) {
+      query = query.order(col, { ascending: true });
+    }
+    const { data, error } = await query.range(offset, offset + PAGE_SIZE - 1);
+    if (error) throw new Error(error.message);
+    if (!data || data.length === 0) break;
+    rows.push(...data);
+    if (data.length < PAGE_SIZE) break;
+    offset += PAGE_SIZE;
+  }
+
+  return rows;
+}
+
 export async function fetchQuizDomain() {
-  const [colsRes, setsRes, qRes, optRes] = await Promise.all([
-    supabase.from('quiz_collections').select('*').order('sort_order', { ascending: true }).order('created_at', { ascending: true }),
-    supabase.from('quiz_sets').select('*').order('created_at', { ascending: true }),
-    supabase.from('questions').select('*').order('sort_order', { ascending: true }),
-    supabase.from('question_options').select('*').order('sort_order', { ascending: true }),
+  const [colsData, setsData, qData, optData] = await Promise.all([
+    fetchAllPaginated('quiz_collections', ['sort_order', 'created_at']),
+    fetchAllPaginated('quiz_sets', ['created_at']),
+    fetchAllPaginated('questions', ['sort_order', 'id']),
+    fetchAllPaginated('question_options', ['sort_order', 'id']),
   ]);
 
-  if (colsRes.error) throw new Error(colsRes.error.message);
-  if (setsRes.error) throw new Error(setsRes.error.message);
-  if (qRes.error) throw new Error(qRes.error.message);
-  if (optRes.error) throw new Error(optRes.error.message);
-
   const optionsByQ = new Map();
-  for (const opt of optRes.data || []) {
+  for (const opt of optData) {
     if (!optionsByQ.has(opt.question_id)) optionsByQ.set(opt.question_id, []);
     optionsByQ.get(opt.question_id).push(opt);
   }
 
   const questionsBySet = new Map();
-  for (const q of qRes.data || []) {
+  for (const q of qData) {
     const opts = optionsByQ.get(q.id) || [];
     const correctIndices = [];
     const mappedOpts = opts.map((o, idx) => {
@@ -40,14 +57,14 @@ export async function fetchQuizDomain() {
     questionsBySet.get(q.quiz_set_id).push(mappedQ);
   }
 
-  const collections = (colsRes.data || []).map((c) => ({
+  const collections = colsData.map((c) => ({
     id: c.id,
     name: c.name,
     description: c.description || '',
     createdAt: c.created_at,
   }));
 
-  const tests = (setsRes.data || []).map((s) => ({
+  const tests = setsData.map((s) => ({
     id: s.id,
     name: s.name,
     collectionId: s.collection_id,
@@ -81,78 +98,21 @@ export async function deleteQuizCollection(collectionId) {
   if (error) throw new Error(error.message);
 }
 
-export async function saveQuizSetWithQuestions(test, userId) {
-  const nextVersion = (test.version || 1) + 1;
-
-  // Check if set exists for optimistic concurrency
-  const { data: existing } = await supabase
-    .from('quiz_sets')
-    .select('id, version')
-    .eq('id', test.id)
-    .maybeSingle();
-
-  if (existing && test.version && existing.version !== test.version) {
-    throw new Error('Bộ đề đã được chỉnh sửa bởi người khác. Vui lòng tải lại trước khi lưu.');
-  }
-
-  const { error: setErr } = await supabase.from('quiz_sets').upsert({
-    id: test.id,
-    collection_id: test.collectionId || null,
-    name: test.name,
-    description: test.description || '',
-    version: existing ? nextVersion : 1,
-    created_by: userId,
+export async function saveQuizSetWithQuestions(test) {
+  const { data, error } = await supabase.rpc('save_quiz_set_atomic', {
+    p_id: test.id,
+    p_collection_id: test.collectionId || null,
+    p_name: test.name,
+    p_description: test.description || '',
+    p_expected_version: test.version ?? null,
+    p_questions: test.questions || [],
   });
-  if (setErr) throw new Error(setErr.message);
 
-  // Sync questions for this set
-  const incomingQuestions = test.questions || [];
-  const incomingIds = incomingQuestions.map((q) => q.id);
-
-  const { data: existingQs } = await supabase
-    .from('questions')
-    .select('id')
-    .eq('quiz_set_id', test.id);
-
-  const toDelete = (existingQs || [])
-    .map((q) => q.id)
-    .filter((id) => !incomingIds.includes(id));
-
-  if (toDelete.length > 0) {
-    const { error: delErr } = await supabase.from('questions').delete().in('id', toDelete);
-    if (delErr) throw new Error(delErr.message);
-  }
-
-  for (let i = 0; i < incomingQuestions.length; i++) {
-    const q = incomingQuestions[i];
-    const { error: qErr } = await supabase.from('questions').upsert({
-      id: q.id,
-      quiz_set_id: test.id,
-      prompt: q.prompt || '',
-      explanation: q.explanation || '',
-      sort_order: i,
-    });
-    if (qErr) throw new Error(qErr.message);
-
-    // Replace options for this question
-    await supabase.from('question_options').delete().eq('question_id', q.id);
-
-    const opts = (q.options || []).map((opt, idx) => ({
-      question_id: q.id,
-      label: opt.label || String.fromCharCode(65 + idx),
-      text: opt.text || '',
-      is_correct: Array.isArray(q.correctIndices) && q.correctIndices.includes(idx),
-      sort_order: idx,
-    }));
-
-    if (opts.length > 0) {
-      const { error: optErr } = await supabase.from('question_options').insert(opts);
-      if (optErr) throw new Error(optErr.message);
-    }
-  }
+  if (error) throw new Error(error.message);
+  return data;
 }
 
 export async function deleteQuizSet(testId) {
-  const { error } = await supabase.from('quiz_sets').delete().eq('id', testId);
+  const { error } = await supabase.rpc('delete_quiz_set_atomic', { p_id: testId });
   if (error) throw new Error(error.message);
 }

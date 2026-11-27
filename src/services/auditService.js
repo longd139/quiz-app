@@ -1,39 +1,26 @@
 import { supabase, hasSupabase } from '../lib/supabase';
 
-const SENSITIVE_KEYS = new Set([
-  'password',
-  'temp_password',
-  'temporary_password',
-  'access_token',
-  'refresh_token',
-  'api_secret',
-  'room_secret',
-  'roomSecret',
-  'service_role_key',
+const ALLOWED_CLIENT_ACTIONS = new Set([
+  'CLIENT_PREFERENCE_UPDATE',
+  'CLIENT_PERSONAL_EXPORT',
 ]);
 
-function sanitizeMetadata(meta) {
-  if (!meta || typeof meta !== 'object') return {};
-  const clean = {};
-  for (const [k, v] of Object.entries(meta)) {
-    if (SENSITIVE_KEYS.has(k)) continue;
-    clean[k] = v;
-  }
-  return clean;
-}
-
-export async function recordCentralAuditLog({ actorUserId, action, entityType, entityId = null, metadata = {} }) {
-  if (!hasSupabase || !actorUserId) return;
+/**
+ * Only non-sensitive client telemetry actions may be written by the client.
+ * Security & Admin audit events are recorded exclusively by DB RPCs / Edge Functions.
+ */
+export async function recordClientAuditLog({ actorUserId, action, entityType, entityId = null, metadata = {} }) {
+  if (!hasSupabase || !actorUserId || !ALLOWED_CLIENT_ACTIONS.has(action)) return;
   try {
     await supabase.from('audit_logs').insert({
       actor_user_id: actorUserId,
       action,
       entity_type: entityType,
       entity_id: entityId ? String(entityId) : null,
-      metadata: sanitizeMetadata(metadata),
+      metadata,
     });
   } catch (err) {
-    console.warn('Audit log write skipped:', err?.message);
+    console.warn('Client audit log skipped:', err?.message);
   }
 }
 

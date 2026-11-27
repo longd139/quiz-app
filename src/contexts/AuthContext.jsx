@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react';
+import { createContext, useContext, useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { supabase, hasSupabase } from '../lib/supabase';
 import {
   fetchProfile,
@@ -24,27 +24,40 @@ export function AuthProvider({ children }) {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [authError, setAuthError] = useState('');
+  const activeUserIdRef = useRef(null);
 
   const loadUserProfile = useCallback(async (currentSession) => {
-    if (!currentSession?.user?.id) {
+    const targetUid = currentSession?.user?.id || null;
+    if (!targetUid) {
+      activeUserIdRef.current = null;
       setProfile(null);
       return null;
     }
+
+    activeUserIdRef.current = targetUid;
     try {
-      const prof = await fetchProfile(currentSession.user.id);
+      const prof = await fetchProfile(targetUid);
+      // Guard against race condition: ignore if user switched/logged out mid-flight
+      if (activeUserIdRef.current !== targetUid) return null;
+
       if (!prof || prof.status === 'DISABLED') {
-        await signOutCurrentUser(currentSession.user.id);
+        await signOutCurrentUser(targetUid);
+        if (activeUserIdRef.current !== targetUid) return null;
+        activeUserIdRef.current = null;
         setSession(null);
         setProfile(null);
         setAuthError('Tài khoản của bạn đã bị khóa hoặc không còn hoạt động.');
         return null;
       }
+
       setProfile(prof);
       setAuthError('');
       return prof;
     } catch (err) {
-      console.error('Failed to load profile:', err);
-      setProfile(null);
+      if (activeUserIdRef.current === targetUid) {
+        console.error('Failed to load profile:', err);
+        setProfile(null);
+      }
       return null;
     }
   }, []);
@@ -72,18 +85,25 @@ export function AuthProvider({ children }) {
       }
     })();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, nextSession) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, nextSession) => {
       if (!mounted) return;
       if (event === 'SIGNED_OUT') {
-        clearUserScopedCaches();
+        const prevUid = activeUserIdRef.current;
+        activeUserIdRef.current = null;
+        clearUserScopedCaches(prevUid);
         setSession(null);
         setProfile(null);
         return;
       }
+
       setSession(nextSession);
+      // Defer Supabase REST calls outside the synchronous auth state callback to prevent deadlocks
       if (nextSession) {
-        await loadUserProfile(nextSession);
+        setTimeout(() => {
+          if (mounted) loadUserProfile(nextSession);
+        }, 0);
       } else {
+        activeUserIdRef.current = null;
         setProfile(null);
       }
     });
@@ -97,13 +117,15 @@ export function AuthProvider({ children }) {
   const signIn = useCallback(async (email, password) => {
     setAuthError('');
     const result = await signInWithEmailPassword(email, password);
+    activeUserIdRef.current = result.user.id;
     setSession(result.session);
     setProfile(result.profile);
     return result;
   }, []);
 
   const signOut = useCallback(async () => {
-    const uid = session?.user?.id;
+    const uid = activeUserIdRef.current || session?.user?.id;
+    activeUserIdRef.current = null;
     await signOutCurrentUser(uid);
     setSession(null);
     setProfile(null);
@@ -113,7 +135,7 @@ export function AuthProvider({ children }) {
   const changePassword = useCallback(async (currentPassword, newPassword) => {
     const email = profile?.email || session?.user?.email;
     if (!email) throw new Error('Không xác định được email tài khoản.');
-    await changePasswordWithReauth({ email, currentPassword, newPassword });
+    await changePasswordWithReauth({ currentPassword, newPassword });
     await loadUserProfile(session);
   }, [profile?.email, session, loadUserProfile]);
 
@@ -136,7 +158,7 @@ export function AuthProvider({ children }) {
     loading,
     authError,
     isAuthenticated: Boolean(session?.user && profile && profile.status === 'ACTIVE'),
-    isAdmin: Boolean(profile?.role === 'ADMIN' && profile?.status === 'ACTIVE'),
+    isAdmin: Boolean(profile?.role === 'ADMIN' && profile?.status === 'ACTIVE' && !profile?.must_change_password),
     mustChangePassword: Boolean(profile?.must_change_password),
     hasSupabase,
     signIn,

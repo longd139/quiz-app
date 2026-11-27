@@ -1,20 +1,40 @@
 import { supabase } from '../lib/supabase';
 
+const PAGE_SIZE = 1000;
+
+async function fetchUserPaginated(table, userId) {
+  const rows = [];
+  let offset = 0;
+
+  while (true) {
+    const { data, error } = await supabase
+      .from(table)
+      .select('*')
+      .eq('user_id', userId)
+      .range(offset, offset + PAGE_SIZE - 1);
+
+    if (error) throw new Error(error.message);
+    if (!data || data.length === 0) break;
+    rows.push(...data);
+    if (data.length < PAGE_SIZE) break;
+    offset += PAGE_SIZE;
+  }
+
+  return rows;
+}
+
 export async function fetchLearningProgress(userId) {
-  const [qStatsRes, vProgRes, actRes, rewardRes] = await Promise.all([
-    supabase.from('question_learning_stats').select('*').eq('user_id', userId),
-    supabase.from('vocab_learning_progress').select('*').eq('user_id', userId),
-    supabase.from('daily_learning_activity').select('*').eq('user_id', userId),
+  const [qStatsData, vProgData, actData, rewardRes] = await Promise.all([
+    fetchUserPaginated('question_learning_stats', userId),
+    fetchUserPaginated('vocab_learning_progress', userId),
+    fetchUserPaginated('daily_learning_activity', userId),
     supabase.from('learning_rewards').select('*').eq('user_id', userId).maybeSingle(),
   ]);
 
-  if (qStatsRes.error) throw new Error(qStatsRes.error.message);
-  if (vProgRes.error) throw new Error(vProgRes.error.message);
-  if (actRes.error) throw new Error(actRes.error.message);
   if (rewardRes.error) throw new Error(rewardRes.error.message);
 
   const questionStats = {};
-  for (const row of qStatsRes.data || []) {
+  for (const row of qStatsData) {
     questionStats[row.question_id] = {
       attempts: row.attempts,
       correct: row.correct,
@@ -24,7 +44,7 @@ export async function fetchLearningProgress(userId) {
   }
 
   const vocabStats = {};
-  for (const row of vProgRes.data || []) {
+  for (const row of vProgData) {
     vocabStats[row.flashcard_id] = {
       mastered: row.mastered,
       reviewCount: row.review_count,
@@ -35,7 +55,7 @@ export async function fetchLearningProgress(userId) {
   }
 
   const activityLog = {};
-  for (const row of actRes.data || []) {
+  for (const row of actData) {
     activityLog[row.activity_date] = row.activity_count;
   }
 
@@ -47,52 +67,27 @@ export async function fetchLearningProgress(userId) {
   };
 }
 
-export async function upsertQuestionStats(userId, questionStats) {
-  const rows = Object.entries(questionStats || {}).map(([questionId, st]) => ({
-    user_id: userId,
-    question_id: questionId,
-    attempts: st.attempts || 0,
-    correct: st.correct || 0,
-    wrong: st.wrong || 0,
-    last_attempted_at: st.lastAttemptedAt || new Date().toISOString(),
-  }));
-  if (rows.length === 0) return;
-  const { error } = await supabase.from('question_learning_stats').upsert(rows);
-  if (error) throw new Error(error.message);
-}
-
-export async function upsertVocabProgress(userId, vocabStats) {
-  const rows = Object.entries(vocabStats || {}).map(([flashcardId, st]) => ({
-    user_id: userId,
-    flashcard_id: flashcardId,
-    mastered: Boolean(st.mastered),
-    review_count: st.reviewCount || 0,
-    correct_count: st.correctCount || 0,
-    wrong_count: st.wrongCount || 0,
-    last_reviewed_at: st.lastReviewed || new Date().toISOString(),
-  }));
-  if (rows.length === 0) return;
-  const { error } = await supabase.from('vocab_learning_progress').upsert(rows);
-  if (error) throw new Error(error.message);
-}
-
-export async function upsertDailyActivity(userId, activityLog) {
-  const rows = Object.entries(activityLog || {}).map(([dateStr, count]) => ({
-    user_id: userId,
-    activity_date: dateStr,
-    activity_count: Math.max(0, Number(count) || 0),
-    updated_at: new Date().toISOString(),
-  }));
-  if (rows.length === 0) return;
-  const { error } = await supabase.from('daily_learning_activity').upsert(rows);
-  if (error) throw new Error(error.message);
-}
-
-export async function upsertMooskCount(userId, mooskCount) {
-  const { error } = await supabase.from('learning_rewards').upsert({
-    user_id: userId,
-    moosk_count: Math.max(0, Number(mooskCount) || 0),
-    updated_at: new Date().toISOString(),
+/**
+ * Apply concurrent-safe, idempotent delta updates for learning progress.
+ * Re-sending the same operationId is a no-op on the server.
+ */
+export async function applyProgressDelta({
+  operationId,
+  questionDeltas = [],
+  vocabDeltas = [],
+  activityDate = null,
+  activityDelta = 0,
+  mooskDelta = 0,
+}) {
+  const { data, error } = await supabase.rpc('apply_learning_progress_event', {
+    p_operation_id: operationId || crypto.randomUUID(),
+    p_question_deltas: questionDeltas,
+    p_vocab_deltas: vocabDeltas,
+    p_activity_date: activityDate,
+    p_activity_delta: Math.max(0, activityDelta),
+    p_moosk_delta: Math.max(0, mooskDelta),
   });
+
   if (error) throw new Error(error.message);
+  return data;
 }

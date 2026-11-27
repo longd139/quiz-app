@@ -20,11 +20,17 @@ returns table (
   history_count integer,
   activity_days_count integer
 )
-language sql
+language plpgsql
 security definer
 stable
 set search_path = public
 as $$
+begin
+  if to_regclass('public.app_rooms') is null then
+    return;
+  end if;
+
+  return query
   select
     r.room_id,
     r.updated_at,
@@ -47,6 +53,7 @@ as $$
     ), 0) as activity_days_count
   from public.app_rooms r
   order by r.updated_at desc;
+end;
 $$;
 
 -- 2. Idempotent migration for a single room (shared content + optional personal data owner)

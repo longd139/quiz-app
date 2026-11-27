@@ -4,9 +4,14 @@ dist/
 *.local
 .env
 .env.*
+!.env*.example
 
 # Supabase CLI cache (riêng từng máy)
 supabase/.temp/
+
+# Playwright artifacts
+playwright-report/
+test-results/
 
 # Agent IDE customizations
 .agents/

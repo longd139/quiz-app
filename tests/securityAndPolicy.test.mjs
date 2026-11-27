@@ -8,6 +8,7 @@ import {
   recordStudyActivity,
 } from '../src/data/streak.js';
 import { arraysEqual, renderMd } from '../src/data/storage.js';
+import { assertLocalEnvironment } from '../scripts/lib/environment-guard.mjs';
 
 describe('Password Policy Validation', () => {
   it('Từ chối mật khẩu quá ngắn hoặc thiếu độ phức tạp', () => {
@@ -69,5 +70,31 @@ describe('XSS Prevention in Markdown Renderer', () => {
     assert.equal(out.includes('<strong>Định nghĩa</strong>'), true);
     assert.equal(out.includes('∈'), true);
     assert.equal(out.includes('≤'), true);
+  });
+});
+
+describe('Production Protection Guard (SEC-07)', () => {
+  it('Từ chối remote Supabase URL hoặc APP_ENV=production', () => {
+    assert.throws(
+      () => assertLocalEnvironment({ appEnv: 'production', supabaseUrl: 'http://127.0.0.1:54321' }),
+      /ENV GUARD BLOCKED/
+    );
+    assert.throws(
+      () => assertLocalEnvironment({ appEnv: 'development', supabaseUrl: 'https://abcxyz.supabase.co' }),
+      /ENV GUARD BLOCKED/
+    );
+    assert.throws(
+      () => assertLocalEnvironment({
+        appEnv: 'test',
+        supabaseUrl: 'http://127.0.0.1:54321',
+        dbUrl: 'postgresql://postgres:pass@db.abcxyz.supabase.co:5432/postgres',
+      }),
+      /ENV GUARD BLOCKED/
+    );
+  });
+
+  it('Cho phép localhost / 127.0.0.1 trong development/test', () => {
+    const res = assertLocalEnvironment({ appEnv: 'test', supabaseUrl: 'http://127.0.0.1:54321' });
+    assert.equal(res.hostname, '127.0.0.1');
   });
 });

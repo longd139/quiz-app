@@ -60,14 +60,14 @@ Deno.serve(async (req: Request) => {
   const callerId = userRes.user.id;
   const { data: callerProfile, error: profErr } = await sbAdmin
     .from('profiles')
-    .select('id, role, status')
+    .select('id, role, status, must_change_password')
     .eq('id', callerId)
     .maybeSingle();
 
   if (profErr || !callerProfile) {
     return json({ error: 'Không tìm thấy hồ sơ người dùng.' }, 403);
   }
-  if (callerProfile.status !== 'ACTIVE' || callerProfile.role !== 'ADMIN') {
+  if (callerProfile.status !== 'ACTIVE' || callerProfile.role !== 'ADMIN' || callerProfile.must_change_password) {
     return json({ error: 'Bạn không có quyền thực hiện thao tác quản trị.' }, 403);
   }
 
@@ -148,67 +148,23 @@ Deno.serve(async (req: Request) => {
       const targetUserId = String(body.user_id ?? '').trim();
       if (!targetUserId) return json({ error: 'Thiếu user_id.' }, 400);
 
-      const { data: target, error: targetErr } = await sbAdmin
-        .from('profiles')
-        .select('*')
-        .eq('id', targetUserId)
-        .maybeSingle();
-
-      if (targetErr || !target) return json({ error: 'Không tìm thấy tài khoản.' }, 404);
-
-      const nextRole = body.role === 'ADMIN' || body.role === 'USER' ? body.role : target.role;
-      const nextStatus = body.status === 'ACTIVE' || body.status === 'DISABLED' ? body.status : target.status;
-      const nextName = typeof body.full_name === 'string' ? body.full_name.trim() : target.full_name;
+      const nextRole = body.role === 'ADMIN' || body.role === 'USER' ? body.role : null;
+      const nextStatus = body.status === 'ACTIVE' || body.status === 'DISABLED' ? body.status : null;
+      const nextName = typeof body.full_name === 'string' ? body.full_name.trim() : null;
       const nextMustChange = typeof body.must_change_password === 'boolean'
         ? body.must_change_password
-        : target.must_change_password;
+        : null;
 
-      // Guard: prevent admin from disabling self or removing the last active admin
-      if (targetUserId === callerId && nextStatus === 'DISABLED') {
-        return json({ error: 'Không thể tự khóa tài khoản của chính mình.' }, 400);
-      }
-      if (target.role === 'ADMIN' && (nextRole !== 'ADMIN' || nextStatus !== 'ACTIVE')) {
-        const { count } = await sbAdmin
-          .from('profiles')
-          .select('id', { count: 'exact', head: true })
-          .eq('role', 'ADMIN')
-          .eq('status', 'ACTIVE');
-
-        if ((count ?? 0) <= 1) {
-          return json({ error: 'Hệ thống phải có ít nhất 1 Quản trị viên đang hoạt động.' }, 400);
-        }
-      }
-
-      const { data: updated, error: updErr } = await sbAdmin
-        .from('profiles')
-        .update({
-          full_name: nextName,
-          role: nextRole,
-          status: nextStatus,
-          must_change_password: nextMustChange,
-        })
-        .eq('id', targetUserId)
-        .select()
-        .single();
-
-      if (updErr) return json({ error: updErr.message }, 400);
-
-      await sbAdmin.from('audit_logs').insert({
-        actor_user_id: callerId,
-        action: nextStatus !== target.status
-          ? (nextStatus === 'DISABLED' ? 'ADMIN_USER_DISABLE' : 'ADMIN_USER_ENABLE')
-          : (nextRole !== target.role ? 'ADMIN_USER_ROLE_CHANGE' : 'ADMIN_USER_UPDATE'),
-        entity_type: 'profile',
-        entity_id: targetUserId,
-        metadata: {
-          email: target.email,
-          previous_role: target.role,
-          new_role: nextRole,
-          previous_status: target.status,
-          new_status: nextStatus,
-        },
+      const { data: updated, error: txErr } = await sbAdmin.rpc('admin_update_profile_tx', {
+        p_actor_id: callerId,
+        p_target_id: targetUserId,
+        p_full_name: nextName,
+        p_role: nextRole,
+        p_status: nextStatus,
+        p_must_change_password: nextMustChange,
       });
 
+      if (txErr) return json({ error: txErr.message }, 400);
       return json({ user: updated });
     }
 
