@@ -106,22 +106,22 @@ export default function Dashboard() {
 
       {/* Breadcrumb & Actions Toolbar */}
       <div className="flex flex-wrap gap-2.5 mb-5 items-center">
-        <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-sm font-semibold">
+        <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-sm">
           <button
             type="button"
             onClick={() => setSelectedCollectionId(null)}
-            className={`px-3 py-2 rounded-lg transition-colors cursor-pointer ${
+            className={`transition-colors cursor-pointer ${
               selectedCollectionId === null
-                ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900'
-                : 'border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'
+                ? 'font-bold text-slate-900 dark:text-slate-100'
+                : 'font-medium text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100'
             }`}
           >
             Kho đề thi
           </button>
           {activeCollection && (
             <>
-              <span className="text-slate-400 select-none px-0.5">&gt;</span>
-              <span className="px-3 py-2 rounded-lg bg-slate-900 text-white dark:bg-white dark:text-slate-900">
+              <span className="text-slate-400 select-none">&gt;</span>
+              <span className="font-bold text-slate-900 dark:text-slate-100">
                 {escHtml(activeCollection.name)}
               </span>
             </>
