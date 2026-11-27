@@ -230,10 +230,10 @@ export default function Editor() {
   return (
     <div>
       {/* Create exam entry point */}
-      <div className="mb-5 p-4 bg-gradient-to-r from-primary-600 to-primary-700 rounded-xl text-white">
+      <div className="mb-5 p-4 bg-slate-900 dark:bg-slate-800 border border-slate-800 dark:border-slate-700 rounded-xl text-white">
         <div className="text-sm font-semibold mb-1">Tạo bài kiểm tra từ nhiều bài</div>
-        <p className="text-xs text-primary-100 mb-3">Chọn nhiều bài đã soạn, bốc ngẫu nhiên đủ số câu và đặt thời gian làm bài.</p>
-        <button onClick={() => navigate('/exam-setup')} className="bg-white text-primary-700 px-4 py-2 rounded-lg text-sm font-semibold hover:opacity-90 active:scale-95 transition-all">
+        <p className="text-xs text-slate-300 mb-3">Chọn nhiều bài đã soạn, bốc ngẫu nhiên đủ số câu và đặt thời gian làm bài.</p>
+        <button onClick={() => navigate('/exam-setup')} className="bg-white text-slate-900 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-slate-100 active:scale-95 transition-all cursor-pointer">
           Tạo bài kiểm tra
         </button>
       </div>
@@ -252,7 +252,7 @@ export default function Editor() {
         {showNewCollection && (
           <div className="mt-2 flex gap-2">
             <input type="text" value={newCollectionName} onChange={e => setNewCollectionName(e.target.value)} placeholder="Tên collection mới..." className="flex-1 px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm focus:border-primary-500 outline-none" />
-            <button onClick={handleCreateCollection} className="bg-success-600 text-white px-3 py-2 rounded-lg text-xs font-semibold whitespace-nowrap">Tạo</button>
+            <button onClick={handleCreateCollection} className="bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-3 py-2 rounded-lg text-xs font-semibold whitespace-nowrap cursor-pointer">Tạo</button>
             <button onClick={() => { setShowNewCollection(false); setCollectionId(''); }} className="border border-slate-200 dark:border-slate-700 px-3 py-2 rounded-lg text-xs text-slate-600">Hủy</button>
           </div>
         )}
@@ -260,9 +260,9 @@ export default function Editor() {
 
       {/* Import from other tests */}
       {collectionId && otherTests.length > 0 && (
-        <div className="mb-5 p-3 bg-primary-50 dark:bg-primary-700/20 rounded-lg">
+        <div className="mb-5 p-3 bg-slate-100 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700 rounded-lg">
           <p className="text-xs text-slate-600 dark:text-slate-300 mb-2">Bạn có thể thêm câu hỏi từ bài khác trong cùng collection:</p>
-          <button onClick={() => setShowQuestionPicker(!showQuestionPicker)} className="border border-primary-300 dark:border-primary-700 px-3 py-1.5 rounded-lg text-xs font-semibold text-primary-600 dark:text-primary-400 hover:bg-primary-100 dark:hover:bg-primary-700/20 transition-all">
+          <button onClick={() => setShowQuestionPicker(!showQuestionPicker)} className="border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all cursor-pointer">
             {showQuestionPicker ? 'Ẩn' : 'Chọn câu hỏi từ bài khác'} ({otherTests.length} bài)
           </button>
         </div>
@@ -320,7 +320,7 @@ export default function Editor() {
           )}
 
           {pickerTest && (
-            <button onClick={handleAddFromPicker} className="mt-3 bg-primary-600 text-white px-3 py-1.5 rounded-lg text-xs font-semibold">
+            <button onClick={handleAddFromPicker} className="mt-3 bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer">
               Thêm câu đã chọn vào bài
             </button>
           )}
@@ -343,7 +343,7 @@ export default function Editor() {
         <textarea value={bulkText} onChange={e => setBulkText(e.target.value)}
           placeholder={`Paste câu hỏi vào đây...\n\nSWT là viết tắt của?\nA. Software Testing\nB. Software Technology\nC. System Web Testing\nD. Software Writing Tool\nĐáp án: A\nGiải thích: SWT = Software Testing\n\nKiểm thử hộp trắng là gì?\nA. Kiểm thử không cần code\nB. Kiểm thử dựa trên cấu trúc bên trong\nC. Kiểm thử giao diện\nD. Kiểm thử chức năng\nĐáp án: B\n\n(Hoặc dùng <1>, Câu 1:, 1. để đánh dấu đầu câu)`}
           className="w-full px-3 py-2.5 border border-slate-200 dark:border-slate-700 rounded-lg text-sm focus:border-primary-500 focus:ring-2 focus:ring-primary-100 outline-none transition-all min-h-[180px] resize-y" />
-        <button onClick={handleParse} className="mt-3 bg-primary-600 text-white px-4 py-2.5 rounded-lg text-sm font-semibold hover:bg-primary-700 active:scale-95 transition-all">Phân tích câu hỏi</button>
+        <button onClick={handleParse} className="mt-3 bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-4 py-2.5 rounded-lg text-sm font-semibold hover:bg-slate-800 dark:hover:bg-slate-100 active:scale-95 transition-all cursor-pointer">Phân tích câu hỏi</button>
         {parseFeedback && <div className="mt-2" dangerouslySetInnerHTML={{ __html: parseFeedback }} />}
       </div>
 
@@ -409,14 +409,14 @@ export default function Editor() {
       </div>
 
       <div ref={saveRef} className="flex gap-2 mt-5">
-        <button onClick={handleSave} className="flex-1 bg-primary-600 text-white px-4 py-3 rounded-lg text-base font-semibold hover:bg-primary-700 active:scale-95 transition-all">Lưu bài</button>
-        <button onClick={() => navigate('/')} className="border border-slate-200 dark:border-slate-700 px-4 py-3 rounded-lg text-sm font-semibold hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-800 text-slate-600">Hủy</button>
+        <button onClick={handleSave} className="flex-1 bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-4 py-3 rounded-lg text-base font-semibold hover:bg-slate-800 dark:hover:bg-slate-100 active:scale-95 transition-all cursor-pointer">Lưu bài</button>
+        <button onClick={() => navigate('/')} className="border border-slate-200 dark:border-slate-700 px-4 py-3 rounded-lg text-sm font-semibold hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-800 text-slate-600 dark:text-slate-300 cursor-pointer">Hủy</button>
       </div>
 
       {/* Floating scroll-to-save button */}
       {questions.length > 0 && (
         <button onClick={scrollToSave}
-          className="fixed bottom-6 right-6 z-50 w-12 h-12 bg-primary-600 text-white rounded-full shadow-lg hover:bg-primary-700 active:scale-90 transition-all flex items-center justify-center text-xl"
+          className="fixed bottom-6 right-6 z-50 w-12 h-12 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-full shadow-lg hover:bg-slate-800 dark:hover:bg-slate-100 active:scale-90 transition-all flex items-center justify-center text-xl cursor-pointer"
           title="Xuống Lưu bài">
           ↓
         </button>

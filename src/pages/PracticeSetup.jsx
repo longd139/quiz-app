@@ -93,7 +93,7 @@ export default function PracticeSetup() {
             return (
               <label key={test.id}
                 onClick={() => toggleTest(test.id)}
-                className={`flex items-center gap-3 p-3.5 border-2 rounded-xl cursor-pointer transition-all ${selected ? 'border-primary-500 bg-primary-100 dark:bg-primary-700/30 shadow-sm' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-primary-500 hover:bg-primary-50 dark:hover:bg-primary-700/20'}`}>
+                className={`flex items-center gap-3 p-3.5 border-2 rounded-xl cursor-pointer transition-all ${selected ? 'border-slate-900 dark:border-white bg-slate-100 dark:bg-slate-800 shadow-sm' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/50 hover:border-slate-400'}`}>
                 <div className="flex-1">
                   <div className="font-semibold text-sm">{escHtml(test.name)}</div>
                   <div className="text-[0.7rem] text-slate-500">{escHtml(getCollectionName(data.collections, test.collectionId))} &middot; {test.questions.length} câu</div>
@@ -120,7 +120,7 @@ export default function PracticeSetup() {
       </select>
 
       <button onClick={handleStart} disabled={selectedIds.size === 0}
-        className="w-full bg-primary-600 text-white px-4 py-3.5 rounded-lg text-base font-semibold hover:bg-primary-700 active:scale-95 transition-all disabled:opacity-50 disabled:pointer-events-none">
+        className="w-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-4 py-3.5 rounded-lg text-base font-semibold hover:bg-slate-800 dark:hover:bg-slate-100 active:scale-95 transition-all disabled:opacity-50 disabled:pointer-events-none cursor-pointer">
         Bắt đầu luyện tập
       </button>
     </div>
