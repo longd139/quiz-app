@@ -59,8 +59,8 @@ export async function getSourceDownloadUrl(redemptionId) {
 // ---------------------------------------------------------------------------
 // Admin Workflows (admin-source)
 // ---------------------------------------------------------------------------
-export async function fetchAdminSourceOverview() {
-  return callFunction('admin-source', { action: 'overview_and_list' });
+export async function fetchAdminSourceOverview(params = {}) {
+  return callFunction('admin-source', { action: 'overview_and_list', ...params });
 }
 
 export async function createSourcePackage(payload) {

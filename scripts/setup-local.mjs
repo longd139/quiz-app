@@ -1,10 +1,12 @@
 /* global process, console */
 import fs from 'node:fs';
 import path from 'node:path';
+import crypto from 'node:crypto';
 import { execSync } from 'node:child_process';
 import {
   assertEnvFileIsLocal,
   assertLocalEnvironment,
+  parseEnvContent,
   readSupabaseProjectId,
 } from './lib/environment-guard.mjs';
 
@@ -95,18 +97,32 @@ async function main() {
     ].join('\n')
   );
 
-  writeEnvIfMissing(
-    path.join(root, 'supabase', 'functions', '.env.local'),
-    [
-      'APP_ENV=development',
-      `SUPABASE_URL=${apiUrl}`,
-      `SUPABASE_ANON_KEY=${status.ANON_KEY || anonKey}`,
-      `SUPABASE_SERVICE_ROLE_KEY=${serviceKey}`,
-      'MEDIA_STORAGE_PROVIDER=supabase',
-      'ALLOWED_ORIGINS=http://localhost:5173,http://127.0.0.1:5173,http://127.0.0.1:5174',
-      '',
-    ].join('\n')
-  );
+  const fnEnvLocalPath = path.join(root, 'supabase', 'functions', '.env.local');
+  const fnEnvPath = path.join(root, 'supabase', 'functions', '.env');
+  const existingFnEnv = fs.existsSync(fnEnvLocalPath)
+    ? parseEnvContent(fs.readFileSync(fnEnvLocalPath, 'utf8'))
+    : fs.existsSync(fnEnvPath)
+      ? parseEnvContent(fs.readFileSync(fnEnvPath, 'utf8'))
+      : {};
+  const devPepper = existingFnEnv.SOURCE_CODE_PEPPER && existingFnEnv.SOURCE_CODE_PEPPER.length >= 16
+    ? existingFnEnv.SOURCE_CODE_PEPPER
+    : crypto.randomBytes(32).toString('hex');
+
+  const fnEnvContent = [
+    'APP_ENV=development',
+    `SUPABASE_URL=${apiUrl}`,
+    `PUBLIC_SUPABASE_URL=${apiUrl}`,
+    `SUPABASE_ANON_KEY=${status.ANON_KEY || anonKey}`,
+    `SUPABASE_SERVICE_ROLE_KEY=${serviceKey}`,
+    `SOURCE_CODE_PEPPER=${devPepper}`,
+    'MAX_SOURCE_FILE_BYTES=20971520',
+    'MEDIA_STORAGE_PROVIDER=supabase',
+    'ALLOWED_ORIGINS=http://localhost:5173,http://127.0.0.1:5173,http://127.0.0.1:5174',
+    '',
+  ].join('\n');
+
+  writeEnvIfMissing(fnEnvLocalPath, fnEnvContent);
+  writeEnvIfMissing(fnEnvPath, fnEnvContent);
 
   console.log('4/5 Applying pending migrations (non-destructive)...');
   execSync('npx supabase migration up --local', { stdio: 'inherit' });

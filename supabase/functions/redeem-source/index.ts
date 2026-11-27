@@ -1,7 +1,11 @@
 import { createClient } from 'npm:@supabase/supabase-js';
 import {
   computeLookupDigest,
+  isValidUuid,
   normalizeAccessCode,
+  requireSourceCodePepper,
+  resolveTrustedPublicSupabaseUrl,
+  rewriteSignedStorageUrl,
   validateHttpsUrl,
   verifyAccessCodeHash,
 } from '../_shared/sourceCrypto.ts';
@@ -13,81 +17,24 @@ const CORS = {
 };
 
 const RATE_LIMIT_MAX_ATTEMPTS = 5;
-const RATE_LIMIT_WINDOW_MS = 5 * 60 * 1000;
-const RATE_LIMIT_COOLDOWN_MS = 60 * 1000;
-const SIGNED_URL_TTL_SECONDS = 60;
+const RATE_LIMIT_WINDOW_SECONDS = 300;
+const RATE_LIMIT_COOLDOWN_SECONDS = 60;
 
-function toPublicSignedUrl(signedUrl: string, req: Request): string {
-  const publicOverride = Deno.env.get('PUBLIC_SUPABASE_URL');
-  const parsed = new URL(signedUrl);
-  if (publicOverride) {
-    const pub = new URL(publicOverride);
-    parsed.protocol = pub.protocol;
-    parsed.host = pub.host;
-    return parsed.toString();
-  }
-  if (parsed.hostname === 'kong' || parsed.hostname.startsWith('supabase_kong_')) {
-    const fwdHost = req.headers.get('x-forwarded-host') || req.headers.get('host');
-    const fwdProto = req.headers.get('x-forwarded-proto') || 'http';
-    const fwdPort = req.headers.get('x-forwarded-port');
-    if (fwdHost && !fwdHost.startsWith('kong')) {
-      parsed.protocol = `${fwdProto}:`;
-      if (!fwdHost.includes(':') && fwdPort && fwdPort !== '80' && fwdPort !== '443') {
-        parsed.host = `${fwdHost}:${fwdPort}`;
-      } else {
-        parsed.host = fwdHost;
-      }
-    }
-  }
-  return parsed.toString();
+function getSignedUrlTtlSeconds(): number {
+  const raw = Number(Deno.env.get('SOURCE_SIGNED_URL_TTL_SECONDS') || '60');
+  if (!Number.isFinite(raw) || raw < 1) return 60;
+  return Math.min(300, Math.floor(raw));
 }
 
-function json(body: unknown, status = 200) {
+function json(body: unknown, status = 200, extraHeaders: Record<string, string> = {}) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { 'Content-Type': 'application/json', ...CORS },
-  });
-}
-
-async function recordFailedAttempt(
-  sbAdmin: ReturnType<typeof createClient>,
-  userId: string,
-  reasonCategory: string
-) {
-  const now = Date.now();
-  const { data: rl } = await sbAdmin
-    .from('source_redeem_rate_limits')
-    .select('*')
-    .eq('user_id', userId)
-    .maybeSingle();
-
-  let attempts = 1;
-  let windowStart = now;
-  if (rl) {
-    const prevWindow = new Date(rl.window_started_at).getTime();
-    if (now - prevWindow <= RATE_LIMIT_WINDOW_MS) {
-      attempts = (rl.failed_attempts || 0) + 1;
-      windowStart = prevWindow;
-    }
-  }
-
-  const blockedUntil = attempts >= RATE_LIMIT_MAX_ATTEMPTS
-    ? new Date(now + RATE_LIMIT_COOLDOWN_MS).toISOString()
-    : null;
-
-  await sbAdmin.from('source_redeem_rate_limits').upsert({
-    user_id: userId,
-    failed_attempts: attempts,
-    window_started_at: new Date(windowStart).toISOString(),
-    blocked_until: blockedUntil,
-    updated_at: new Date(now).toISOString(),
-  });
-
-  await sbAdmin.from('audit_logs').insert({
-    actor_user_id: userId,
-    action: 'SOURCE_REDEEM_FAILURE',
-    entity_type: 'source_access_code',
-    metadata: { reason: reasonCategory },
+    headers: {
+      'Content-Type': 'application/json',
+      'Cache-Control': 'no-store',
+      ...CORS,
+      ...extraHeaders,
+    },
   });
 }
 
@@ -97,8 +44,20 @@ Deno.serve(async (req: Request) => {
 
   const url = Deno.env.get('SUPABASE_URL') ?? '';
   const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
-  const pepperSecret = Deno.env.get('SOURCE_CODE_PEPPER') || serviceKey;
   if (!url || !serviceKey) return json({ error: 'Server configuration error.' }, 500);
+
+  let pepperSecret: string;
+  let trustedPublicUrl: URL;
+  try {
+    pepperSecret = requireSourceCodePepper();
+    trustedPublicUrl = resolveTrustedPublicSupabaseUrl();
+  } catch (cfgErr) {
+    const code = cfgErr instanceof Error ? cfgErr.message : 'CONFIG_ERROR';
+    return json(
+      { error: code === 'MISCONFIGURED_PEPPER' ? 'Hệ thống chưa cấu hình mã bảo mật SRC.' : 'Hệ thống chưa cấu hình PUBLIC_SUPABASE_URL hợp lệ.' },
+      500
+    );
+  }
 
   const authHeader = req.headers.get('Authorization') ?? '';
   const token = authHeader.replace(/^Bearer\s+/i, '').trim();
@@ -134,26 +93,37 @@ Deno.serve(async (req: Request) => {
   }
 
   const action = String(body.action || 'redeem');
+  const signedTtl = getSignedUrlTtlSeconds();
 
-  // List authenticated user's redeemed packages (no access codes, no storage_path)
+  // Paginated list of authenticated user's redeemed packages
   if (action === 'list_my_redemptions') {
-    const { data: rows, error } = await sbAdmin
-      .from('source_redemptions')
-      .select(`
-        id,
-        redeemed_at,
-        status,
-        package:source_packages!source_redemptions_source_package_id_fkey(
-          id, name, description, instructions, category, version, delivery_type, file_name, file_size, status
-        )
-      `)
-      .eq('user_id', userId)
-      .order('redeemed_at', { ascending: false });
+    const allRows: Record<string, unknown>[] = [];
+    let offset = 0;
+    const pageSize = 1000;
+    while (true) {
+      const { data: rows, error } = await sbAdmin
+        .from('source_redemptions')
+        .select(`
+          id,
+          redeemed_at,
+          status,
+          package:source_packages!source_redemptions_source_package_id_fkey(
+            id, name, description, instructions, category, version, delivery_type, file_name, file_size, status
+          )
+        `)
+        .eq('user_id', userId)
+        .order('redeemed_at', { ascending: false })
+        .range(offset, offset + pageSize - 1);
 
-    if (error) return json({ error: 'Không thể tải lịch sử nhận SRC.' }, 500);
+      if (error) return json({ error: 'Không thể tải lịch sử nhận SRC.' }, 500);
+      if (!rows || rows.length === 0) break;
+      allRows.push(...rows);
+      if (rows.length < pageSize) break;
+      offset += pageSize;
+    }
 
     return json({
-      redemptions: (rows || []).map((r) => ({
+      redemptions: allRows.map((r) => ({
         id: r.id,
         redeemed_at: r.redeemed_at,
         status: r.status,
@@ -165,7 +135,7 @@ Deno.serve(async (req: Request) => {
   // Re-issue short-lived signed URL or link for an existing valid redemption (no extra redemption count)
   if (action === 'get_download_url') {
     const redemptionId = String(body.redemptionId || '').trim();
-    if (!redemptionId) return json({ error: 'Thiếu redemptionId.' }, 400);
+    if (!isValidUuid(redemptionId)) return json({ error: 'redemptionId không hợp lệ.' }, 400);
 
     const { data: red } = await sbAdmin
       .from('source_redemptions')
@@ -202,10 +172,17 @@ Deno.serve(async (req: Request) => {
     const fileName = String(pkg.file_name || 'source.zip');
     const { data: signed, error: signErr } = await sbAdmin.storage
       .from('source-packages')
-      .createSignedUrl(storagePath, SIGNED_URL_TTL_SECONDS, { download: fileName });
+      .createSignedUrl(storagePath, signedTtl, { download: fileName });
 
     if (signErr || !signed?.signedUrl) {
       return json({ error: 'Không thể tạo liên kết tải xuống lúc này.' }, 500);
+    }
+
+    let safeSignedUrl: string;
+    try {
+      safeSignedUrl = rewriteSignedStorageUrl(signed.signedUrl, trustedPublicUrl);
+    } catch {
+      return json({ error: 'Cấu hình đường dẫn tải xuống không hợp lệ.' }, 500);
     }
 
     await sbAdmin.from('audit_logs').insert({
@@ -213,42 +190,49 @@ Deno.serve(async (req: Request) => {
       action: 'SOURCE_DOWNLOAD_URL_ISSUED',
       entity_type: 'source_package',
       entity_id: String(pkg.id),
-      metadata: { redemption_id: redemptionId, expires_in: SIGNED_URL_TTL_SECONDS },
+      metadata: { redemption_id: redemptionId, expires_in: signedTtl },
     });
 
     return json({
       deliveryType: 'FILE',
-      signedUrl: toPublicSignedUrl(signed.signedUrl, req),
-      expiresIn: SIGNED_URL_TTL_SECONDS,
+      signedUrl: safeSignedUrl,
+      expiresIn: signedTtl,
       fileName,
     });
+  }
+
+  if (action !== 'redeem') {
+    return json({ error: `Unsupported action: ${action}` }, 400);
   }
 
   // Redeem SRC by access code
   const accessCode = normalizeAccessCode(String(body.accessCode || ''));
   const operationId = String(body.operationId || '').trim();
-  if (!accessCode || accessCode.length > 64 || !operationId) {
+  if (!accessCode || accessCode.length > 64 || !operationId || operationId.length > 128) {
     return json({ error: 'Mã nhận SRC không hợp lệ hoặc không còn hiệu lực.' }, 400);
   }
 
-  // DB-backed rate limit check
-  const { data: rl } = await sbAdmin
-    .from('source_redeem_rate_limits')
-    .select('*')
-    .eq('user_id', userId)
-    .maybeSingle();
+  // BUG-29: Atomic DB-backed rate limit reservation BEFORE code lookup/verification (fail-closed)
+  const { data: rlRes, error: rlErr } = await sbAdmin.rpc('reserve_source_redeem_attempt_atomic', {
+    p_user_id: userId,
+    p_max_attempts: RATE_LIMIT_MAX_ATTEMPTS,
+    p_window_seconds: RATE_LIMIT_WINDOW_SECONDS,
+    p_cooldown_seconds: RATE_LIMIT_COOLDOWN_SECONDS,
+  });
 
-  if (rl?.blocked_until && new Date(rl.blocked_until).getTime() > Date.now()) {
-    const retryAfterSeconds = Math.max(
-      1,
-      Math.ceil((new Date(rl.blocked_until).getTime() - Date.now()) / 1000)
-    );
+  if (rlErr || !rlRes) {
+    return json({ error: 'Không thể nhận SRC lúc này. Vui lòng thử lại.' }, 500);
+  }
+
+  if (!rlRes.allowed) {
+    const retryAfterSeconds = Number(rlRes.retry_after_seconds || RATE_LIMIT_COOLDOWN_SECONDS);
     return json(
       {
         error: `Bạn đã thử quá nhiều lần. Vui lòng thử lại sau ${retryAfterSeconds} giây.`,
         retryAfterSeconds,
       },
-      429
+      429,
+      { 'Retry-After': String(retryAfterSeconds) }
     );
   }
 
@@ -261,11 +245,16 @@ Deno.serve(async (req: Request) => {
     .maybeSingle();
 
   if (!codeRow || !(await verifyAccessCodeHash(accessCode, codeRow.code_hash))) {
-    await recordFailedAttempt(sbAdmin, userId, 'invalid_code');
+    await sbAdmin.from('audit_logs').insert({
+      actor_user_id: userId,
+      action: 'SOURCE_REDEEM_FAILURE',
+      entity_type: 'source_access_code',
+      metadata: { reason: 'invalid_code' },
+    });
     return json({ error: 'Mã nhận SRC không hợp lệ hoặc không còn hiệu lực.' }, 400);
   }
 
-  // Execute atomic redemption RPC (FOR UPDATE row lock + idempotent operationId)
+  // BUG-34: Concurrency-safe atomic redemption RPC
   const { data: redeemResult, error: rpcErr } = await sbAdmin.rpc('redeem_source_package_atomic', {
     p_user_id: userId,
     p_access_code_id: codeRow.id,
@@ -274,18 +263,32 @@ Deno.serve(async (req: Request) => {
 
   if (rpcErr || !redeemResult) {
     const msg = rpcErr?.message || '';
-    if (msg.includes('LIMIT_REACHED')) {
+    if (msg.includes('OPERATION_CONFLICT')) {
+      return json({ error: 'Yêu cầu thao tác bị xung đột. Vui lòng thử lại.' }, 409);
+    }
+    if (msg.includes('LIMIT_REACHED') || msg.includes('USER_LIMIT_REACHED')) {
       return json({ error: 'Bạn đã đạt giới hạn nhận SRC.' }, 400);
     }
+    if (msg.includes('USER_FORBIDDEN')) {
+      return json({ error: 'Tài khoản chưa được phép thực hiện thao tác này.' }, 403);
+    }
     if (msg.includes('CODE_INVALID') || msg.includes('CODE_EXPIRED') || msg.includes('PACKAGE_INACTIVE')) {
-      await recordFailedAttempt(sbAdmin, userId, 'inactive_or_expired');
+      await sbAdmin.from('audit_logs').insert({
+        actor_user_id: userId,
+        action: 'SOURCE_REDEEM_FAILURE',
+        entity_type: 'source_access_code',
+        metadata: { reason: 'inactive_or_expired' },
+      });
       return json({ error: 'Mã nhận SRC không hợp lệ hoặc không còn hiệu lực.' }, 400);
     }
     return json({ error: 'Không thể nhận SRC lúc này. Vui lòng thử lại.' }, 500);
   }
 
-  // Clear rate limit failed attempts upon valid redemption
-  await sbAdmin.from('source_redeem_rate_limits').delete().eq('user_id', userId);
+  // Release ONLY this successful request's reserved rate-limit slot
+  await sbAdmin.rpc('finalize_source_redeem_attempt_atomic', {
+    p_user_id: userId,
+    p_success: true,
+  });
 
   const pkg = redeemResult.package as Record<string, unknown>;
   const safePkg = {
@@ -317,10 +320,17 @@ Deno.serve(async (req: Request) => {
   const fileName = String(pkg.file_name || 'source.zip');
   const { data: signed, error: signErr } = await sbAdmin.storage
     .from('source-packages')
-    .createSignedUrl(storagePath, SIGNED_URL_TTL_SECONDS, { download: fileName });
+    .createSignedUrl(storagePath, signedTtl, { download: fileName });
 
   if (signErr || !signed?.signedUrl) {
     return json({ error: 'Không thể tạo liên kết tải xuống lúc này. Vui lòng thử lại.' }, 500);
+  }
+
+  let safeSignedUrl: string;
+  try {
+    safeSignedUrl = rewriteSignedStorageUrl(signed.signedUrl, trustedPublicUrl);
+  } catch {
+    return json({ error: 'Cấu hình đường dẫn tải xuống không hợp lệ.' }, 500);
   }
 
   await sbAdmin.from('audit_logs').insert({
@@ -328,14 +338,14 @@ Deno.serve(async (req: Request) => {
     action: 'SOURCE_DOWNLOAD_URL_ISSUED',
     entity_type: 'source_package',
     entity_id: String(pkg.id),
-    metadata: { redemption_id: redeemResult.redemption_id, expires_in: SIGNED_URL_TTL_SECONDS },
+    metadata: { redemption_id: redeemResult.redemption_id, expires_in: signedTtl },
   });
 
   return json({
     redemptionId: redeemResult.redemption_id,
     idempotent: Boolean(redeemResult.idempotent),
     package: safePkg,
-    signedUrl: toPublicSignedUrl(signed.signedUrl, req),
-    expiresIn: SIGNED_URL_TTL_SECONDS,
+    signedUrl: safeSignedUrl,
+    expiresIn: signedTtl,
   });
 });

@@ -1,5 +1,7 @@
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
 const PBKDF2_ITERATIONS = 100_000;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const LOCAL_HOSTS = new Set(['127.0.0.1', 'localhost', '::1', '[::1]']);
 const encoder = new TextEncoder();
 
 function toHex(bytes: Uint8Array): string {
@@ -24,6 +26,59 @@ function constantTimeEqual(a: Uint8Array, b: Uint8Array): boolean {
     diff |= a[i] ^ b[i];
   }
   return diff === 0;
+}
+
+export function isValidUuid(val: string): boolean {
+  return UUID_RE.test(String(val || '').trim());
+}
+
+export function requireSourceCodePepper(): string {
+  const pepper = String(Deno.env.get('SOURCE_CODE_PEPPER') || '').trim();
+  if (!pepper || pepper.length < 16) {
+    throw new Error('MISCONFIGURED_PEPPER');
+  }
+  return pepper;
+}
+
+export function resolveTrustedPublicSupabaseUrl(): URL {
+  const raw = String(Deno.env.get('PUBLIC_SUPABASE_URL') || '').trim();
+  if (!raw) {
+    throw new Error('MISCONFIGURED_PUBLIC_URL');
+  }
+  let parsed: URL;
+  try {
+    parsed = new URL(raw);
+  } catch {
+    throw new Error('MISCONFIGURED_PUBLIC_URL');
+  }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    throw new Error('MISCONFIGURED_PUBLIC_URL');
+  }
+  if (parsed.username || parsed.password) {
+    throw new Error('MISCONFIGURED_PUBLIC_URL');
+  }
+  const appEnv = String(Deno.env.get('APP_ENV') || '').trim().toLowerCase();
+  const isLocal = LOCAL_HOSTS.has(parsed.hostname.toLowerCase());
+  if (appEnv === 'production' && (parsed.protocol !== 'https:' || isLocal)) {
+    throw new Error('MISCONFIGURED_PUBLIC_URL');
+  }
+  if ((appEnv === 'development' || appEnv === 'test') && !isLocal) {
+    throw new Error('MISCONFIGURED_PUBLIC_URL');
+  }
+  return parsed;
+}
+
+export function rewriteSignedStorageUrl(signedUrl: string, trustedOriginUrl: URL): string {
+  const parsed = new URL(signedUrl);
+  const validPath =
+    parsed.pathname.startsWith('/storage/v1/object/sign/source-packages/') ||
+    parsed.pathname.startsWith('/object/sign/source-packages/');
+  if (!validPath) {
+    throw new Error('INVALID_SIGNED_URL_PATH');
+  }
+  parsed.protocol = trustedOriginUrl.protocol;
+  parsed.host = trustedOriginUrl.host;
+  return parsed.toString();
 }
 
 export function normalizeAccessCode(raw: string): string {
@@ -119,6 +174,7 @@ export async function verifyAccessCodeHash(normalizedCode: string, storedHash: s
 export function validateHttpsUrl(rawUrl: string): { ok: boolean; url?: string; error?: string } {
   const trimmed = String(rawUrl || '').trim();
   if (!trimmed) return { ok: false, error: 'Vui lòng nhập liên kết HTTPS.' };
+  if (trimmed.length > 2048) return { ok: false, error: 'URL vượt quá 2048 ký tự.' };
   let parsed: URL;
   try {
     parsed = new URL(trimmed);
@@ -145,7 +201,6 @@ export function validateZipBuffer(bytes: Uint8Array, fileName: string, maxBytes:
   if (bytes.byteLength > maxBytes) {
     return `Dung lượng tệp vượt quá giới hạn cho phép (${Math.round(maxBytes / (1024 * 1024))} MB).`;
   }
-  // ZIP magic bytes: PK\x03\x04 (local file header) or PK\x05\x06 (empty archive) or PK\x07\x08
   const isZipSig =
     bytes.length >= 4 &&
     bytes[0] === 0x50 &&

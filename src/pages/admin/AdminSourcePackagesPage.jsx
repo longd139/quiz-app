@@ -69,13 +69,22 @@ export default function AdminSourcePackagesPage() {
   const [revealedCode, setRevealedCode] = useState('');
   const [copiedCode, setCopiedCode] = useState(false);
 
+  const [totalFilteredPackages, setTotalFilteredPackages] = useState(0);
+
   const loadAll = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
-      const res = await fetchAdminSourceOverview();
+      const res = await fetchAdminSourceOverview({
+        page,
+        pageSize,
+        search,
+        statusFilter,
+        typeFilter,
+      });
       setOverview(res.overview || null);
       setPackages(res.packages || []);
+      setTotalFilteredPackages(res.totalFilteredPackages ?? (res.packages || []).length);
       setCodes(res.codes || []);
       setRedemptions(res.redemptions || []);
     } catch (err) {
@@ -83,7 +92,7 @@ export default function AdminSourcePackagesPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [page, pageSize, search, statusFilter, typeFilter]);
 
   useEffect(() => {
     loadAll();
@@ -100,18 +109,8 @@ export default function AdminSourcePackagesPage() {
 
   const pkgById = useMemo(() => new Map(packages.map((p) => [p.id, p])), [packages]);
 
-  const filteredPackages = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return packages.filter((p) => {
-      if (statusFilter !== 'ALL' && p.status !== statusFilter) return false;
-      if (typeFilter !== 'ALL' && p.delivery_type !== typeFilter) return false;
-      if (q && !`${p.name} ${p.category || ''} ${p.version || ''}`.toLowerCase().includes(q)) return false;
-      return true;
-    });
-  }, [packages, search, statusFilter, typeFilter]);
-
-  const totalPages = Math.max(1, Math.ceil(filteredPackages.length / pageSize));
-  const pagedPackages = filteredPackages.slice((page - 1) * pageSize, page * pageSize);
+  const totalPages = Math.max(1, Math.ceil(totalFilteredPackages / pageSize));
+  const pagedPackages = packages;
 
   const openCreateModal = () => {
     setEditingPkg(null);

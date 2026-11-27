@@ -6,8 +6,8 @@ Quiz App V2.0.0 đã hoàn tất **Review 02 Remediation** trên nhánh `feat/v2
 
 - **ESLint (`npm run lint`)**: **PASS** — `0 errors, 0 warnings` (`LINT_EXIT=0`).
 - **Unit Tests (`npm run test:unit`)**: **PASS** — `44/44` tests trên `13` suites (`UNIT_EXIT=0`).
-- **Integration Tests (`npm run test:integration`)**: **PASS** — `15/15` suites/cases chạy trên stack `quiz-app-test` độc lập (`127.0.0.1:54331`, `INT_EXIT=0`).
-- **Playwright E2E (`npm run test:e2e`)**: **PASS** — `20/20` tests (`desktop-chromium` + `mobile-chromium`, `127.0.0.1:5174`, `E2E_EXIT=0`).
+- **Integration Tests (`npm run test:integration`)**: **PASS** — `23/23` tests trên `2` suites (`supabase.integration.test.mjs` 15/15 + `sourceSecurity.integration.test.mjs` 8/8) chạy trên stack `quiz-app-test` độc lập (`127.0.0.1:54331`, `INT_EXIT=0`).
+- **Playwright E2E (`npm run test:e2e`)**: **PASS** — `22/22` tests (`desktop-chromium` + `mobile-chromium`, `127.0.0.1:5174`, `E2E_EXIT=0`).
 - **Production Build (`npm run build`)**: **PASS** — `197 modules transformed`, sinh PWA `dist/sw.js`, `dist/manifest.webmanifest` (`BUILD_EXIT=0`).
 
 ## 2. Git & Local Environment Architecture
@@ -56,13 +56,14 @@ Quiz App V2.0.0 đã hoàn tất **Review 02 Remediation** trên nhánh `feat/v2
 |---|---|---|---|
 | ESLint | `npm run lint` | `0` | **PASS** (`0 errors, 0 warnings`) |
 | Unit Tests | `npm run test:unit` | `0` | **PASS** (`44/44`, `13` suites) |
-| Integration Tests | `npm run test:integration` | `0` | **PASS** (`15/15` trên `quiz-app-test` `54331`) |
-| E2E Tests | `npm run test:e2e` | `0` | **PASS** (`20/20` Desktop + Mobile trên `5174`) |
+| Integration Tests | `npm run test:integration` | `0` | **PASS** (`23/23` trên `quiz-app-test` `54331`) |
+| E2E Tests | `npm run test:e2e` | `0` | **PASS** (`22/22` Desktop + Mobile trên `5174`) |
 | Production Build | `npm run build` | `0` | **PASS** (`197` modules + PWA) |
 
-## 6. Secure Source Code Distribution & Review 05 Patches
+## 6. Secure Source Code Distribution & Review 05/06 Hardening
 
-- **Database & Private Storage**: Migration `20261127000007_v2_source_distribution_and_review05.sql` tạo `source_packages`, `source_access_codes`, `source_redemptions`, `source_redeem_rate_limits`, private bucket `source-packages` (20 MB), và `redeem_source_package_atomic()`.
+- **Database & Private Storage (8 Migrations)**: Migration `20261127000007` & `20261127000008` tạo `source_packages`, `source_access_codes`, `source_redemptions`, `source_redeem_rate_limits`, private bucket `source-packages` (20 MB), `reserve_source_redeem_attempt_atomic()`, `finalize_source_redeem_attempt_atomic()`, `rotate_source_access_code_atomic()`, và `redeem_source_package_atomic()`.
+- **BUG-29..BUG-34**: Atomic rate limiting DB-backed (`FOR UPDATE`), atomic transactional code rotation, chặn direct REST mutation trên `source_packages` (`REVOKE INSERT/UPDATE/DELETE`), `PUBLIC_SUPABASE_URL` bắt buộc (không tin forwarded headers), `SOURCE_CODE_PEPPER` bắt buộc (không fallback service role key), và concurrent idempotent redemption (`pg_advisory_xact_lock` + conflict 409).
 - **Edge Functions**: `admin-source` (quản lý gói SRC, upload ZIP, tạo/thu hồi/xoay mã CSPRNG 12+ ký tự với PBKDF2-SHA256 + HMAC lookup digest) và `redeem-source` (rate limit DB, idempotent redeem, signed URL 60s, lịch sử cá nhân).
 - **UI/UX**: Nút `Nhận SRC` + `RedeemSourceModal` trên Dashboard, mục `SRC đã nhận` trong `/data`, và `/admin/source-packages` trong `AdminLayout`.
 - **Review 05 (`BUG-25`..`BUG-28`)**: Khóa chế độ `replace` restore (chỉ giữ `merge`), `verify:local` bao gồm đầy đủ E2E, `merge` restore giữ nguyên `term` khi backup cũ không có field `term`.

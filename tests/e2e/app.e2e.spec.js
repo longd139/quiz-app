@@ -200,8 +200,21 @@ test.describe('Quiz App V2.0 E2E Regression', () => {
     const accessCode = (await codeEl.textContent()).trim();
     expect(accessCode.length).toBeGreaterThanOrEqual(12);
 
-    // 2. Real logout & login as User A
-    await page.evaluate(() => localStorage.clear());
+    // Close Access Codes modal then real UI logout & login as User A
+    await page.locator('[role="dialog"] button').first().click();
+    await page.getByRole('button', { name: /Về ứng dụng học tập/i }).click();
+    await expect(page).toHaveURL(/\/$/);
+    const menuBtn = page.locator('button[aria-haspopup="menu"]');
+    const mobileSettingsBtn = page.getByRole('button', { name: /Cài đặt tài khoản/i });
+    await expect(menuBtn.or(mobileSettingsBtn).first()).toBeVisible({ timeout: 10_000 });
+    if (await menuBtn.isVisible()) {
+      await menuBtn.click();
+      await page.getByRole('menuitem', { name: /Đăng xuất/i }).click();
+    } else {
+      await mobileSettingsBtn.click();
+      await page.getByRole('button', { name: /Đăng xuất/i }).click();
+    }
+    await expect(page).toHaveURL(/\/login/, { timeout: 10_000 });
     await loginThroughUI(page, 'usera@quiz.local');
     await expect(page).toHaveURL(/\/$/);
 
@@ -216,7 +229,7 @@ test.describe('Quiz App V2.0 E2E Regression', () => {
     await page.locator('#src-access-code').fill(accessCode);
     await page.getByRole('button', { name: /Xác nhận mã/i }).click();
     await expect(page.getByText(/Xác nhận mã thành công/i)).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByText('Quiz App E2E SRC')).toBeVisible();
+    await expect(page.getByText('Quiz App E2E SRC').first()).toBeVisible();
     await expect(page.getByRole('link', { name: /Mở Source Code/i })).toBeVisible();
     await page.getByRole('button', { name: 'Đóng' }).last().click();
 
@@ -224,5 +237,22 @@ test.describe('Quiz App V2.0 E2E Regression', () => {
     await page.goto('/data');
     await expect(page.getByText(/SRC đã nhận/i)).toBeVisible({ timeout: 15_000 });
     await expect(page.getByText('Quiz App E2E SRC').first()).toBeVisible({ timeout: 10_000 });
+  });
+
+  test('BUG-28: Quiz Exam setup & Vocab flashcard learning flow', async ({ page }) => {
+    await loginThroughUI(page, 'usera@quiz.local');
+    await expect(page).toHaveURL(/\/$/);
+
+    // Exam setup flow
+    await page.getByRole('button', { name: /Tạo bài kiểm tra/i }).click();
+    await expect(page).toHaveURL(/\/exam-setup/);
+    await expect(page.getByText(/Đề mẫu ISTQB Foundation/i)).toBeVisible({ timeout: 10_000 });
+
+    // Vocab flashcard flow
+    await page.getByRole('button', { name: /Học Ngôn Ngữ/i }).click();
+    await expect(page).toHaveURL(/\/vocab/);
+    await expect(page.getByText(/Thuật ngữ Testing Cơ bản/i)).toBeVisible({ timeout: 15_000 });
+    await page.getByTitle('Lật thẻ Flashcard').first().click();
+    await expect(page).toHaveURL(/\/vocab-learn/);
   });
 });

@@ -11,21 +11,27 @@ export default function RedeemSourceModal({ open, onClose, onRedeemed }) {
   const [result, setResult] = useState(null);
   const [downloading, setDownloading] = useState(false);
   const opIdRef = useRef(crypto.randomUUID());
+  const lastCodeRef = useRef('');
+  const sessionTokenRef = useRef(0);
 
   useEffect(() => {
     if (open) {
       opIdRef.current = crypto.randomUUID();
+      lastCodeRef.current = '';
+      sessionTokenRef.current += 1;
     }
   }, [open]);
 
   if (!open) return null;
 
   const handleClose = () => {
+    sessionTokenRef.current += 1;
     setCode('');
     setShowCode(false);
     setError('');
     setResult(null);
     setSubmitting(false);
+    lastCodeRef.current = '';
     onClose();
   };
 
@@ -39,6 +45,13 @@ export default function RedeemSourceModal({ open, onClose, onRedeemed }) {
       return;
     }
 
+    // Keep same operationId for retries of the same code; rotate only when code changes
+    if (lastCodeRef.current && lastCodeRef.current !== normalized) {
+      opIdRef.current = crypto.randomUUID();
+    }
+    lastCodeRef.current = normalized;
+
+    const currentSessionToken = sessionTokenRef.current;
     setSubmitting(true);
     setError('');
     try {
@@ -46,14 +59,22 @@ export default function RedeemSourceModal({ open, onClose, onRedeemed }) {
         accessCode: normalized,
         operationId: opIdRef.current,
       });
+      if (sessionTokenRef.current !== currentSessionToken) return;
       setResult(res);
       setCode('');
       if (typeof onRedeemed === 'function') onRedeemed(res);
     } catch (err) {
-      opIdRef.current = crypto.randomUUID();
+      if (sessionTokenRef.current !== currentSessionToken) return;
+      // Preserve opIdRef on network/5xx errors so retry after DB commit stays idempotent;
+      // only rotate on explicit validation/4xx conflict if needed
+      if (err?.status === 409) {
+        opIdRef.current = crypto.randomUUID();
+      }
       setError(err?.message || 'Không thể nhận SRC lúc này. Vui lòng thử lại.');
     } finally {
-      setSubmitting(false);
+      if (sessionTokenRef.current === currentSessionToken) {
+        setSubmitting(false);
+      }
     }
   };
 

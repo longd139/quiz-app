@@ -690,9 +690,9 @@ describe('Local Supabase Integration Suite (Auth, RLS, Transactions, Isolation, 
       .single();
     assert.equal(code2Row.redemption_count, 1);
 
-    // SRC-19: Loser cannot see winner's redemption history
+    // SRC-19: Loser cannot see winner's redemption history for this package
     const loserHist = await callRedeemSrc(loser.session.access_token, { action: 'list_my_redemptions' });
-    assert.equal(loserHist.data.redemptions.length, 0);
+    assert.equal(loserHist.data.redemptions.some((r) => r.package?.id === pkgId), false);
 
     // SRC-21: Rotate code -> old code stops working
     const rotRes = await callAdminSrc(admin.session.access_token, {

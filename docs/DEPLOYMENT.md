@@ -41,6 +41,8 @@ Chỉ cấu hình các biến public:
 
 - Deploy Edge Functions: `admin-users`, `password-change`, `media-upload`, `admin-source`, `redeem-source`.
 - Thiết lập secrets trên Supabase Edge Functions:
-  - `SOURCE_CODE_PEPPER`: chuỗi bí mật ngẫu nhiên server-side dùng cho HMAC lookup digest mã SRC.
+  - `SOURCE_CODE_PEPPER`: chuỗi bí mật ngẫu nhiên server-side (>= 16 ký tự, không fallback sang service role key) dùng cho HMAC lookup digest mã SRC. *Lưu ý rotation*: nếu thay `SOURCE_CODE_PEPPER`, các mã cũ không thể lookup bằng HMAC mới và cần Admin tạo/xoay mã mới (không thể rehash từ hash cũ).
+  - `PUBLIC_SUPABASE_URL`: URL công khai chính xác của Supabase Project (dev: `http://127.0.0.1:54321`, test: `http://127.0.0.1:54331`, prod: `https://<project-ref>.supabase.co`), tuyệt đối không dùng `x-forwarded-*` để suy đoán origin.
   - `MAX_SOURCE_FILE_BYTES`: mặc định `20971520` (20 MB, phù hợp giới hạn free-tier; gói lớn ưu tiên `LINK` HTTPS).
+- Chính sách thu hồi & TTL: Signed download URL có TTL mặc định 60 giây (`SOURCE_SIGNED_URL_TTL_SECONDS`). Thu hồi mã (`REVOKED`) chặn redemption mới; vô hiệu hóa gói (`INACTIVE`/`ARCHIVED`) chặn cả cấp signed URL mới từ lịch sử `SRC đã nhận`.
 - Đảm bảo bucket `source-packages` ở trạng thái **private** (`public = false`) và không cấp policy đọc trực tiếp cho `anon` hoặc `authenticated`.

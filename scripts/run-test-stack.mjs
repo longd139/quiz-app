@@ -1,6 +1,7 @@
 /* global process, console */
 import fs from 'node:fs';
 import path from 'node:path';
+import crypto from 'node:crypto';
 import { execSync, spawnSync } from 'node:child_process';
 import { assertLocalEnvironment, readSupabaseProjectId } from './lib/environment-guard.mjs';
 
@@ -36,6 +37,20 @@ async function main() {
   // Sync migrations and edge functions from single source of truth
   syncDir(path.join(root, 'supabase', 'migrations'), path.join(testWorkdir, 'supabase', 'migrations'));
   syncDir(path.join(root, 'supabase', 'functions'), path.join(testWorkdir, 'supabase', 'functions'));
+
+  const testPepper = process.env.TEST_SOURCE_CODE_PEPPER || crypto.randomBytes(32).toString('hex');
+  const initialFnEnv = [
+    'APP_ENV=test',
+    'PUBLIC_SUPABASE_URL=http://127.0.0.1:54331',
+    `SOURCE_CODE_PEPPER=${testPepper}`,
+    `SOURCE_SIGNED_URL_TTL_SECONDS=${process.env.TEST_SIGNED_URL_TTL_SECONDS || '60'}`,
+    'MAX_SOURCE_FILE_BYTES=20971520',
+    'MEDIA_STORAGE_PROVIDER=supabase',
+    'ALLOWED_ORIGINS=http://127.0.0.1:5174,http://localhost:5174',
+    '',
+  ].join('\n');
+  fs.writeFileSync(path.join(testWorkdir, 'supabase', 'functions', '.env'), initialFnEnv, 'utf8');
+  fs.writeFileSync(path.join(testWorkdir, 'supabase', 'functions', '.env.local'), initialFnEnv, 'utf8');
 
   console.log('Starting isolated test Supabase stack (quiz-app-test on port 54331)...');
   execSync(
@@ -74,19 +89,21 @@ async function main() {
       'utf8'
     );
 
-    fs.writeFileSync(
-      path.join(testWorkdir, 'supabase', 'functions', '.env.local'),
-      [
-        'APP_ENV=test',
-        `SUPABASE_URL=${apiUrl}`,
-        `SUPABASE_ANON_KEY=${status.ANON_KEY || anonKey}`,
-        `SUPABASE_SERVICE_ROLE_KEY=${serviceKey}`,
-        'MEDIA_STORAGE_PROVIDER=supabase',
-        'ALLOWED_ORIGINS=http://127.0.0.1:5174,http://localhost:5174',
-        '',
-      ].join('\n'),
-      'utf8'
-    );
+    const fullTestFnEnv = [
+      'APP_ENV=test',
+      `SUPABASE_URL=${apiUrl}`,
+      `PUBLIC_SUPABASE_URL=${apiUrl}`,
+      `SUPABASE_ANON_KEY=${status.ANON_KEY || anonKey}`,
+      `SUPABASE_SERVICE_ROLE_KEY=${serviceKey}`,
+      `SOURCE_CODE_PEPPER=${testPepper}`,
+      `SOURCE_SIGNED_URL_TTL_SECONDS=${process.env.TEST_SIGNED_URL_TTL_SECONDS || '60'}`,
+      'MAX_SOURCE_FILE_BYTES=20971520',
+      'MEDIA_STORAGE_PROVIDER=supabase',
+      'ALLOWED_ORIGINS=http://127.0.0.1:5174,http://localhost:5174',
+      '',
+    ].join('\n');
+    fs.writeFileSync(path.join(testWorkdir, 'supabase', 'functions', '.env'), fullTestFnEnv, 'utf8');
+    fs.writeFileSync(path.join(testWorkdir, 'supabase', 'functions', '.env.local'), fullTestFnEnv, 'utf8');
 
     console.log('Resetting and seeding isolated quiz-app-test database...');
     execSync('npx supabase --workdir supabase-test db reset --local', { stdio: 'inherit' });
@@ -117,7 +134,7 @@ async function main() {
     };
 
     if (mode === 'integration') {
-      const res = spawnSync('node', ['--test', 'tests/integration/*.test.mjs', ...extraArgs], {
+      const res = spawnSync('node', ['--test', '--test-concurrency=1', 'tests/integration/*.test.mjs', ...extraArgs], {
         stdio: 'inherit',
         env: childEnv,
         shell: true,

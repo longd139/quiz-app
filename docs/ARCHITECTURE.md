@@ -15,5 +15,5 @@ Component -> Domain Hook (useQuizData / useAuth) -> Service Layer (src/services/
 - **Server-side Edge Functions**:
   - `admin-users`: Tạo tài khoản, cập nhật role/status, đặt lại mật khẩu tạm thời bằng `SUPABASE_SERVICE_ROLE_KEY`.
   - `media-upload`: Upload ảnh an toàn phía server (kiểm tra dung lượng thực tế `<= 5MB` + magic bytes), hỗ trợ Cloudinary & Supabase Storage local.
-  - `admin-source`: Quản lý gói SRC (`source_packages`), upload `.zip` vào private bucket `source-packages` (`<= 20MB`), tạo/thu hồi/xoay mã truy cập (PBKDF2-SHA256 + HMAC lookup digest).
-  - `redeem-source`: Xác thực mã nhận SRC, rate limit theo user trên DB, gọi `redeem_source_package_atomic`, cấp short-lived signed URL (60s) hoặc link HTTPS, và trả lịch sử nhận SRC cá nhân.
+  - `admin-source`: Quản lý gói SRC (`source_packages`), upload `.zip` vào private bucket `source-packages` (`<= 20MB`), tạo/thu hồi/xoay mã truy cập (`rotate_source_access_code_atomic`, PBKDF2-SHA256 + HMAC lookup digest với `SOURCE_CODE_PEPPER` bắt buộc).
+  - `redeem-source`: Xác thực mã nhận SRC, atomic rate limit DB (`reserve_source_redeem_attempt_atomic`), idempotent redeem (`redeem_source_package_atomic`), rewrite signed URL (60s) theo `PUBLIC_SUPABASE_URL` tin cậy (không dùng forwarded headers), và trả lịch sử nhận SRC cá nhân.
