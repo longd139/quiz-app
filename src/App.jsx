@@ -1,4 +1,7 @@
-import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, useLocation, Navigate } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
+import ProtectedRoute from './components/ProtectedRoute';
 import { useQuizData } from './hooks/useQuizData';
 import { useDarkMode } from './hooks/useDarkMode';
 import { useFontSize } from './hooks/useFontSize';
@@ -7,6 +10,8 @@ import TabNav from './components/TabNav';
 import ConfirmDialog from './components/ConfirmDialog';
 import AlertDialog from './components/AlertDialog';
 import Toast from './components/Toast';
+import LoginPage from './pages/LoginPage';
+import ChangePasswordPage from './pages/ChangePasswordPage';
 import Dashboard from './pages/Dashboard';
 import Editor from './pages/Editor';
 import PracticeSetup from './pages/PracticeSetup';
@@ -15,15 +20,28 @@ import Practice from './pages/Practice';
 import Results from './pages/Results';
 import History from './pages/History';
 import DataManagement from './pages/DataManagement';
-
-// Language Learning Pages
 import VocabDashboard from './pages/VocabDashboard';
 import VocabEditor from './pages/VocabEditor';
 import VocabFlashcard from './pages/VocabFlashcard';
 import VocabQuiz from './pages/VocabQuiz';
+import AdminLayout from './pages/admin/AdminLayout';
+import AdminDashboard from './pages/admin/AdminDashboard';
+import AdminUsersPage from './pages/admin/AdminUsersPage';
+import AdminContentPage from './pages/admin/AdminContentPage';
+import AdminAuditLogsPage from './pages/admin/AdminAuditLogsPage';
+import AdminBackupsPage from './pages/admin/AdminBackupsPage';
+import AdminSettingsPage from './pages/admin/AdminSettingsPage';
 import { isTtsMuted, setTtsMuted } from './lib/tts';
-
 import { useState, useCallback, createContext, useContext, useEffect, Component } from 'react';
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: false,
+      retry: 1,
+    },
+  },
+});
 
 export const QuizContext = createContext(null);
 
@@ -76,14 +94,11 @@ class ErrorBoundary extends Component {
   }
 }
 
-function MainLayout({ quiz, dark, toggleDark, fontSizeState }) {
-  const location = useLocation();
-
+function QuizAppProvider({ dark, toggleDark, fontSizeState, children }) {
+  const { user, isAdmin } = useAuth();
+  const quiz = useQuizData(user, isAdmin);
   const [appMode, setAppModeState] = useState(() => {
-    // If opening a vocab URL directly, default to language mode
-    if (window.location.pathname.startsWith('/vocab')) {
-      return 'language';
-    }
+    if (window.location.pathname.startsWith('/vocab')) return 'language';
     return localStorage.getItem('app_learning_mode') || 'quiz';
   });
 
@@ -92,62 +107,33 @@ function MainLayout({ quiz, dark, toggleDark, fontSizeState }) {
     setAppModeState(mode);
   }, []);
 
-  // Sync mode if user navigates via URL
-  useEffect(() => {
-    if (location.pathname.startsWith('/vocab')) {
-      if (appMode !== 'language') {
-        setAppModeState('language');
-        localStorage.setItem('app_learning_mode', 'language');
-      }
-    } else if (location.pathname === '/' || location.pathname === '/practice-setup' || location.pathname === '/editor') {
-      if (appMode !== 'quiz') {
-        setAppModeState('quiz');
-        localStorage.setItem('app_learning_mode', 'quiz');
-      }
-    }
-  }, [location.pathname]);
-
   const [confirmMsg, setConfirmMsg] = useState(null);
   const [confirmCallback, setConfirmCallback] = useState(null);
   const [confirmOpts, setConfirmOpts] = useState({});
   const [toasts, setToasts] = useState([]);
   const [alertInfo, setAlertInfo] = useState(null);
+  const [ttsMuted, setTtsMutedState] = useState(() => isTtsMuted());
 
   const dismissToast = useCallback((id) => {
-    setToasts(t => t.filter(x => x.id !== id));
+    setToasts((t) => t.filter((x) => x.id !== id));
   }, []);
 
   const showToast = useCallback((message, type = 'success', duration = 3500) => {
     const text = typeof message === 'object' && message !== null ? message.message : message;
     const id = `${Date.now()}-${Math.random()}`;
-    const toastObj = typeof message === 'object' && message !== null
-      ? { id, type, ...message }
-      : { id, message, type };
+    const toastObj = typeof message === 'object' && message !== null ? { id, type, ...message } : { id, message, type };
 
-    setToasts(current => {
-      // Prevent showing the exact same toast twice simultaneously
-      if (current.some(t => t.message === text)) {
-        return current;
-      }
-      return [...current, toastObj];
-    });
-
+    setToasts((current) => (current.some((t) => t.message === text) ? current : [...current, toastObj]));
     setTimeout(() => {
-      setToasts(t => t.filter(x => x.id !== id));
+      setToasts((t) => t.filter((x) => x.id !== id));
     }, duration);
   }, []);
-
-  const [ttsMuted, setTtsMutedState] = useState(() => isTtsMuted());
 
   const toggleTts = useCallback(() => {
     const next = !ttsMuted;
     setTtsMuted(next);
     setTtsMutedState(next);
-    if (next) {
-      showToast('Đã tắt tự động đọc khi chuyển câu', 'info');
-    } else {
-      showToast('Đã bật tự động đọc khi chuyển câu', 'success');
-    }
+    showToast(next ? 'Đã tắt tự động đọc khi chuyển câu' : 'Đã bật tự động đọc khi chuyển câu', next ? 'info' : 'success');
   }, [ttsMuted, showToast]);
 
   const showConfirm = useCallback((msg, cb, opts = {}) => {
@@ -169,6 +155,7 @@ function MainLayout({ quiz, dark, toggleDark, fontSizeState }) {
 
   const ctx = {
     ...quiz,
+    isAdmin,
     appMode,
     setAppMode,
     ttsMuted,
@@ -176,48 +163,14 @@ function MainLayout({ quiz, dark, toggleDark, fontSizeState }) {
     fontSizeState,
     showConfirm,
     showToast,
-    showAlert
+    showAlert,
+    dark,
+    toggleDark,
   };
 
   return (
     <QuizContext.Provider value={ctx}>
-      <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-10 dark:text-slate-200 transition-all">
-        <Header
-          syncStatus={quiz.syncStatus}
-          dark={dark}
-          toggleDark={toggleDark}
-          appMode={appMode}
-          setAppMode={setAppMode}
-          ttsMuted={ttsMuted}
-          toggleTts={toggleTts}
-          fontSizeState={fontSizeState}
-        />
-        <TabNav />
-        <div className="page-enter">
-          <ErrorBoundary>
-            <Routes>
-              {/* Quiz Mode Routes */}
-              <Route path="/" element={<Dashboard />} />
-              <Route path="/editor" element={<Editor />} />
-              <Route path="/editor/:testId" element={<Editor />} />
-              <Route path="/practice-setup" element={<PracticeSetup />} />
-              <Route path="/exam-setup" element={<ExamSetup />} />
-              <Route path="/practice" element={<Practice />} />
-              <Route path="/results" element={<Results />} />
-              <Route path="/history" element={<History />} />
-              <Route path="/data" element={<DataManagement />} />
-
-              {/* Language Learning Mode Routes */}
-              <Route path="/vocab" element={<VocabDashboard />} />
-              <Route path="/vocab-editor" element={<VocabEditor />} />
-              <Route path="/vocab-editor/:deckId" element={<VocabEditor />} />
-              <Route path="/vocab-learn" element={<VocabFlashcard />} />
-              <Route path="/vocab-quiz" element={<VocabQuiz />} />
-            </Routes>
-          </ErrorBoundary>
-        </div>
-      </div>
-
+      {children}
       {confirmMsg && (
         <ConfirmDialog
           title={confirmOpts.title}
@@ -230,28 +183,118 @@ function MainLayout({ quiz, dark, toggleDark, fontSizeState }) {
         />
       )}
       {alertInfo && (
-        <AlertDialog
-          title={alertInfo.title}
-          message={alertInfo.message}
-          type={alertInfo.type}
-          onClose={hideAlert}
-        />
+        <AlertDialog title={alertInfo.title} message={alertInfo.message} type={alertInfo.type} onClose={hideAlert} />
       )}
       <Toast toasts={toasts} onDismiss={dismissToast} />
     </QuizContext.Provider>
   );
 }
 
+function MainLayout() {
+  const location = useLocation();
+  const { appMode, setAppMode, dark, toggleDark, ttsMuted, toggleTts, fontSizeState, isLoading, isAdmin } = useQuiz();
+
+  useEffect(() => {
+    if (location.pathname.startsWith('/vocab') && appMode !== 'language') {
+      setAppMode('language');
+    } else if ((location.pathname === '/' || location.pathname === '/practice-setup' || location.pathname === '/editor') && appMode !== 'quiz') {
+      setAppMode('quiz');
+    }
+  }, [location.pathname, appMode, setAppMode]);
+
+  return (
+    <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-10 dark:text-slate-200 transition-all">
+      <Header
+        dark={dark}
+        toggleDark={toggleDark}
+        appMode={appMode}
+        setAppMode={setAppMode}
+        ttsMuted={ttsMuted}
+        toggleTts={toggleTts}
+        fontSizeState={fontSizeState}
+      />
+      <TabNav />
+      {isLoading ? (
+        <div className="py-16 flex flex-col items-center justify-center gap-3">
+          <div className="w-7 h-7 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+          <p className="text-xs text-slate-500">Đang tải dữ liệu học tập...</p>
+        </div>
+      ) : (
+        <div className="page-enter">
+          <ErrorBoundary>
+            <Routes>
+              <Route path="/" element={<Dashboard />} />
+              <Route path="/editor" element={isAdmin ? <Editor /> : <Navigate to="/" replace />} />
+              <Route path="/editor/:testId" element={isAdmin ? <Editor /> : <Navigate to="/" replace />} />
+              <Route path="/practice-setup" element={<PracticeSetup />} />
+              <Route path="/exam-setup" element={<ExamSetup />} />
+              <Route path="/practice" element={<Practice />} />
+              <Route path="/results" element={<Results />} />
+              <Route path="/history" element={<History />} />
+              <Route path="/data" element={<DataManagement />} />
+
+              <Route path="/vocab" element={<VocabDashboard />} />
+              <Route path="/vocab-editor" element={isAdmin ? <VocabEditor /> : <Navigate to="/vocab" replace />} />
+              <Route path="/vocab-editor/:deckId" element={isAdmin ? <VocabEditor /> : <Navigate to="/vocab" replace />} />
+              <Route path="/vocab-learn" element={<VocabFlashcard />} />
+              <Route path="/vocab-quiz" element={<VocabQuiz />} />
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </ErrorBoundary>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function App() {
-  const quiz = useQuizData();
   const { dark, toggle: toggleDark } = useDarkMode();
   const fontSizeState = useFontSize();
 
   return (
-    <BrowserRouter>
-      <ErrorBoundary>
-        <MainLayout quiz={quiz} dark={dark} toggleDark={toggleDark} fontSizeState={fontSizeState} />
-      </ErrorBoundary>
-    </BrowserRouter>
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <BrowserRouter>
+          <ErrorBoundary>
+            <QuizAppProvider dark={dark} toggleDark={toggleDark} fontSizeState={fontSizeState}>
+              <Routes>
+                <Route path="/login" element={<LoginPage />} />
+                <Route
+                  path="/change-password"
+                  element={
+                    <ProtectedRoute allowPasswordChangeOnly>
+                      <ChangePasswordPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/admin"
+                  element={
+                    <ProtectedRoute requireAdmin>
+                      <AdminLayout />
+                    </ProtectedRoute>
+                  }
+                >
+                  <Route index element={<AdminDashboard />} />
+                  <Route path="users" element={<AdminUsersPage />} />
+                  <Route path="content" element={<AdminContentPage />} />
+                  <Route path="audit-logs" element={<AdminAuditLogsPage />} />
+                  <Route path="backups" element={<AdminBackupsPage />} />
+                  <Route path="settings" element={<AdminSettingsPage />} />
+                </Route>
+                <Route
+                  path="/*"
+                  element={
+                    <ProtectedRoute>
+                      <MainLayout />
+                    </ProtectedRoute>
+                  }
+                />
+              </Routes>
+            </QuizAppProvider>
+          </ErrorBoundary>
+        </BrowserRouter>
+      </AuthProvider>
+    </QueryClientProvider>
   );
 }

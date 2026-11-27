@@ -1,10 +1,11 @@
 // Data storage helpers + model factories
 import { marked } from 'marked';
+import DOMPurify from 'dompurify';
 
-// Configure marked for safe rendering (no raw HTML from user input)
+// Configure marked for safe rendering
 marked.setOptions({ breaks: true, gfm: true });
 
-import { getDefaultVocabDecks, getDefaultVocabCollections } from './defaultVocab';
+import { getDefaultVocabDecks, getDefaultVocabCollections } from './defaultVocab.js';
 
 const STORAGE_KEY = 'quiz_data';
 
@@ -291,8 +292,16 @@ export function renderMd(text) {
     // Return the processed content (unwrap $...$ since it's now Unicode or plain text)
     return result || inner;
   });
-  // Step 3: Parse Markdown
-  return marked.parse(processed);
+  // Step 3: Parse Markdown & sanitize with DOMPurify
+  const rawHtml = marked.parse(processed);
+  if (typeof window !== 'undefined') {
+    return DOMPurify.sanitize(rawHtml, {
+      ALLOWED_TAGS: ['p', 'br', 'strong', 'b', 'em', 'i', 'u', 's', 'del', 'code', 'pre', 'blockquote', 'ul', 'ol', 'li', 'h1', 'h2', 'h3', 'h4', 'hr', 'a', 'span', 'mark'],
+      ALLOWED_ATTR: ['href', 'target', 'rel', 'class', 'style'],
+      ALLOW_DATA_ATTR: false,
+    });
+  }
+  return rawHtml;
 }
 
 export function escAttr(s) {

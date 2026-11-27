@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import DOMPurify from 'dompurify';
 import { createVocabCard } from '../data/storage';
-import { uploadToCloudinary, getCloudinaryConfig } from '../lib/cloudinary';
+import { uploadToCloudinary } from '../lib/cloudinary';
 import { IconImage, IconPlus, IconEdit, IconTrash, IconChevronDown } from './Icons';
 import { BADGE_COLORS, getAllPosList, saveCustomPos, deletePos, updateCustomPos, getBadgeColor, getColorForPos, savePosColor } from '../data/badgeColors';
 import FormattedText, { parseExampleHtmlLines, convertMarkdownToHtml, HIGHLIGHT_COLORS, TEXT_COLORS } from './FormattedText';
@@ -161,7 +162,7 @@ export default function CreateFlashcardModal({ deck, isOpen, onClose, onSaveCard
       }).join('');
       setExamplesHtml(initialHtml);
       if (editorRef.current) {
-        editorRef.current.innerHTML = initialHtml;
+        editorRef.current.innerHTML = DOMPurify.sanitize(initialHtml);
       }
       setNote(editingCard.note || '');
       setIsExpanded(Boolean(editingCard.image || editingCard.partOfSpeech || editingCard.phonetic || initialHtml || editingCard.note));
@@ -249,7 +250,7 @@ export default function CreateFlashcardModal({ deck, isOpen, onClose, onSaveCard
     }).join('');
     setExamplesHtml(initialHtml);
     if (editorRef.current) {
-      editorRef.current.innerHTML = initialHtml;
+      editorRef.current.innerHTML = DOMPurify.sanitize(initialHtml);
     }
     setNote(targetCard.note || '');
     setIsExpanded(true);
@@ -274,19 +275,16 @@ export default function CreateFlashcardModal({ deck, isOpen, onClose, onSaveCard
     };
     reader.readAsDataURL(file);
 
-    const cfg = getCloudinaryConfig();
-    if (cfg.cloudName) {
-      setIsUploadingImage(true);
-      setUploadWarning('');
-      try {
-        const cloudUrl = await uploadToCloudinary(file);
-        setImage(cloudUrl);
-      } catch (err) {
-        console.warn('Upload warning:', err);
-        setUploadWarning('Không thể tải ảnh lên máy chủ, đã lưu ảnh tạm cục bộ.');
-      } finally {
-        setIsUploadingImage(false);
-      }
+    setIsUploadingImage(true);
+    setUploadWarning('');
+    try {
+      const cloudUrl = await uploadToCloudinary(file);
+      setImage(cloudUrl);
+    } catch (err) {
+      console.warn('Upload warning:', err);
+      setUploadWarning('Không thể tải ảnh lên máy chủ, đã lưu ảnh tạm cục bộ.');
+    } finally {
+      setIsUploadingImage(false);
     }
   };
 

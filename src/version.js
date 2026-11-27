@@ -1,10 +1,39 @@
-export const APP_VERSION = 'v1.3.5';
+export const APP_VERSION = 'v2.0.0';
 
 export const CHANGELOG_DATA = [
   {
+    version: 'v2.0.0',
+    date: '27/11/2026',
+    isLatest: true,
+    title: 'Kiến trúc Database Tập trung, Xác thực Tài khoản & Khu vực Quản trị',
+    tag: 'Phiên bản mới nhất',
+    changes: [
+      {
+        type: 'feature',
+        title: 'Đăng nhập bảo mật bằng Supabase Auth (Private)',
+        description: 'Gỡ bỏ hoàn toàn mô hình mã phòng cũ. Hỗ trợ đăng nhập Email/Mật khẩu, đổi mật khẩu, bắt buộc đổi mật khẩu lần đầu và khóa tài khoản tức thì.'
+      },
+      {
+        type: 'feature',
+        title: 'Khu vực Quản trị Hệ thống (/admin)',
+        description: 'Quản lý tài khoản (tạo mới, phân quyền ADMIN/USER, khóa/mở khóa, đặt lại mật khẩu), quản lý nội dung dùng chung, nhật ký Audit tập trung và sao lưu/khôi phục.'
+      },
+      {
+        type: 'improvement',
+        title: 'Cơ sở dữ liệu PostgreSQL tập trung & Row Level Security',
+        description: 'Nội dung học tập (bộ đề, câu hỏi, bộ từ vựng, flashcard) dùng chung cho toàn hệ thống; tiến độ, lịch sử làm bài và streak được tách riêng an toàn theo từng tài khoản.'
+      },
+      {
+        type: 'fix',
+        title: 'Tăng cường bảo mật Cloudinary & Chống XSS',
+        description: 'Chuyển ký chữ ký upload Cloudinary sang Supabase Edge Function phía server và lọc HTML bằng DOMPurify.'
+      }
+    ]
+  },
+  {
     version: 'v1.3.5',
     date: '25/10/2026',
-    isLatest: true,
+    isLatest: false,
     title: 'Hệ thống Audit Trail & Hợp nhất Quản lý Dữ liệu vào Cài đặt',
     tag: 'Bản cập nhật hiện tại',
     changes: [

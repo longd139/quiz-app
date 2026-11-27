@@ -18,14 +18,14 @@ const languageTabs = [
 export default function TabNav() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { appMode } = useQuiz();
+  const { appMode, isAdmin } = useQuiz();
 
   // Bỏ thanh card chọn nhanh (Bộ từ vựng, Soạn từ, ...) khi ở chế độ Học Ngôn Ngữ
   if (appMode === 'language' || location.pathname.startsWith('/vocab')) {
     return null;
   }
 
-  const tabs = quizTabs;
+  const tabs = isAdmin ? quizTabs : quizTabs.filter(t => t.path !== '/editor');
 
   return (
     <nav className="flex gap-1 bg-white/70 dark:bg-slate-900/60 backdrop-blur-xs rounded-xl p-1 border border-slate-200/80 dark:border-slate-800 mb-6 overflow-x-auto">

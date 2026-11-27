@@ -1,34 +1,35 @@
-import { useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useState, useRef, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQuiz } from '../App';
-import { IconBook, IconCards, IconSettings } from './Icons';
+import { useAuth } from '../contexts/AuthContext';
+import { calculateStreakStats } from '../data/streak';
+import { IconBook, IconCards, IconSettings, IconShield, IconLock } from './Icons';
 import SettingsModal from './SettingsModal';
 import ChangelogModal from './ChangelogModal';
 import { APP_VERSION } from '../version';
 
-export default function Header({ syncStatus, dark, toggleDark, appMode, setAppMode, ttsMuted, toggleTts, fontSizeState }) {
+export default function Header({ dark, toggleDark, appMode, setAppMode, ttsMuted, toggleTts, fontSizeState }) {
   const { data } = useQuiz();
+  const { profile, isAdmin, signOut } = useAuth();
   const navigate = useNavigate();
-  const location = useLocation();
+
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [settingsInitialTab, setSettingsInitialTab] = useState('account');
   const [isChangelogOpen, setIsChangelogOpen] = useState(false);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const dropdownRef = useRef(null);
 
-  const colors = {
-    synced: 'bg-emerald-500',
-    syncing: 'bg-amber-500 sync-pulse',
-    error: 'bg-rose-500',
-    unconfigured: 'bg-slate-300 dark:bg-slate-600'
-  };
-  const titles = {
-    synced: 'Đã đồng bộ Cloud',
-    syncing: 'Đang đồng bộ...',
-    error: 'Lỗi đồng bộ Cloud',
-    unconfigured: 'Chưa cấu hình đồng bộ'
-  };
+  const streakStats = useMemo(() => calculateStreakStats(data), [data]);
 
-  const handleDotClick = () => {
-    navigate('/data');
-  };
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const handleSwitchMode = (mode) => {
     if (mode === appMode) return;
@@ -40,12 +41,30 @@ export default function Header({ syncStatus, dark, toggleDark, appMode, setAppMo
     }
   };
 
-  const hasCustomSettings = dark || ttsMuted || (fontSizeState && fontSizeState.fontSize !== 100);
+  const openSettingsTab = (tab) => {
+    setSettingsInitialTab(tab);
+    setIsSettingsOpen(true);
+    setDropdownOpen(false);
+  };
+
+  const handleLogout = async () => {
+    setDropdownOpen(false);
+    await signOut();
+    navigate('/login', { replace: true });
+  };
+
+  const displayName = profile?.full_name || profile?.email || 'Người dùng';
+  const initials = displayName
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0]?.toUpperCase())
+    .join('') || 'U';
 
   return (
     <header className="relative sticky top-0 z-20 bg-[#fbfbfa] dark:bg-[#0c0f17] border-b border-slate-200/80 dark:border-slate-800/80 py-3.5 mb-6 transition-colors">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        {/* Left: Logo / App title */}
+        {/* Left: Logo & Version */}
         <div className="flex items-center justify-between sm:justify-start gap-2 sm:min-w-[180px]">
           <div className="flex items-center gap-1.5 sm:gap-2">
             <span className="text-base font-extrabold tracking-tight text-slate-900 dark:text-slate-100">
@@ -64,23 +83,21 @@ export default function Header({ syncStatus, dark, toggleDark, appMode, setAppMo
             </button>
           </div>
 
-          {/* Settings button for mobile */}
-          <div className="sm:hidden flex items-center">
+          {/* Mobile right controls */}
+          <div className="sm:hidden flex items-center gap-1.5">
+            <span
+              className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200/70 dark:border-amber-800/60 text-[11px] font-bold text-amber-700 dark:text-amber-300"
+              title="Chuỗi ngày học liên tiếp"
+            >
+              🔥 {streakStats.currentStreak}
+            </span>
             <button
               type="button"
-              onClick={() => setIsSettingsOpen(prev => !prev)}
-              className={`relative w-8 h-8 flex items-center justify-center rounded-lg border transition-all cursor-pointer ${
-                isSettingsOpen
-                  ? 'border-indigo-400 dark:border-indigo-600 bg-indigo-50/90 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 shadow-2xs'
-                  : 'border-slate-200/80 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800/60 text-slate-600 dark:text-slate-300'
-              }`}
-              title="Cài đặt hệ thống (Giao diện, âm thanh, cỡ chữ)"
-              aria-label="Cài đặt hệ thống"
+              onClick={() => openSettingsTab('account')}
+              className="w-8 h-8 rounded-lg border border-slate-200/80 dark:border-slate-800 flex items-center justify-center text-slate-600 dark:text-slate-300 cursor-pointer"
+              aria-label="Cài đặt tài khoản"
             >
-              <IconSettings className={`w-4 h-4 transition-transform duration-300 ${isSettingsOpen ? 'rotate-90' : ''}`} />
-              {hasCustomSettings && (
-                <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-indigo-500 ring-1 ring-white dark:ring-slate-900" />
-              )}
+              <IconSettings className="w-4 h-4" />
             </button>
           </div>
         </div>
@@ -112,51 +129,121 @@ export default function Header({ syncStatus, dark, toggleDark, appMode, setAppMo
             >
               <IconCards className="w-3.5 h-3.5" />
               <span>Học Ngôn Ngữ</span>
-              <span className="text-[9px] px-1.5 py-0.2 rounded-sm bg-indigo-50 dark:bg-indigo-950/70 text-indigo-700 dark:text-indigo-300 font-mono font-medium tracking-normal border border-indigo-200/60 dark:border-indigo-800/60">
-                NEW
-              </span>
             </button>
           </div>
         </div>
 
-        {/* Right: Settings button for desktop */}
-        <div className="hidden sm:flex items-center justify-end sm:min-w-[120px]">
+        {/* Right: Streak, Dark mode & Account Dropdown */}
+        <div className="hidden sm:flex items-center justify-end gap-2 sm:min-w-[180px]" ref={dropdownRef}>
+          <div
+            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-50/90 dark:bg-amber-950/40 border border-amber-200/70 dark:border-amber-800/60 text-xs font-bold text-amber-700 dark:text-amber-300"
+            title="Chuỗi ngày học liên tiếp"
+          >
+            <span>🔥</span>
+            <span>{streakStats.currentStreak}</span>
+          </div>
+
           <button
             type="button"
-            onClick={() => setIsSettingsOpen(prev => !prev)}
-            className={`group flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold tracking-tight transition-all cursor-pointer ${
-              isSettingsOpen
-                ? 'border-indigo-400 dark:border-indigo-600 bg-indigo-50/90 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 shadow-2xs'
-                : 'border-slate-200/80 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800/60 text-slate-700 dark:text-slate-200'
-            }`}
-            title="Cài đặt hệ thống (Giao diện, âm thanh, cỡ chữ)"
-            aria-label="Cài đặt hệ thống"
+            onClick={toggleDark}
+            className="w-8 h-8 flex items-center justify-center rounded-lg border border-slate-200/80 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800/60 text-xs cursor-pointer"
+            title={dark ? 'Chuyển sang giao diện sáng' : 'Chuyển sang giao diện tối'}
+            aria-label="Đổi giao diện Sáng/Tối"
           >
-            <IconSettings className={`w-3.5 h-3.5 transition-transform duration-300 ${isSettingsOpen ? 'rotate-90 text-indigo-600 dark:text-indigo-400' : 'group-hover:rotate-45'}`} />
-            <span>Cài đặt</span>
-            {hasCustomSettings && (
-              <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 ring-1 ring-white dark:ring-slate-900" />
-            )}
+            {dark ? '☀️' : '🌙'}
           </button>
+
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setDropdownOpen((o) => !o)}
+              className="flex items-center gap-2 pl-1.5 pr-2.5 py-1 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-all cursor-pointer"
+              aria-expanded={dropdownOpen}
+              aria-haspopup="menu"
+            >
+              <span className="w-6 h-6 rounded-lg bg-indigo-600 text-white text-[11px] font-bold flex items-center justify-center">
+                {initials}
+              </span>
+              <span className="text-xs font-semibold text-slate-700 dark:text-slate-200 max-w-[100px] truncate">
+                {displayName}
+              </span>
+            </button>
+
+            {dropdownOpen && (
+              <div
+                role="menu"
+                className="absolute right-0 mt-2 w-56 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-lg py-1.5 z-40 text-xs"
+              >
+                <div className="px-3.5 py-2 border-b border-slate-100 dark:border-slate-800">
+                  <p className="font-bold text-slate-900 dark:text-slate-100 truncate">{displayName}</p>
+                  <p className="text-[11px] text-slate-500 truncate">{profile?.email}</p>
+                </div>
+
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => openSettingsTab('account')}
+                  className="w-full text-left px-3.5 py-2 hover:bg-slate-50 dark:hover:bg-slate-800/60 text-slate-700 dark:text-slate-200 cursor-pointer"
+                >
+                  Thông tin tài khoản
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => { setDropdownOpen(false); navigate('/change-password'); }}
+                  className="w-full text-left px-3.5 py-2 hover:bg-slate-50 dark:hover:bg-slate-800/60 text-slate-700 dark:text-slate-200 flex items-center gap-2 cursor-pointer"
+                >
+                  <IconLock className="w-3.5 h-3.5 text-slate-400" />
+                  <span>Đổi mật khẩu</span>
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => openSettingsTab('appearance')}
+                  className="w-full text-left px-3.5 py-2 hover:bg-slate-50 dark:hover:bg-slate-800/60 text-slate-700 dark:text-slate-200 flex items-center gap-2 cursor-pointer"
+                >
+                  <IconSettings className="w-3.5 h-3.5 text-slate-400" />
+                  <span>Cài đặt</span>
+                </button>
+
+                {isAdmin && (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => { setDropdownOpen(false); navigate('/admin'); }}
+                    className="w-full text-left px-3.5 py-2 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 font-semibold flex items-center gap-2 cursor-pointer border-t border-slate-100 dark:border-slate-800 mt-1 pt-2"
+                  >
+                    <IconShield className="w-3.5 h-3.5" />
+                    <span>Quản trị hệ thống</span>
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={handleLogout}
+                  className="w-full text-left px-3.5 py-2 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-rose-600 dark:text-rose-400 font-semibold cursor-pointer border-t border-slate-100 dark:border-slate-800 mt-1 pt-2"
+                >
+                  Đăng xuất
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* Settings Modal / Popover */}
       <SettingsModal
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
+        initialTab={settingsInitialTab}
         dark={dark}
         toggleDark={toggleDark}
         ttsMuted={ttsMuted}
         toggleTts={toggleTts}
         fontSizeState={fontSizeState}
+        onOpenChangelog={() => { setIsSettingsOpen(false); setIsChangelogOpen(true); }}
       />
-
-      {/* Changelog Modal */}
-      <ChangelogModal
-        isOpen={isChangelogOpen}
-        onClose={() => setIsChangelogOpen(false)}
-      />
+      <ChangelogModal isOpen={isChangelogOpen} onClose={() => setIsChangelogOpen(false)} />
     </header>
   );
 }
