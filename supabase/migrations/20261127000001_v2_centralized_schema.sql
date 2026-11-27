@@ -102,11 +102,12 @@ begin
     if new.status is distinct from old.status then
       raise exception 'Forbidden: cannot modify status';
     end if;
-    if new.email is distinct from old.email then
+    if (new.email is distinct from old.email) then
       raise exception 'Forbidden: cannot modify email';
     end if;
-    -- Users may clear must_change_password only when updating their own password flow,
-    -- but cannot set it back to false arbitrarily? Actually allow clearing only via Edge Function or self-update after password change.
+    if new.must_change_password is distinct from old.must_change_password then
+      raise exception 'Forbidden: cannot modify must_change_password directly';
+    end if;
   end if;
   return new;
 end;

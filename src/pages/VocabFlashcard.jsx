@@ -13,7 +13,7 @@ export default function VocabFlashcard() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const vocabDecks = data.vocabDecks || [];
+  const vocabDecks = useMemo(() => data.vocabDecks || [], [data.vocabDecks]);
   const initialDeckId = location.state?.deckId || (vocabDecks[0]?.id || '');
 
   const [selectedDeckId, setSelectedDeckId] = useState(initialDeckId);
@@ -79,7 +79,7 @@ export default function VocabFlashcard() {
     if (currentCard && autoSpeak && !isFinished && !isFlipped) {
       speakWordAuto(currentCard.term, currentDeck?.targetLanguage || 'en-US');
     }
-  }, [currentIndex, currentCard, autoSpeak, isFinished, currentDeck]);
+  }, [currentIndex, currentCard, autoSpeak, isFinished, isFlipped, currentDeck]);
 
   const handleFlip = useCallback(() => {
     if (isAnimatingRef.current) return;

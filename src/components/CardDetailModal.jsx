@@ -1,4 +1,3 @@
-import React from 'react';
 import { IconSpeaker } from './Icons';
 import { speakWord } from '../lib/tts';
 import { getBadgeColor } from '../data/badgeColors';

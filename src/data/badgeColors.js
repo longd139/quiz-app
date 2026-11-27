@@ -157,7 +157,9 @@ export function updateCustomPos(oldName, newName, newColorId = 'emerald') {
     const deleted = getDeletedPosList();
     const updatedDeleted = deleted.filter(p => p !== newTrimmed.toLowerCase());
     localStorage.setItem(DELETED_POS_LIST_KEY, JSON.stringify(updatedDeleted));
-  } catch (e) {}
+  } catch (err) {
+    console.warn('Failed to update deleted POS list:', err);
+  }
 
   // Save new name and color
   saveCustomPos(newTrimmed, newColorId);

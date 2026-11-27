@@ -21,7 +21,7 @@ export default function VocabDashboard() {
   const [studyOptionDeck, setStudyOptionDeck] = useState(null);
   const [viewingMistakesDeck, setViewingMistakesDeck] = useState(null);
 
-  const vocabDecks = data?.vocabDecks || [];
+  const vocabDecks = useMemo(() => data?.vocabDecks || [], [data?.vocabDecks]);
   const vocabCollections = data?.vocabCollections || [];
   const vocabStats = data?.vocabStats || {};
 

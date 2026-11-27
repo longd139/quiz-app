@@ -1,4 +1,4 @@
-import { createQuestion } from './storage';
+import { createQuestion } from './storage.js';
 
 export function parseBulkPaste(text) {
   const normalized = text.replace(/\r\n/g, '\n').trim();

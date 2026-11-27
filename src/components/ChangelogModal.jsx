@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { APP_VERSION, CHANGELOG_DATA } from '../version';
 import { IconChevronDown } from './Icons';
 

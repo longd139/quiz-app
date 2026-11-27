@@ -128,7 +128,9 @@ Deno.serve(async (req: Request) => {
         .single();
 
       if (upsertErr) {
-        return json({ error: 'Tạo Auth thành công nhưng lỗi lưu profile: ' + upsertErr.message }, 500);
+        // Compensate: remove newly created Auth user to avoid orphan accounts
+        await sbAdmin.auth.admin.deleteUser(newUserId);
+        return json({ error: 'Không thể lưu hồ sơ người dùng, đã hoàn tác tài khoản: ' + upsertErr.message }, 500);
       }
 
       await sbAdmin.from('audit_logs').insert({

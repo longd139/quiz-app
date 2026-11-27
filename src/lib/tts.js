@@ -13,8 +13,8 @@ export function setTtsAutoMuted(muted) {
   if (muted && 'speechSynthesis' in window) {
     try {
       window.speechSynthesis.cancel();
-    } catch (e) {
-      // ignore
+    } catch (err) {
+      console.warn('TTS cancel failed:', err);
     }
   }
 }
@@ -27,8 +27,8 @@ export function stopSpeaking() {
   if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
     try {
       window.speechSynthesis.cancel();
-    } catch (e) {
-      // ignore
+    } catch (err) {
+      console.warn('TTS cancel failed:', err);
     }
   }
 }

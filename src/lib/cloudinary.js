@@ -46,6 +46,9 @@ export async function uploadToCloudinary(file, folder = 'vocab_flashcards') {
   formData.append('timestamp', String(signData.timestamp));
   formData.append('signature', signData.signature);
   formData.append('folder', signData.folder);
+  if (signData.allowedFormats) {
+    formData.append('allowed_formats', signData.allowedFormats);
+  }
 
   const res = await fetch(`https://api.cloudinary.com/v1_1/${signData.cloudName}/image/upload`, {
     method: 'POST',

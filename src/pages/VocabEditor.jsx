@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQuiz } from '../App';
-import { createVocabDeck, createVocabCard, createVocabCollection, escHtml, uid } from '../data/storage';
+import { createVocabCard, createVocabCollection, escHtml, uid } from '../data/storage';
 import { speakWord } from '../lib/tts';
 import { IconSpeaker, IconTrash, IconPlus, IconFolder, IconArrowLeft, IconEdit, IconSearch } from '../components/Icons';
 import CreateFlashcardModal from '../components/CreateFlashcardModal';
@@ -17,7 +17,7 @@ export default function VocabEditor() {
   // Đảm bảo luôn có ID ổn định cho bộ từ (kể cả khi tạo mới)
   const [activeDeckId] = useState(() => deckId || uid());
 
-  const vocabCollections = data.vocabCollections || [];
+  const vocabCollections = useMemo(() => data.vocabCollections || [], [data.vocabCollections]);
 
   const [name, setName] = useState('');
   const [collectionId, setCollectionId] = useState(() => {
@@ -131,7 +131,9 @@ export default function VocabEditor() {
             return;
           }
         }
-      } catch (_e) {}
+      } catch (err) {
+        console.warn('Draft restore error:', err);
+      }
 
       setCards([]);
       if (vocabCollections.length > 0 && !collectionId) {
@@ -204,7 +206,11 @@ export default function VocabEditor() {
           description: finalDesc
         }
       });
-      try { localStorage.removeItem('vocab_draft_new'); } catch (_e) {}
+      try {
+        localStorage.removeItem('vocab_draft_new');
+      } catch (err) {
+        console.warn('Draft clear error:', err);
+      }
     } finally {
       setIsSavingCard(false);
     }
@@ -227,7 +233,9 @@ export default function VocabEditor() {
     };
     try {
       localStorage.setItem('vocab_draft_new', JSON.stringify(draftData));
-    } catch (_e) {}
+    } catch (err) {
+      console.warn('Draft save error:', err);
+    }
   }, [name, collectionId, description, targetLanguage, cards, deckId, activeDeckId]);
 
   // Cảnh báo người dùng khi bấm F5 hoặc đóng tab nếu đang có từ vựng chưa lưu
@@ -484,7 +492,7 @@ export default function VocabEditor() {
         const jsonSlice = raw.slice(firstBracket, lastBracket + 1);
         const parsed = JSON.parse(jsonSlice);
         if (Array.isArray(parsed)) jsonCandidates = parsed;
-      } catch (e) {
+      } catch {
         // Continue to fallback
       }
     }
@@ -494,7 +502,7 @@ export default function VocabEditor() {
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed)) jsonCandidates = parsed;
         else if (Array.isArray(parsed.cards)) jsonCandidates = parsed.cards;
-      } catch (e) {
+      } catch {
         // Try regex matching objects { "term": "...", "meaning": "..." }
         const itemRegex = /\{\s*"term"\s*:\s*"([^"]+)"[\s\S]*?"meaning"\s*:\s*"([^"]+)"[\s\S]*?\}/g;
         let match;
@@ -502,7 +510,7 @@ export default function VocabEditor() {
           try {
             const obj = JSON.parse(match[0]);
             jsonCandidates.push(obj);
-          } catch (err) {
+          } catch {
             jsonCandidates.push({ term: match[1], meaning: match[2] });
           }
         }
@@ -630,7 +638,11 @@ export default function VocabEditor() {
             <button
               type="button"
               onClick={() => {
-                try { localStorage.removeItem('vocab_draft_new'); } catch (_e) {}
+                try {
+        localStorage.removeItem('vocab_draft_new');
+      } catch (err) {
+        console.warn('Draft clear error:', err);
+      }
                 setCards([]);
                 setName('');
                 setDescription('');

@@ -106,7 +106,8 @@ Deno.serve(async (req: Request) => {
   }
 
   const timestamp = Math.floor(Date.now() / 1000);
-  const stringToSign = `folder=${folder}&timestamp=${timestamp}${apiSecret}`;
+  const allowedFormats = 'jpg,png,webp,gif';
+  const stringToSign = `allowed_formats=${allowedFormats}&folder=${folder}&timestamp=${timestamp}${apiSecret}`;
   const signature = await sha1Hex(stringToSign);
 
   await sbAdmin.from('audit_logs').insert({
@@ -123,5 +124,6 @@ Deno.serve(async (req: Request) => {
     timestamp,
     signature,
     folder,
+    allowedFormats,
   });
 });

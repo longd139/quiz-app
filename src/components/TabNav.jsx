@@ -8,13 +8,6 @@ const quizTabs = [
   { path: '/history', label: 'Lịch sử' }
 ];
 
-const languageTabs = [
-  { path: '/vocab', label: 'Bộ từ vựng' },
-  { path: '/vocab-editor', label: 'Soạn từ' },
-  { path: '/vocab-learn', label: 'Flashcard' },
-  { path: '/vocab-quiz', label: 'Trắc nghiệm' }
-];
-
 export default function TabNav() {
   const navigate = useNavigate();
   const location = useLocation();

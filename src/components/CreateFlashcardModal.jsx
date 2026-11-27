@@ -4,14 +4,14 @@ import { createVocabCard } from '../data/storage';
 import { uploadToCloudinary } from '../lib/cloudinary';
 import { IconImage, IconPlus, IconEdit, IconTrash, IconChevronDown } from './Icons';
 import { BADGE_COLORS, getAllPosList, saveCustomPos, deletePos, updateCustomPos, getBadgeColor, getColorForPos, savePosColor } from '../data/badgeColors';
-import FormattedText, { parseExampleHtmlLines, convertMarkdownToHtml, HIGHLIGHT_COLORS, TEXT_COLORS } from './FormattedText';
+import FormattedText, { parseExampleHtmlLines, convertMarkdownToHtml } from './FormattedText';
 import TextFormatMenu from './TextFormatMenu';
 import CardDetailModal from './CardDetailModal';
 import { useQuiz } from '../App';
 
 export default function CreateFlashcardModal({ deck, isOpen, onClose, onSaveCard, editingCard = null }) {
   const quizContext = useQuiz();
-  const vocabDecks = quizContext?.data?.vocabDecks || [];
+  const vocabDecks = useMemo(() => quizContext?.data?.vocabDecks || [], [quizContext?.data?.vocabDecks]);
 
   const [term, setTerm] = useState('');
   const [meaning, setMeaning] = useState('');
@@ -301,7 +301,9 @@ export default function CreateFlashcardModal({ deck, isOpen, onClose, onSaveCard
       e.preventDefault();
       try {
         savedRangeRef.current = selection.getRangeAt(0).cloneRange();
-      } catch (err) {}
+      } catch (err) {
+        console.warn('Selection range error:', err);
+      }
       setFormatMenu({
         x: e.clientX,
         y: e.clientY,
@@ -320,7 +322,9 @@ export default function CreateFlashcardModal({ deck, isOpen, onClose, onSaveCard
         const selection = window.getSelection();
         selection.removeAllRanges();
         selection.addRange(savedRangeRef.current);
-      } catch (err) {}
+      } catch (err) {
+        console.warn('Restore selection range error:', err);
+      }
     }
 
     if (type === 'bold') {
@@ -343,7 +347,7 @@ export default function CreateFlashcardModal({ deck, isOpen, onClose, onSaveCard
     setFormatMenu(null);
   };
 
-  const handleEditorKeyDown = (e) => {
+  const handleEditorKeyDown = () => {
     requestAnimationFrame(() => {
       if (editorRef.current) {
         setExamplesHtml(editorRef.current.innerHTML);

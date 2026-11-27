@@ -29,7 +29,9 @@ export function loadLocalBackups() {
 export function saveLocalBackups(backups) {
   try {
     localStorage.setItem(BACKUP_STORAGE_KEY, JSON.stringify(backups));
-  } catch (_e) {}
+  } catch (err) {
+    console.warn('Failed to save local backups:', err);
+  }
 }
 
 // Tạo snapshot chuẩn từ data hiện tại (loại bỏ trường dailyBackups để không bị lặp lồng)

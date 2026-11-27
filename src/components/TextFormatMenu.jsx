@@ -1,10 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { HIGHLIGHT_COLORS, TEXT_COLORS } from './FormattedText';
 
 export default function TextFormatMenu({
   isOpen,
   position,
-  selectedText,
   onApplyFormat,
   onClose
 }) {

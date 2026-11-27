@@ -21,12 +21,12 @@ export default function VocabQuiz() {
     dataRef.current = data;
   }, [data]);
 
-  const vocabDecks = data.vocabDecks || [];
+  const vocabDecks = useMemo(() => data.vocabDecks || [], [data.vocabDecks]);
   const initialDeckId = location.state?.deckId || (vocabDecks[0]?.id || '');
   const initialMode = location.state?.mode;
   const initialStudyMode = location.state?.studyMode || 'continue'; // 'continue' | 'restart' | 'wrong_only'
 
-  const [selectedDeckId, setSelectedDeckId] = useState(initialDeckId);
+  const [selectedDeckId] = useState(initialDeckId);
   const [studyMode, setStudyMode] = useState(initialStudyMode);
 
   useEffect(() => {
@@ -118,8 +118,8 @@ export default function VocabQuiz() {
 
   // Common question state
   const [isAnswered, setIsAnswered] = useState(false);
-  const [score, setScore] = useState(0);
-  const [streak, setStreak] = useState(0);
+  const [, setScore] = useState(0);
+  const [, setStreak] = useState(0);
   const [maxStreak, setMaxStreak] = useState(0);
   const [wrongItems, setWrongItems] = useState([]);
   const [isCompleted, setIsCompleted] = useState(false);
@@ -134,7 +134,7 @@ export default function VocabQuiz() {
       return new Set();
     }
     const set = new Set();
-    const curStats = dataRef.current?.vocabStats || data.vocabStats || {};
+    const curStats = dataRef.current?.vocabStats || {};
     if (currentDeck?.cards) {
       currentDeck.cards.forEach(c => {
         if (curStats[c.id]?.mastered) {
@@ -143,14 +143,14 @@ export default function VocabQuiz() {
       });
     }
     return set;
-  }, [currentDeck, data.vocabStats, studyMode]);
+  }, [currentDeck, studyMode]);
 
   const [masteredCardIds, setMasteredCardIds] = useState(() => getInitialMastered());
 
   // Khi đổi deck hoặc studyMode, nạp lại tiến độ các từ đã thuộc của deck đó
   useEffect(() => {
     setMasteredCardIds(getInitialMastered());
-  }, [selectedDeckId, studyMode]);
+  }, [getInitialMastered]);
 
   // Danh sách các từ đã từng làm sai trong bộ từ này
   const wrongCards = useMemo(() => {
@@ -535,6 +535,9 @@ export default function VocabQuiz() {
     resetQuestionStates();
   };
 
+  const generateQuizRef = useRef(null);
+  generateQuizRef.current = generateQuiz;
+
   useEffect(() => {
     if (!currentDeck || !currentDeck.cards || currentDeck.cards.length < 2) return;
     const configKey = `${currentDeck.id}_${studyMode}_${direction}_${allowChoice}_${allowWritten}_${allowFlashcard}_${allowMatching}`;
@@ -543,8 +546,8 @@ export default function VocabQuiz() {
       return;
     }
     activeQuizConfigRef.current = configKey;
-    generateQuiz();
-  }, [currentDeck?.id, direction, allowChoice, allowWritten, allowFlashcard, allowMatching, studyMode]);
+    generateQuizRef.current?.();
+  }, [currentDeck, direction, allowChoice, allowWritten, allowFlashcard, allowMatching, studyMode, questions.length]);
 
   const currentQ = questions[currentIndex] || null;
 
@@ -834,6 +837,9 @@ export default function VocabQuiz() {
 
 
 
+  const handleFlashcardAnswerRef = useRef(null);
+  handleFlashcardAnswerRef.current = handleFlashcardAnswer;
+
   // Keyboard navigation shortcuts in flashcard mode
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -844,10 +850,10 @@ export default function VocabQuiz() {
           setIsCardFlipped(prev => !prev);
         } else if (e.code === 'ArrowLeft') {
           e.preventDefault();
-          handleFlashcardAnswer(false);
+          handleFlashcardAnswerRef.current?.(false);
         } else if (e.code === 'ArrowRight') {
           e.preventDefault();
-          handleFlashcardAnswer(true);
+          handleFlashcardAnswerRef.current?.(true);
         } else if (e.code === 'ArrowUp' && currentQ?.card) {
           e.preventDefault();
           speakWord(currentQ.card.term, currentDeck?.targetLanguage || 'en-US');
@@ -856,7 +862,7 @@ export default function VocabQuiz() {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [currentQ, isCompleted, showSettings, currentDeck, handleFlashcardAnswer]);
+  }, [currentQ, isCompleted, showSettings, currentDeck]);
 
   // Practice only missed items
   const handlePracticeMissed = () => {
@@ -940,9 +946,6 @@ export default function VocabQuiz() {
 
   // Completed view
   if (isCompleted) {
-    const total = questions.length;
-    const percent = Math.round((score / total) * 100);
-
     return (
       <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 sm:p-8 border border-slate-200 dark:border-slate-800 text-center max-w-md mx-auto space-y-6">
         <div>

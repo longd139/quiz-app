@@ -84,46 +84,21 @@ export async function signOutCurrentUser(userId) {
   }
 }
 
-export async function changePasswordWithReauth({ email, currentPassword, newPassword }) {
+export async function changePasswordWithReauth({ currentPassword, newPassword }) {
   if (!hasSupabase) throw new Error('Chưa cấu hình Supabase.');
 
-  // Reauthenticate to verify current password
-  const { error: reauthErr } = await supabase.auth.signInWithPassword({
-    email,
-    password: currentPassword,
+  const { data, error } = await supabase.functions.invoke('password-change', {
+    body: { currentPassword, newPassword },
   });
 
-  if (reauthErr) {
-    throw new Error('Mật khẩu hiện tại không chính xác.');
+  if (error) {
+    throw new Error(error.message || 'Không thể cập nhật mật khẩu mới.');
+  }
+  if (data?.error) {
+    throw new Error(data.error);
   }
 
-  const { data: userData, error: updateErr } = await supabase.auth.updateUser({
-    password: newPassword,
-  });
-
-  if (updateErr) {
-    throw new Error(updateErr.message || 'Không thể cập nhật mật khẩu mới.');
-  }
-
-  // Clear must_change_password flag
-  if (userData?.user?.id) {
-    const { error: profErr } = await supabase
-      .from('profiles')
-      .update({ must_change_password: false })
-      .eq('id', userData.user.id);
-
-    if (profErr) {
-      throw new Error('Đổi mật khẩu thành công nhưng lỗi cập nhật trạng thái tài khoản: ' + profErr.message);
-    }
-
-    await supabase.from('audit_logs').insert({
-      actor_user_id: userData.user.id,
-      action: 'USER_PASSWORD_CHANGE',
-      entity_type: 'profile',
-      entity_id: userData.user.id,
-      metadata: { self_service: true },
-    });
-  }
+  await supabase.auth.refreshSession();
 }
 
 export async function updateOwnProfile(userId, updates) {

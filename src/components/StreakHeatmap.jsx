@@ -320,12 +320,6 @@ export default function StreakHeatmap({ onQuickStudy, className = '' }) {
     }
   }, [weeksRange, collapsed]);
 
-  const nextMilestone = useMemo(() => {
-    const next = stats.milestones.find(m => stats.currentStreak < m.target);
-    if (!next) return { target: 100, label: '100 ngày', title: 'Huyền thoại', remaining: 0 };
-    return { ...next, remaining: next.target - stats.currentStreak };
-  }, [stats.milestones, stats.currentStreak]);
-
   const handleStartQuickStudy = () => {
     if (onQuickStudy) {
       onQuickStudy();
