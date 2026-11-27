@@ -1,74 +1,118 @@
 /* global process, console */
-import { execSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { assertLocalEnvironment } from './lib/environment-guard.mjs';
+import { execSync } from 'node:child_process';
+import {
+  assertEnvFileIsLocal,
+  assertLocalEnvironment,
+  readSupabaseProjectId,
+} from './lib/environment-guard.mjs';
 
-function run(cmd) {
-  return execSync(cmd, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
-}
+const root = process.cwd();
+const args = new Set(process.argv.slice(2));
+const forceWrite = args.has('--force');
 
-function getSupabaseStatusJson() {
-  const out = run('npx supabase status --output json');
-  return JSON.parse(out);
-}
+const ENV_FILES_TO_CHECK = [
+  '.env',
+  '.env.local',
+  '.env.development',
+  '.env.development.local',
+  '.env.test',
+  '.env.test.local',
+  'supabase/functions/.env.local',
+];
 
-function writeEnvIfMissingOrLocal(filePath, content) {
-  if (fs.existsSync(filePath)) {
-    const existing = fs.readFileSync(filePath, 'utf8');
-    if (!existing.includes('127.0.0.1') && !existing.includes('localhost')) {
-      console.log(`Skipped ${path.basename(filePath)} (custom non-local file exists).`);
-      return;
-    }
+function validateExistingEnvFiles() {
+  for (const rel of ENV_FILES_TO_CHECK) {
+    assertEnvFileIsLocal(path.join(root, rel), root);
   }
+}
+
+function writeEnvIfMissing(filePath, content) {
+  if (fs.existsSync(filePath) && !forceWrite) {
+    assertEnvFileIsLocal(filePath, root);
+    console.log(`Preserved existing ${path.relative(root, filePath)}`);
+    return;
+  }
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
   fs.writeFileSync(filePath, content, 'utf8');
-  console.log(`Wrote ${path.basename(filePath)}`);
+  console.log(`Generated ${path.relative(root, filePath)}`);
+}
+
+function getSupabaseStatus() {
+  const raw = execSync('npx supabase status --output json', { encoding: 'utf8' });
+  return JSON.parse(raw);
 }
 
 async function main() {
-  console.log('1. Checking Docker daemon...');
-  run('docker info --format "{{.ServerVersion}}"');
-
-  console.log('2. Checking/Starting local Supabase stack...');
-  let status;
-  try {
-    status = getSupabaseStatusJson();
-  } catch {
-    execSync('npx supabase start', { stdio: 'inherit' });
-    status = getSupabaseStatusJson();
+  console.log('1/5 Validating local project config & existing environment files...');
+  const projectId = readSupabaseProjectId(path.join(root, 'supabase', 'config.toml'));
+  if (projectId !== 'quiz-app-local') {
+    throw new Error(`Expected supabase/config.toml project_id="quiz-app-local", got "${projectId}".`);
   }
+  validateExistingEnvFiles();
 
+  console.log('2/5 Starting lightweight local Supabase stack (quiz-app-local)...');
+  execSync('npx supabase start --exclude logflare,vector,realtime,imgproxy,supavisor', {
+    stdio: 'inherit',
+  });
+
+  const status = getSupabaseStatus();
   const apiUrl = status.API_URL || 'http://127.0.0.1:54321';
-  const anonKey = status.ANON_KEY || status.PUBLISHABLE_KEY;
-  const serviceKey = status.SERVICE_ROLE_KEY;
+  const dbUrl = status.DB_URL || 'postgresql://postgres:postgres@127.0.0.1:54322/postgres';
+  const anonKey = status.PUBLISHABLE_KEY || status.ANON_KEY;
+  const serviceKey = status.SECRET_KEY || status.SERVICE_ROLE_KEY;
 
   assertLocalEnvironment({
     appEnv: 'development',
     supabaseUrl: apiUrl,
+    dbUrl,
     operation: 'setup:local',
+    expectedProjectId: 'quiz-app-local',
+    actualProjectId: projectId,
+    expectedApiPort: '54321',
+    expectedDbPort: '54322',
   });
 
-  if (!anonKey || !serviceKey) {
-    throw new Error('Could not read local Supabase keys from `supabase status --output json`.');
-  }
-
-  writeEnvIfMissingOrLocal(
-    path.resolve('.env.development.local'),
-    `VITE_APP_ENV=development\nVITE_SUPABASE_URL=${apiUrl}\nVITE_SUPABASE_PUBLISHABLE_KEY=${anonKey}\nVITE_UPLOAD_ADAPTER=local-supabase\n`
+  console.log('3/5 Ensuring local env files exist (non-destructive)...');
+  writeEnvIfMissing(
+    path.join(root, '.env.development.local'),
+    [
+      'VITE_APP_ENV=development',
+      `VITE_SUPABASE_URL=${apiUrl}`,
+      `VITE_SUPABASE_PUBLISHABLE_KEY=${anonKey}`,
+      '',
+    ].join('\n')
   );
 
-  writeEnvIfMissingOrLocal(
-    path.resolve('.env.test.local'),
-    `VITE_APP_ENV=test\nVITE_SUPABASE_URL=${apiUrl}\nVITE_SUPABASE_PUBLISHABLE_KEY=${anonKey}\nVITE_UPLOAD_ADAPTER=local-supabase\n`
+  writeEnvIfMissing(
+    path.join(root, '.env.test.local'),
+    [
+      'VITE_APP_ENV=test',
+      'VITE_SUPABASE_URL=http://127.0.0.1:54331',
+      `VITE_SUPABASE_PUBLISHABLE_KEY=${anonKey}`,
+      '',
+    ].join('\n')
   );
 
-  writeEnvIfMissingOrLocal(
-    path.resolve('supabase/functions/.env.local'),
-    `SUPABASE_URL=${apiUrl}\nSUPABASE_ANON_KEY=${anonKey}\nSUPABASE_SERVICE_ROLE_KEY=${serviceKey}\n`
+  writeEnvIfMissing(
+    path.join(root, 'supabase', 'functions', '.env.local'),
+    [
+      'APP_ENV=development',
+      `SUPABASE_URL=${apiUrl}`,
+      `SUPABASE_ANON_KEY=${status.ANON_KEY || anonKey}`,
+      `SUPABASE_SERVICE_ROLE_KEY=${serviceKey}`,
+      'MEDIA_STORAGE_PROVIDER=supabase',
+      'ALLOWED_ORIGINS=http://localhost:5173,http://127.0.0.1:5173,http://127.0.0.1:5174',
+      '',
+    ].join('\n')
   );
 
-  console.log('3. Seeding local test accounts and fixture data...');
-  execSync('node scripts/seed-local.mjs', {
+  console.log('4/5 Applying pending migrations (non-destructive)...');
+  execSync('npx supabase migration up --local', { stdio: 'inherit' });
+
+  console.log('5/5 Ensuring seed data without overwriting existing accounts...');
+  execSync('node scripts/seed-local.mjs --preserve-existing', {
     stdio: 'inherit',
     env: {
       ...process.env,
@@ -78,14 +122,13 @@ async function main() {
     },
   });
 
-  console.log('\nLocal Supabase environment ready!');
-  console.log(`  Frontend:        http://127.0.0.1:5173 (run: npm run dev)`);
-  console.log(`  Supabase API:    ${apiUrl}`);
-  console.log(`  Supabase Studio: ${status.STUDIO_URL || 'http://127.0.0.1:54323'}`);
-  console.log(`  Edge Functions:  npm run functions:serve:local`);
+  console.log('\nLocal environment ready!');
+  console.log(`- API URL:    ${apiUrl}`);
+  console.log(`- Studio URL: ${status.STUDIO_URL || 'http://127.0.0.1:54323'}`);
+  console.log('- Run "npm run dev:local" to start the frontend.');
 }
 
 main().catch((err) => {
-  console.error('setup:local failed:', err.message);
+  console.error('setup:local failed:', err.message || err);
   process.exit(1);
 });

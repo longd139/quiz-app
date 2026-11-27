@@ -1,0 +1,57 @@
+# Isolated local test Supabase configuration (ENV-03)
+# Dedicated project_id and ports so integration/E2E tests NEVER touch quiz-app-local (54321/54322).
+project_id = "quiz-app-test"
+
+[api]
+enabled = true
+port = 54331
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54332
+shadow_port = 54330
+major_version = 17
+
+[studio]
+enabled = false
+port = 54333
+api_url = "http://127.0.0.1"
+
+[local_smtp]
+enabled = false
+port = 54334
+
+[storage]
+enabled = true
+file_size_limit = "10MiB"
+
+[auth]
+enabled = true
+site_url = "http://127.0.0.1:5174"
+additional_redirect_urls = ["http://localhost:5174", "http://127.0.0.1:5174"]
+jwt_expiry = 3600
+enable_refresh_token_rotation = true
+refresh_token_reuse_interval = 10
+enable_signup = false
+enable_anonymous_sign_ins = false
+minimum_password_length = 8
+password_requirements = "lower_upper_letters_digits"
+
+[auth.email]
+enable_signup = true
+double_confirm_changes = true
+enable_confirmations = false
+max_frequency = "1s"
+
+[edge_runtime]
+enabled = true
+policy = "oneshot"
+inspector_port = 8084
+deno_version = 1
+
+[analytics]
+enabled = false
+port = 54337
+backend = "postgres"

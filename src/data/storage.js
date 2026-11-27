@@ -63,8 +63,31 @@ export function createTest(name, collectionId) {
   return { id: uid(), name, collectionId: collectionId || null, questions: [], createdAt: now, updatedAt: now };
 }
 
+export function normalizeQuizTerm(term = '') {
+  const clean = String(term || '').trim().replace(/\s+/g, ' ');
+  if (!clean || clean.toLowerCase() === 'chung') return '';
+  const match = clean.match(/^k[yỳ]\s*(\d+)$/i);
+  if (match) return `Kỳ ${Number(match[1])}`;
+  return clean;
+}
+
+export function compareQuizTerms(a = '', b = '') {
+  const normA = normalizeQuizTerm(a);
+  const normB = normalizeQuizTerm(b);
+  if (!normA && !normB) return 0;
+  if (!normA) return 1;
+  if (!normB) return -1;
+
+  const numA = normA.match(/^Kỳ\s+(\d+)$/i);
+  const numB = normB.match(/^Kỳ\s+(\d+)$/i);
+  if (numA && numB) return Number(numA[1]) - Number(numB[1]);
+  if (numA) return -1;
+  if (numB) return 1;
+  return normA.localeCompare(normB, 'vi');
+}
+
 export function createCollection(name, term = '') {
-  return { id: uid(), name, term: term.trim(), createdAt: new Date().toISOString() };
+  return { id: uid(), name, term: normalizeQuizTerm(term), createdAt: new Date().toISOString() };
 }
 
 export function getCollectionName(collections, id) {

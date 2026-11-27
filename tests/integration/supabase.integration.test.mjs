@@ -12,12 +12,32 @@ let ANON_KEY;
 let SERVICE_KEY;
 
 function loadLocalStatus() {
-  const raw = execSync('npx supabase status --output json', { encoding: 'utf8' });
+  if (process.env.SUPABASE_URL && process.env.SUPABASE_ANON_KEY && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    SUPABASE_URL = process.env.SUPABASE_URL;
+    ANON_KEY = process.env.SUPABASE_ANON_KEY;
+    SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    assertLocalEnvironment({
+      appEnv: 'test',
+      supabaseUrl: SUPABASE_URL,
+      dbUrl: process.env.DB_URL || '',
+      operation: 'integration tests',
+      expectedApiPort: '54331',
+    });
+    return;
+  }
+  const workdir = process.env.SUPABASE_WORKDIR || 'supabase-test';
+  const raw = execSync(`npx supabase --workdir "${workdir}" status --output json`, { encoding: 'utf8' });
   const status = JSON.parse(raw);
-  SUPABASE_URL = status.API_URL || 'http://127.0.0.1:54321';
+  SUPABASE_URL = status.API_URL || 'http://127.0.0.1:54331';
   ANON_KEY = status.ANON_KEY || status.PUBLISHABLE_KEY;
   SERVICE_KEY = status.SERVICE_ROLE_KEY;
-  assertLocalEnvironment({ appEnv: 'test', supabaseUrl: SUPABASE_URL, operation: 'integration tests' });
+  assertLocalEnvironment({
+    appEnv: 'test',
+    supabaseUrl: SUPABASE_URL,
+    dbUrl: status.DB_URL || '',
+    operation: 'integration tests',
+    expectedApiPort: '54331',
+  });
 }
 
 function makeAnonClient() {
@@ -315,5 +335,163 @@ describe('Local Supabase Integration Suite (Auth, RLS, Transactions, Isolation, 
       p_dry_run: true,
     });
     assert.ok(restoreErr, 'Regular user must not invoke restore_backup_atomic');
+  });
+
+  // ---------------------------------------------------------------------------
+  // Group G — BUG-19, BUG-21, BUG-23 Hardening Tests
+  // ---------------------------------------------------------------------------
+  it('BUG-19: Concurrent 2-admin editing detects conflict and transaction rolls back on invalid payload', async () => {
+    const { client: admin1 } = await signInAs('admin@quiz.local');
+    const { client: admin2 } = await signInAs('admin2@quiz.local');
+    const setId = crypto.randomUUID();
+
+    // Admin 1 creates set (version 1)
+    const { error: createErr } = await admin1.rpc('save_quiz_set_atomic', {
+      p_id: setId,
+      p_collection_id: null,
+      p_name: 'Concurrent Set',
+      p_description: '',
+      p_expected_version: null,
+      p_questions: [{
+        id: crypto.randomUUID(),
+        prompt: 'Q1',
+        explanation: '',
+        options: [{ label: 'A', text: '1' }, { label: 'B', text: '2' }],
+        correctIndices: [0],
+      }],
+    });
+    assert.equal(createErr, null);
+
+    // Admin 2 updates with version 1 -> succeeds (version becomes 2)
+    const { data: upd2, error: err2 } = await admin2.rpc('save_quiz_set_atomic', {
+      p_id: setId,
+      p_collection_id: null,
+      p_name: 'Concurrent Set v2',
+      p_description: '',
+      p_expected_version: 1,
+      p_questions: [{
+        id: crypto.randomUUID(),
+        prompt: 'Q1 updated',
+        explanation: '',
+        options: [{ label: 'A', text: '1' }, { label: 'B', text: '2' }],
+        correctIndices: [0],
+      }],
+    });
+    assert.equal(err2, null);
+    assert.equal(upd2.version, 2);
+
+    // Admin 1 tries to save with stale version 1 -> CONFLICT
+    const { error: conflictErr } = await admin1.rpc('save_quiz_set_atomic', {
+      p_id: setId,
+      p_collection_id: null,
+      p_name: 'Stale Write',
+      p_description: '',
+      p_expected_version: 1,
+      p_questions: [],
+    });
+    assert.ok(conflictErr && conflictErr.message.includes('CONFLICT'));
+
+    // Invalid payload (null option/question array) must roll back atomically without bumping version
+    const { error: txFailErr } = await admin1.rpc('save_quiz_set_atomic', {
+      p_id: setId,
+      p_collection_id: null,
+      p_name: 'Rollback Set',
+      p_description: '',
+      p_expected_version: 2,
+      p_questions: [{ id: 'not-a-uuid', prompt: 'Bad', options: [], correctIndices: [] }],
+    });
+    assert.ok(txFailErr);
+
+    const { data: persisted } = await admin1.from('quiz_sets').select('name, version').eq('id', setId).single();
+    assert.equal(persisted.name, 'Concurrent Set v2');
+    assert.equal(persisted.version, 2);
+
+    await admin1.rpc('delete_quiz_set_atomic', { p_id: setId });
+  });
+
+  it('BUG-19: Pagination fetches >1000 rows without PostgREST truncation', async () => {
+    const sbService = makeAdminServiceClient();
+    const { user } = await signInAs('admin@quiz.local');
+    const setId = crypto.randomUUID();
+    await sbService.from('quiz_sets').insert({ id: setId, name: 'Large Set 1050', created_by: user.id });
+
+    const bulkQuestions = Array.from({ length: 1050 }, (_, idx) => ({
+      id: crypto.randomUUID(),
+      quiz_set_id: setId,
+      prompt: `Bulk Question ${idx + 1}`,
+      explanation: '',
+      sort_order: idx,
+    }));
+    const { error: insErr } = await sbService.from('questions').insert(bulkQuestions);
+    assert.equal(insErr, null);
+
+    // Fetch with 1000-row pagination
+    const { client: userA } = await signInAs('usera@quiz.local');
+    const fetched = [];
+    let offset = 0;
+    while (true) {
+      const { data, error } = await userA
+        .from('questions')
+        .select('id')
+        .eq('quiz_set_id', setId)
+        .order('sort_order', { ascending: true })
+        .range(offset, offset + 999);
+      assert.equal(error, null);
+      if (!data || data.length === 0) break;
+      fetched.push(...data);
+      if (data.length < 1000) break;
+      offset += 1000;
+    }
+    assert.equal(fetched.length, 1050);
+
+    await sbService.from('quiz_sets').delete().eq('id', setId);
+  });
+
+  it('BUG-21 & BUG-23: Backup & restore preserves quiz_collections.term and normalizes term values', async () => {
+    const { client: adminClient, user } = await signInAs('admin@quiz.local');
+    const colId = crypto.randomUUID();
+    const { error: colErr } = await adminClient.from('quiz_collections').insert({
+      id: colId,
+      name: 'Môn Kỳ 10',
+      term: 'Kỳ 10',
+      created_by: user.id,
+    });
+    assert.equal(colErr, null);
+
+    const { data: normTerm } = await adminClient.rpc('normalize_quiz_term', { p_term: '  ky  10 ' });
+    assert.equal(normTerm, 'Kỳ 10');
+
+    const { data: backup, error: bErr } = await adminClient
+      .from('backup_metadata')
+      .insert({
+        created_by: user.id,
+        scope: 'shared_content',
+        status: 'completed',
+        app_version: 'v2.0.0',
+        entity_counts: { quizCollections: 1, quizSets: 0 },
+        snapshot_data: {
+          collections: [{ id: colId, name: 'Môn Kỳ 10', term: 'Kỳ 10', description: '' }],
+          tests: [],
+          vocabCollections: [],
+          vocabDecks: [],
+        },
+      })
+      .select('id')
+      .single();
+    assert.equal(bErr, null);
+
+    // Mutate term to something else, then restore and verify term='Kỳ 10' is restored
+    await adminClient.from('quiz_collections').update({ term: 'Kỳ 1' }).eq('id', colId);
+    const { error: restErr } = await adminClient.rpc('restore_backup_atomic', {
+      p_backup_id: backup.id,
+      p_mode: 'merge',
+      p_dry_run: false,
+    });
+    assert.equal(restErr, null);
+
+    const { data: restoredCol } = await adminClient.from('quiz_collections').select('term').eq('id', colId).single();
+    assert.equal(restoredCol.term, 'Kỳ 10');
+
+    await adminClient.from('quiz_collections').delete().eq('id', colId);
   });
 });

@@ -128,6 +128,7 @@ Deno.serve(async (req: Request) => {
           role,
           status,
           must_change_password: mustChangePassword,
+          password_change_recommended: true,
         })
         .select()
         .single();
@@ -193,7 +194,10 @@ Deno.serve(async (req: Request) => {
 
       const { data: updated, error: profUpdErr } = await sbAdmin
         .from('profiles')
-        .update({ must_change_password: mustChangePassword })
+        .update({
+          must_change_password: mustChangePassword,
+          password_change_recommended: true,
+        })
         .eq('id', targetUserId)
         .select()
         .single();

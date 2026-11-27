@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuiz } from '../App';
-import { getFilteredTests, getCollectionName, escHtml, truncate, fmtDate } from '../data/storage';
+import { getFilteredTests, getCollectionName, escHtml, truncate, fmtDate, normalizeQuizTerm, compareQuizTerms } from '../data/storage';
 import StreakHeatmap from '../components/StreakHeatmap';
 import { recordAuditLog, AUDIT_TYPES, AUDIT_CATEGORIES } from '../data/auditTrail';
 
@@ -70,14 +70,17 @@ export default function Dashboard() {
   const termGroups = useMemo(() => {
     const map = new Map();
     for (const col of collectionCards) {
-      const key = col.term || 'Chung';
+      const normalized = normalizeQuizTerm(col.term);
+      const key = normalized || 'Chung';
       if (!map.has(key)) map.set(key, []);
       map.get(key).push(col);
     }
-    return Array.from(map.entries()).map(([term, subjects]) => ({
-      term,
-      subjects,
-    }));
+    return Array.from(map.entries())
+      .sort(([a], [b]) => compareQuizTerms(a, b))
+      .map(([term, subjects]) => ({
+        term,
+        subjects,
+      }));
   }, [collectionCards]);
 
   const activeCollection = useMemo(() => {
@@ -95,18 +98,27 @@ export default function Dashboard() {
 
   const handleDelete = (idx) => {
     const test = data.tests[idx];
-    showConfirm(`Xóa bài "${test.name}" (${test.questions.length} câu)? Hành động này không thể hoàn tác.`, () => {
+    showConfirm(`Xóa bài "${test.name}" (${test.questions.length} câu)? Hành động này không thể hoàn tác.`, async () => {
       const d = { ...data, tests: data.tests.filter((_, i) => i !== idx) };
-      update(d);
-      recordAuditLog({
-        type: AUDIT_TYPES.TEST_DELETE,
-        category: AUDIT_CATEGORIES.TEST,
-        title: `Xóa bài test: "${test.name}"`,
-        detail: {
-          testName: test.name,
-          questionsCount: test.questions.length
-        }
-      });
+      try {
+        await update(d);
+        recordAuditLog({
+          type: AUDIT_TYPES.TEST_DELETE,
+          category: AUDIT_CATEGORIES.TEST,
+          title: `Xóa bài test: "${test.name}"`,
+          detail: {
+            testName: test.name,
+            questionsCount: test.questions.length
+          }
+        });
+      } catch (err) {
+        showConfirm(`Không thể xóa bài "${test.name}": ${err?.message || 'Lỗi kết nối'}`, () => {}, {
+          title: 'Lỗi xóa bài',
+          yesLabel: 'Đóng',
+          noLabel: 'Hủy',
+          danger: true,
+        });
+      }
     });
   };
 

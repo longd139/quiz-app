@@ -100,7 +100,10 @@ Deno.serve(async (req: Request) => {
 
   const { error: profErr } = await sbAdmin
     .from('profiles')
-    .update({ must_change_password: false })
+    .update({
+      must_change_password: false,
+      password_change_recommended: false,
+    })
     .eq('id', userId);
 
   if (profErr) {

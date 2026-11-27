@@ -16,6 +16,10 @@ export default function Practice() {
   const [timeLeftMs, setTimeLeftMs] = useState(timeLimitMs);
   const submittedRef = useRef(false);
   const submitRef = useRef(null);
+  const submitOpIdRef = useRef(uid());
+  const submitSessionIdRef = useRef(uid());
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [saveError, setSaveError] = useState('');
   const isTimed = timeLimitMs > 0;
 
   const handleSubmitRef = useCallback(() => {
@@ -96,7 +100,11 @@ export default function Practice() {
   const currentAnswers = useMemo(() => qId ? (answers[qId] || []) : [], [qId, answers]);
   const isLast = currentIdx >= questions.length - 1;
 
-  const handleSubmit = useCallback(() => {
+  const handleSubmit = useCallback(async () => {
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+    setSaveError('');
+
     let correctCount = 0;
     const d = { ...data, questionStats: { ...data.questionStats } };
     const originalQuestions = questions.filter(qq => !qq._retryOf);
@@ -121,17 +129,24 @@ export default function Practice() {
     const total = originalQuestions.length;
     const score = Math.round((correctCount / total) * 100);
     const session = {
-      id: uid(), testNames: sessionNames, questions, answers, totalQuestions: total,
-      correctCount, score, startedAt: new Date().toISOString(), completedAt: new Date().toISOString(),
+      id: submitSessionIdRef.current, testNames: sessionNames, questions, answers, totalQuestions: total,
+      correctCount, score, startedAt: new Date(startRef.current).toISOString(), completedAt: new Date().toISOString(),
       ...(isTimed ? { timeLimit, isExam, elapsedMs: Math.min(timeLimitMs, Date.now() - startRef.current) } : {})
     };
 
-    d.history = [session, ...d.history].slice(0, 100);
+    d.history = [session, ...(d.history || []).filter(h => h.id !== session.id)].slice(0, 100);
     const updatedData = recordStudyActivity(d, total);
-    update(updatedData);
 
-    navigate('/results', { state: { session, score, correctCount, total } });
-  }, [data, update, navigate, sessionNames, questions, answers, isTimed, timeLimit, isExam, timeLimitMs]);
+    try {
+      await update(updatedData, { operationId: submitOpIdRef.current });
+      navigate('/results', { state: { session, score, correctCount, total } });
+    } catch (err) {
+      submittedRef.current = false;
+      setSaveError(err?.message || 'Không thể lưu kết quả bài làm. Vui lòng thử lại.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [isSubmitting, data, update, navigate, sessionNames, questions, answers, isTimed, timeLimit, isExam, timeLimitMs]);
 
   // Keep latest handleSubmit available to the timer (avoids stale closure)
   useEffect(() => { submitRef.current = handleSubmit; });
@@ -326,17 +341,32 @@ export default function Practice() {
       </div>
       </div>
 
+      {/* Save error banner with retry */}
+      {saveError && (
+        <div role="alert" className="mb-3 p-3 bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 text-xs sm:text-sm rounded-lg border border-rose-200 dark:border-rose-800/60 flex items-center justify-between gap-3">
+          <span>{saveError}</span>
+          <button
+            type="button"
+            onClick={handleSubmit}
+            disabled={isSubmitting}
+            className="shrink-0 bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-3 py-1.5 rounded-md text-xs font-semibold cursor-pointer disabled:opacity-50"
+          >
+            {isSubmitting ? 'Đang lưu...' : 'Thử lưu lại'}
+          </button>
+        </div>
+      )}
+
       {/* Navigation */}
       <div className="flex gap-3 justify-between mt-3">
-        <button onClick={handlePrev} disabled={currentIdx === 0}
+        <button onClick={handlePrev} disabled={currentIdx === 0 || isSubmitting}
           className="border border-slate-200 dark:border-slate-700 px-4 py-2.5 rounded-lg text-sm font-semibold hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-800 transition-all text-slate-600 dark:text-slate-300 disabled:opacity-50">
           Trước
         </button>
         <span className="text-xs text-slate-500 dark:text-slate-400 self-center">Câu {currentIdx + 1} / {questions.length}</span>
-        <button onClick={handleNext} className={`px-4 py-2.5 rounded-lg text-sm font-semibold active:scale-95 transition-all text-white ${
+        <button onClick={handleNext} disabled={isSubmitting} className={`px-4 py-2.5 rounded-lg text-sm font-semibold active:scale-95 transition-all text-white disabled:opacity-60 ${
           (isInstant && showingResult && isLast) || (!isInstant && isLast) ? 'bg-success-600 hover:bg-success-700' : 'bg-primary-600 hover:bg-primary-700'
         }`}>
-          {isInstant && !showingResult ? 'Xem đáp án' : isInstant && showingResult && isLast ? 'Hoàn thành' : isInstant && showingResult ? 'Tiếp tục' : isLast ? 'Nộp bài' : 'Sau'}
+          {isSubmitting ? 'Đang lưu...' : isInstant && !showingResult ? 'Xem đáp án' : isInstant && showingResult && isLast ? 'Hoàn thành' : isInstant && showingResult ? 'Tiếp tục' : isLast ? 'Nộp bài' : 'Sau'}
         </button>
       </div>
     </div>

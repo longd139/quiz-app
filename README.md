@@ -17,29 +17,34 @@ npm run dev:local
 ```
 
 Lệnh `npm run setup:local` sẽ:
-1. Kiểm tra Docker daemon.
-2. Khởi động stack Supabase local (`project_id = quiz-app-local`).
-3. Áp dụng toàn bộ migrations và seed 6 tài khoản test + dữ liệu mẫu.
-4. Tự động tạo `.env.development.local`, `.env.test.local`, `supabase/functions/.env.local`.
+1. Kiểm tra `.env*` hiện có (chặn ngay nếu phát hiện remote/production).
+2. Khởi động stack Supabase local nhẹ (`project_id = quiz-app-local`, loại bỏ `logflare, vector, realtime, imgproxy, supavisor`).
+3. Áp dụng migrations pending (không reset hay ghi đè dữ liệu hiện có) và seed tài khoản mẫu theo chế độ bảo toàn (`--preserve-existing`).
+4. Tự động tạo `.env.development.local`, `.env.test.local`, `supabase/functions/.env.local` nếu chưa tồn tại.
 
 ### Local Service URLs
 
 | Service | URL |
 |---|---|
-| Frontend (Vite) | `http://127.0.0.1:5173` |
-| Supabase API / Auth / REST | `http://127.0.0.1:54321` |
-| PostgreSQL Local | `postgresql://postgres:postgres@127.0.0.1:54322/postgres` |
+| Frontend Dev (Vite) | `http://127.0.0.1:5173` |
+| Frontend E2E (Test mode) | `http://127.0.0.1:5174` |
+| Supabase Local Dev API | `http://127.0.0.1:54321` |
+| PostgreSQL Local Dev | `postgresql://postgres:postgres@127.0.0.1:54322/postgres` |
 | Supabase Studio | `http://127.0.0.1:54323` |
-| Mail Testing (Inbucket) | `http://127.0.0.1:54324` |
+| Mail Testing (Local SMTP) | `http://127.0.0.1:54324` |
+| Supabase Isolated Test API (`quiz-app-test`) | `http://127.0.0.1:54331` (tự bật/tắt khi chạy test) |
 
 ### Các lệnh thường dùng
 
 ```bash
-npm run dev:local           # Chạy Frontend local (trỏ 127.0.0.1:54321)
+npm run dev:local           # Chạy Frontend local (trỏ 127.0.0.1:54321, có env guard)
+npm run db:start            # Khởi động stack Supabase nhẹ (khuyến nghị hàng ngày)
+npm run db:start:full       # Khởi động đầy đủ container Supabase (khi cần analytics/realtime)
+npm run db:stats            # Theo dõi CPU / RAM Docker containers
 npm run functions:serve:local # Chạy local Edge Functions
 npm run db:status           # Xem trạng thái Supabase local
 npm run db:stop             # Dừng Supabase local
-npm run db:seed:local       # Seed lại tài khoản & dữ liệu mẫu
+npm run db:seed:local       # Seed tài khoản thiếu (không ghi đè mật khẩu hiện có)
 npm run db:reset:local -- --confirm-local-reset  # Reset DB local (có guard bảo vệ)
 ```
 
@@ -48,9 +53,10 @@ npm run db:reset:local -- --confirm-local-reset  # Reset DB local (có guard b�
 ```bash
 npm run lint                # ESLint (0 errors, 0 warnings)
 npm run test:unit           # Unit tests
-npm run test:integration    # Integration tests (Supabase Auth, RLS, Transactions, Isolation)
-npm run test:e2e            # Playwright E2E (Desktop + Mobile)
-npm run build               # Production build + PWA
+npm run test:integration    # Integration tests trên stack quiz-app-test (54331) độc lập
+npm run test:e2e            # Playwright E2E trên stack quiz-app-test (54331) + cổng 5174
+npm run verify:quick        # Nhanh: lint + test:unit + build
+npm run verify:local        # Đầy đủ: lint + test:unit + test:integration + build
 ```
 
 ## Quy tắc Bảo vệ Production

@@ -22,6 +22,9 @@ export default function Editor() {
   const [newCollectionName, setNewCollectionName] = useState('');
   const [newCollectionTerm, setNewCollectionTerm] = useState('Kỳ 1');
   const [errors, setErrors] = useState({});
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
+  const saveOpIdRef = useRef(uid());
 
   // Refs for scroll-to-error
   const testNameRef = useRef(null);
@@ -78,15 +81,20 @@ export default function Editor() {
     setQuestions([...questions, createQuestion()]);
   };
 
-  const handleCreateCollection = () => {
+  const handleCreateCollection = async () => {
     const name = newCollectionName.trim();
     if (!name) { showAlert('Chưa nhập tên', 'Vui lòng nhập tên collection.', 'warning'); return; }
     const newColl = createCollection(name, newCollectionTerm);
     const d = { ...data, collections: [...data.collections, newColl] };
-    update(d);
-    setCollectionId(newColl.id);
-    setShowNewCollection(false);
-    setNewCollectionName('');
+    try {
+      await update(d);
+      setCollectionId(newColl.id);
+      setShowNewCollection(false);
+      setNewCollectionName('');
+      setNewCollectionTerm('Kỳ 1');
+    } catch (err) {
+      showAlert('Không thể tạo môn học', err?.message || 'Vui lòng thử lại.', 'danger');
+    }
   };
 
   const handleCollectionChange = (e) => {
@@ -172,7 +180,9 @@ export default function Editor() {
     }, 100);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    if (isSaving) return;
+    setSaveError('');
     const e = validate();
     setErrors(e);
 
@@ -194,23 +204,31 @@ export default function Editor() {
       test.updatedAt = now;
       d = { ...data, tests: [...data.tests, test] };
     }
-    update(d);
-    recordAuditLog({
-      type: existingTest ? AUDIT_TYPES.TEST_UPDATE : AUDIT_TYPES.TEST_CREATE,
-      category: AUDIT_CATEGORIES.TEST,
-      title: `${existingTest ? 'Cập nhật' : 'Tạo mới'} bài test: "${testName}"`,
-      detail: {
-        testName,
-        questionsCount: questions.length,
-        isNew: !existingTest
+
+    setIsSaving(true);
+    try {
+      await update(d, { operationId: saveOpIdRef.current });
+      recordAuditLog({
+        type: existingTest ? AUDIT_TYPES.TEST_UPDATE : AUDIT_TYPES.TEST_CREATE,
+        category: AUDIT_CATEGORIES.TEST,
+        title: `${existingTest ? 'Cập nhật' : 'Tạo mới'} bài test: "${testName}"`,
+        detail: {
+          testName,
+          questionsCount: questions.length,
+          isNew: !existingTest
+        }
+      });
+      if (existingTest) {
+        showToast(`✅ Đã cập nhật bài test "${testName}" thành công.`, 'success');
+      } else {
+        showToast(`✅ Đã tạo bài test "${testName}" thành công!`, 'success');
       }
-    });
-    if (existingTest) {
-      showToast(`✅ Đã cập nhật bài test "${testName}" thành công.`, 'success');
-    } else {
-      showToast(`✅ Đã tạo bài test "${testName}" thành công!`, 'success');
+      navigate('/');
+    } catch (err) {
+      setSaveError(err?.message || 'Lưu bài thất bại. Bản nháp vẫn được giữ lại, vui lòng thử lại.');
+    } finally {
+      setIsSaving(false);
     }
-    navigate('/');
   };
 
   const scrollToSave = () => {
@@ -410,9 +428,17 @@ export default function Editor() {
         <button onClick={handleAddManual} className="border border-slate-200 dark:border-slate-700 px-4 py-2 rounded-lg text-sm font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700">+ Thêm câu hỏi thủ công</button>
       </div>
 
+      {saveError && (
+        <div role="alert" className="mt-4 p-3 rounded-lg bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/60 text-xs text-rose-700 dark:text-rose-300">
+          {saveError}
+        </div>
+      )}
+
       <div ref={saveRef} className="flex gap-2 mt-5">
-        <button onClick={handleSave} className="flex-1 bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-4 py-3 rounded-lg text-base font-semibold hover:bg-slate-800 dark:hover:bg-slate-100 active:scale-95 transition-all cursor-pointer">Lưu bài</button>
-        <button onClick={() => navigate('/')} className="border border-slate-200 dark:border-slate-700 px-4 py-3 rounded-lg text-sm font-semibold hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-800 text-slate-600 dark:text-slate-300 cursor-pointer">Hủy</button>
+        <button onClick={handleSave} disabled={isSaving} className="flex-1 bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-4 py-3 rounded-lg text-base font-semibold hover:bg-slate-800 dark:hover:bg-slate-100 active:scale-95 transition-all cursor-pointer disabled:opacity-60">
+          {isSaving ? 'Đang lưu...' : 'Lưu bài'}
+        </button>
+        <button onClick={() => navigate('/')} disabled={isSaving} className="border border-slate-200 dark:border-slate-700 px-4 py-3 rounded-lg text-sm font-semibold hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-800 text-slate-600 dark:text-slate-300 cursor-pointer disabled:opacity-60">Hủy</button>
       </div>
 
       {/* Floating scroll-to-save button */}

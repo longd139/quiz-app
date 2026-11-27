@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { supabaseConfigError } from '../lib/supabase';
 import { IconEye, IconEyeOff, IconLock, IconBook } from '../components/Icons';
 import { APP_VERSION } from '../version';
 
@@ -81,8 +82,8 @@ export default function LoginPage() {
           </div>
 
           {!hasSupabase && (
-            <div className="mb-4 p-3 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 text-xs text-amber-800 dark:text-amber-200">
-              Hệ thống chưa cấu hình biến môi trường Supabase (`VITE_SUPABASE_URL` và `VITE_SUPABASE_PUBLISHABLE_KEY`).
+            <div role="alert" className="mb-4 p-3 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 text-xs text-amber-800 dark:text-amber-200">
+              {supabaseConfigError || 'Hệ thống chưa cấu hình biến môi trường Supabase (VITE_SUPABASE_URL và VITE_SUPABASE_PUBLISHABLE_KEY).'}
             </div>
           )}
 

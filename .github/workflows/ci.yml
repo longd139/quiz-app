@@ -20,21 +20,15 @@ jobs:
       - run: npm run lint
       - run: npm run test:unit
 
-      - name: Start local Supabase test stack
-        run: npx supabase start
-
-      - name: Setup local env & seed test database
-        run: npm run setup:local
-
       - name: Run database & RLS integration tests
         run: npm run test:integration
 
       - name: Build production bundle
         run: npm run build
         env:
-          VITE_APP_ENV: test
-          VITE_SUPABASE_URL: http://127.0.0.1:54321
-          VITE_SUPABASE_PUBLISHABLE_KEY: ci-placeholder-key
+          VITE_APP_ENV: production
+          VITE_SUPABASE_URL: https://ci-placeholder.supabase.co
+          VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_ci_placeholder_key
 
       - name: Install Playwright Chromium & run E2E
         run: |
@@ -48,7 +42,3 @@ jobs:
           name: playwright-report
           path: playwright-report/
           retention-days: 7
-
-      - name: Stop local Supabase stack
-        if: always()
-        run: npx supabase stop

@@ -96,4 +96,85 @@ test.describe('Quiz App V2.0 E2E Regression', () => {
     await page.goto('/data');
     await expect(page.getByText(/Dữ liệu học tập cá nhân/i)).toBeVisible({ timeout: 15_000 });
   });
+
+  test('BUG-15 & BUG-24: Semester grouping, breadcrumb, quiz practice submit & history persistence', async ({ page }) => {
+    await loginThroughUI(page, 'usera@quiz.local');
+    await expect(page).toHaveURL(/\/$/);
+
+    // Semester Kỳ 1 -> Subject card -> Quiz set
+    await expect(page.getByText('Kỳ 1')).toBeVisible({ timeout: 15_000 });
+    await page.getByText(/Kiểm thử phần mềm \(ISTQB\)/i).click();
+    await expect(page.getByText('Kho đề thi')).toBeVisible();
+    await expect(page.getByText(/Đề mẫu ISTQB Foundation/i)).toBeVisible();
+
+    // Start Practice
+    await page.getByRole('button', { name: /Luyện tập/i }).last().click();
+    await expect(page).toHaveURL(/\/practice-setup/);
+    const startBtn = page.getByRole('button', { name: /Bắt đầu luyện tập/i });
+    if (await startBtn.isDisabled()) {
+      await page.getByText(/Đề mẫu ISTQB Foundation/i).click();
+    }
+    await startBtn.click();
+    await expect(page).toHaveURL(/\/practice/);
+
+    // Answer Q1 and Q2 then submit
+    await page.locator('.opt-btn').first().click();
+    await page.getByRole('button', { name: /Sau/i }).click();
+    await page.locator('.opt-btn').first().click();
+    await page.getByRole('button', { name: /Nộp bài/i }).click();
+
+    await expect(page).toHaveURL(/\/results/, { timeout: 15_000 });
+    await page.goto('/history');
+    await expect(page.getByText(/Đề mẫu ISTQB Foundation/i).first()).toBeVisible({ timeout: 10_000 });
+  });
+
+  test('BUG-15 & BUG-16: Failed quiz save keeps user on Practice and succeeds on retry', async ({ page }) => {
+    await loginThroughUI(page, 'usera@quiz.local');
+    await expect(page).toHaveURL(/\/$/);
+    await page.getByText(/Kiểm thử phần mềm \(ISTQB\)/i).click();
+    await page.getByRole('button', { name: /Luyện tập/i }).last().click();
+    await expect(page).toHaveURL(/\/practice-setup/);
+    const startBtn = page.getByRole('button', { name: /Bắt đầu luyện tập/i });
+    if (await startBtn.isDisabled()) {
+      await page.getByText(/Đề mẫu ISTQB Foundation/i).click();
+    }
+    await startBtn.click();
+    await expect(page).toHaveURL(/\/practice/);
+
+    await page.locator('.opt-btn').first().click();
+    await page.getByRole('button', { name: /Sau/i }).click();
+    await page.locator('.opt-btn').first().click();
+
+    // Fail the first save RPC call
+    let failOnce = true;
+    await page.route('**/rest/v1/rpc/apply_learning_progress_event', async (route) => {
+      if (failOnce) {
+        failOnce = false;
+        await route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ message: 'Simulated DB failure' }) });
+        return;
+      }
+      await route.continue();
+    });
+
+    await page.getByRole('button', { name: /Nộp bài/i }).click();
+    await expect(page.getByRole('button', { name: /Thử lưu lại/i })).toBeVisible({ timeout: 10_000 });
+    await expect(page).toHaveURL(/\/practice/);
+
+    // Retry succeeds and navigates to /results
+    await page.getByRole('button', { name: /Thử lưu lại/i }).click();
+    await expect(page).toHaveURL(/\/results/, { timeout: 15_000 });
+  });
+
+  test('BUG-15: Dark mode toggle updates html.dark class', async ({ page }) => {
+    await loginThroughUI(page, 'usera@quiz.local');
+    await expect(page).toHaveURL(/\/$/);
+
+    const toggleBtn = page.getByRole('button', { name: /Chế độ tối|Chế độ sáng|Dark|Light/i }).first();
+    if (await toggleBtn.count()) {
+      const beforeDark = await page.evaluate(() => document.documentElement.classList.contains('dark'));
+      await toggleBtn.click();
+      const afterDark = await page.evaluate(() => document.documentElement.classList.contains('dark'));
+      expect(afterDark).not.toBe(beforeDark);
+    }
+  });
 });

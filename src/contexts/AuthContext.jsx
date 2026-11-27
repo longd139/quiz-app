@@ -161,8 +161,7 @@ export function AuthProvider({ children }) {
     isAdmin: Boolean(profile?.role === 'ADMIN' && profile?.status === 'ACTIVE' && !profile?.must_change_password),
     mustChangePassword: Boolean(profile?.must_change_password),
     needsPasswordChangeNotice: Boolean(
-      profile?.must_change_password ||
-      (session?.user?.user_metadata?.created_by_admin && session?.user?.user_metadata?.password_changed !== true)
+      profile?.must_change_password || profile?.password_change_recommended
     ),
     hasSupabase,
     signIn,

@@ -141,14 +141,12 @@ export function useQuizData(user, isAdmin = false) {
         ? computeVocabDeltas(prev.vocabStats, next.vocabStats)
         : [];
 
-      let activityDate = null;
-      let activityDelta = 0;
+      const activityEntries = [];
       if (next.activityLog !== prev.activityLog) {
         for (const [dateStr, val] of Object.entries(next.activityLog || {})) {
           const prevVal = prev.activityLog?.[dateStr] || 0;
           if (val > prevVal) {
-            activityDate = dateStr;
-            activityDelta += val - prevVal;
+            activityEntries.push({ date: dateStr, delta: val - prevVal });
           }
         }
       }
@@ -157,15 +155,26 @@ export function useQuizData(user, isAdmin = false) {
         ? Math.max(0, (next.mooskCount || 0) - (prev.mooskCount || 0))
         : 0;
 
-      if (questionDeltas.length > 0 || vocabDeltas.length > 0 || activityDelta > 0 || mooskDelta > 0) {
+      if (questionDeltas.length > 0 || vocabDeltas.length > 0 || activityEntries.length > 0 || mooskDelta > 0) {
+        const primaryAct = activityEntries[0] || { date: null, delta: 0 };
         await applyProgressDelta({
           operationId,
           questionDeltas,
           vocabDeltas,
-          activityDate,
-          activityDelta,
+          activityDate: primaryAct.date,
+          activityDelta: primaryAct.delta,
           mooskDelta,
         });
+        for (let i = 1; i < activityEntries.length; i++) {
+          await applyProgressDelta({
+            operationId: `${operationId}:act:${i}`,
+            questionDeltas: [],
+            vocabDeltas: [],
+            activityDate: activityEntries[i].date,
+            activityDelta: activityEntries[i].delta,
+            mooskDelta: 0,
+          });
+        }
       }
 
       // 3. Quiz history attempts
@@ -295,10 +304,10 @@ export function useQuizData(user, isAdmin = false) {
   });
 
   const update = useCallback(
-    async (newData) => {
+    async (newData, options = {}) => {
       if (!userId) return;
       const prev = queryClient.getQueryData(['centralized-quiz-data', userId]) || EMPTY_DATA;
-      const operationId = crypto.randomUUID();
+      const operationId = options?.operationId || crypto.randomUUID();
       return mutation.mutateAsync({ prev, next: newData, targetUserId: userId, operationId });
     },
     [userId, queryClient, mutation]

@@ -5,10 +5,10 @@
 Quiz App V2.0.0 đã hoàn tất **Review 02 Remediation** trên nhánh `feat/v2-auth-centralized-storage`, thiết lập hoàn chỉnh **Local Docker + Supabase CLI Development Environment** tách biệt khỏi Production, khắc phục toàn bộ **BUG-01 đến BUG-14**, và kiểm thử thực tế trên PostgreSQL/Auth/PostgREST local và trình duyệt Playwright (Desktop + Mobile).
 
 - **ESLint (`npm run lint`)**: **PASS** — `0 errors, 0 warnings` (`LINT_EXIT=0`).
-- **Unit Tests (`npm run test:unit`)**: **PASS** — `28/28` tests trên `9` suites (`UNIT_EXIT=0`).
-- **Integration Tests (`npm run test:integration`)**: **PASS** — `11/11` suites/cases chạy trực tiếp trên Supabase Auth + PostgreSQL + PostgREST local (`INT_EXIT=0`).
-- **Playwright E2E (`npm run test:e2e`)**: **PASS** — `12/12` tests (`desktop-chromium` + `mobile-chromium`, `E2E_EXIT=0`).
-- **Production Build (`npm run build`)**: **PASS** — `192 modules transformed`, sinh PWA `dist/sw.js`, `dist/manifest.webmanifest`, `dist/icon-192.png`, `dist/icon-512.png` (`BUILD_EXIT=0`).
+- **Unit Tests (`npm run test:unit`)**: **PASS** — `40/40` tests trên `12` suites (`UNIT_EXIT=0`).
+- **Integration Tests (`npm run test:integration`)**: **PASS** — `14/14` suites/cases chạy trên stack `quiz-app-test` độc lập (`127.0.0.1:54331`, `INT_EXIT=0`).
+- **Playwright E2E (`npm run test:e2e`)**: **PASS** — `18/18` tests (`desktop-chromium` + `mobile-chromium`, `127.0.0.1:5174`, `E2E_EXIT=0`).
+- **Production Build (`npm run build`)**: **PASS** — `193 modules transformed`, sinh PWA `dist/sw.js`, `dist/manifest.webmanifest` (`BUILD_EXIT=0`).
 
 ## 2. Git & Local Environment Architecture
 
@@ -55,12 +55,18 @@ Quiz App V2.0.0 đã hoàn tất **Review 02 Remediation** trên nhánh `feat/v2
 | Gate | Command | Exit Code | Result |
 |---|---|---|---|
 | ESLint | `npm run lint` | `0` | **PASS** (`0 errors, 0 warnings`) |
-| Unit Tests | `npm run test:unit` | `0` | **PASS** (`28/28`, `9` suites) |
-| Integration Tests | `npm run test:integration` | `0` | **PASS** (`11/11`, `1` suite trên Supabase local) |
-| E2E Tests | `npm run test:e2e` | `0` | **PASS** (`12/12` Desktop + Mobile) |
-| Production Build | `npm run build` | `0` | **PASS** (`192` modules + PWA) |
+| Unit Tests | `npm run test:unit` | `0` | **PASS** (`40/40`, `12` suites) |
+| Integration Tests | `npm run test:integration` | `0` | **PASS** (`14/14` trên `quiz-app-test` `54331`) |
+| E2E Tests | `npm run test:e2e` | `0` | **PASS** (`18/18` Desktop + Mobile trên `5174`) |
+| Production Build | `npm run build` | `0` | **PASS** (`193` modules + PWA) |
 
-## 6. Remaining External Production Blockers
+## 6. Final Hardening Summary (ENV-01..03, BUG-15..24, Lightweight Docker)
+
+- **Lightweight Docker Local**: `npm run db:start` loại bỏ `logflare`, `vector`, `realtime`, `imgproxy`, `supavisor`; giảm từ 12 containers (~1,648 MiB, `vector` crash-loop) xuống 9 containers khỏe mạnh (~830 MiB).
+- **ENV-01 / ENV-02 / ENV-03**: Fail-closed `src/lib/supabase.js` + `src/lib/supabaseEnv.js`, `scripts/lib/environment-guard.mjs` kiểm tra `project_id` + host + port + Vite precedence, `setup-local.mjs` không ghi đè dữ liệu hiện có, `quiz-app-test` (`54331`/`54332`) tách biệt hoàn toàn khỏi `quiz-app-local` (`54321`/`54322`).
+- **BUG-15..24**: Xóa `supabase/functions/cloudinary-sign`, `await update(...)` + stable `operationId` trong `Practice.jsx`/`Editor.jsx`/`Dashboard.jsx`/`useQuizData.js`, `password_change_recommended` DB-backed trên `profiles`, bảo toàn & chuẩn hóa `term` trong `restore_backup_atomic` + `Dashboard.jsx`.
+
+## 7. Remaining External Production Blockers
 
 1. **Cloudinary Credential Rotation**: Chủ dự án cần revoke/rotate `CLOUDINARY_API_SECRET` cũ từng xuất hiện trong lịch sử Git v1.x và cấu hình secret mới trên Supabase Edge Functions (`media-upload`). *(Không sử dụng credential cũ để kiểm thử).*
 2. **Supabase Production Public Signup**: Chủ dự án cần tắt **Allow new users to sign up** trong Supabase Production Dashboard → Authentication → Providers → Email.

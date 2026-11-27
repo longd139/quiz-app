@@ -8,6 +8,10 @@ dist/
 
 # Supabase CLI cache (riêng từng máy)
 supabase/.temp/
+supabase-test/supabase/.temp/
+supabase-test/supabase/.branches/
+supabase-test/supabase/migrations/
+supabase-test/supabase/functions/
 
 # Playwright artifacts
 playwright-report/
