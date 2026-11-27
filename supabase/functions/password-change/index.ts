@@ -86,9 +86,13 @@ Deno.serve(async (req: Request) => {
     return json({ error: 'Mật khẩu hiện tại không chính xác.' }, 400);
   }
 
-  // Update password via Admin API and clear must_change_password atomically
+  // Update password via Admin API and clear must_change_password + password_changed flag
   const { error: updatePwErr } = await sbAdmin.auth.admin.updateUserById(userId, {
     password: newPassword,
+    user_metadata: {
+      ...(userRes.user.user_metadata || {}),
+      password_changed: true,
+    },
   });
   if (updatePwErr) {
     return json({ error: updatePwErr.message || 'Không thể cập nhật mật khẩu mới.' }, 400);

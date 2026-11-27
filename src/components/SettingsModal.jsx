@@ -27,7 +27,7 @@ export default function SettingsModal({
 }) {
   const navigate = useNavigate();
   const { data, update, syncStatus, showToast } = useQuiz();
-  const { profile, user, isAdmin, updateProfile, signOut } = useAuth();
+  const { profile, user, isAdmin, needsPasswordChangeNotice, updateProfile, signOut } = useAuth();
 
   const [activeTab, setActiveTab] = useState(initialTab);
   const [fullNameInput, setFullNameInput] = useState(profile?.full_name || '');
@@ -183,10 +183,15 @@ export default function SettingsModal({
                 <button
                   type="button"
                   onClick={() => { onClose(); navigate('/change-password'); }}
-                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 font-semibold hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer"
+                  className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border font-semibold cursor-pointer ${
+                    needsPasswordChangeNotice
+                      ? 'border-rose-200 dark:border-rose-900 bg-rose-50/70 dark:bg-rose-950/30 text-rose-600 dark:text-rose-400'
+                      : 'border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800'
+                  }`}
                 >
                   <IconLock className="w-3.5 h-3.5" />
                   <span>Đổi mật khẩu</span>
+                  {needsPasswordChangeNotice && <span className="w-2 h-2 rounded-full bg-rose-500" />}
                 </button>
 
                 {isAdmin && (

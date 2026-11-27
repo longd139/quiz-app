@@ -37,12 +37,25 @@ async function ensureUser(sb, acct) {
       email: acct.email,
       password: LOCAL_TEST_PASSWORD,
       email_confirm: true,
-      user_metadata: { full_name: acct.full_name, must_change_password: acct.must_change_password },
+      user_metadata: {
+        full_name: acct.full_name,
+        must_change_password: acct.must_change_password,
+        created_by_admin: true,
+        password_changed: false,
+      },
     });
     if (error) throw new Error(`Create ${acct.email} failed: ${error.message}`);
     userId = created.user.id;
   } else {
-    await sb.auth.admin.updateUserById(userId, { password: LOCAL_TEST_PASSWORD });
+    await sb.auth.admin.updateUserById(userId, {
+      password: LOCAL_TEST_PASSWORD,
+      user_metadata: {
+        full_name: acct.full_name,
+        must_change_password: acct.must_change_password,
+        created_by_admin: true,
+        password_changed: false,
+      },
+    });
   }
 
   const { error: profErr } = await sb.from('profiles').upsert({

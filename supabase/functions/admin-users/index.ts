@@ -106,7 +106,12 @@ Deno.serve(async (req: Request) => {
         email,
         password,
         email_confirm: true,
-        user_metadata: { full_name: fullName, must_change_password: mustChangePassword },
+        user_metadata: {
+          full_name: fullName,
+          must_change_password: mustChangePassword,
+          created_by_admin: true,
+          password_changed: false,
+        },
       });
 
       if (createErr || !created?.user) {
@@ -179,6 +184,10 @@ Deno.serve(async (req: Request) => {
 
       const { error: resetErr } = await sbAdmin.auth.admin.updateUserById(targetUserId, {
         password: newPassword,
+        user_metadata: {
+          created_by_admin: true,
+          password_changed: false,
+        },
       });
       if (resetErr) return json({ error: resetErr.message }, 400);
 
